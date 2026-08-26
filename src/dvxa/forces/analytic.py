@@ -98,8 +98,12 @@ def compute_forces(result, config) -> np.ndarray:
         positions = molecule.positions
         pts = grid.local_points
         wts = grid.local_weights
-        chi = result.chi
         alpha = config.scf.alpha
+        # The gradient block D is (n_points, n_basis, 3) -- three times the size
+        # of chi -- so the force evaluation always builds chi explicitly here
+        # rather than reusing a cached one, and is the memory high-water mark of
+        # a run.  See docs/hpc.md.
+        chi = result.chi if result.chi is not None else chi_matrix(basis, positions, pts)
 
         # -- effective potential on the grid, from the converged density ----
         if result.unrestricted:

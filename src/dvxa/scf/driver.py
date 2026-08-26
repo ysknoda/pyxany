@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..basis.evaluate import chi_matrix
 from ..constants import HARTREE_TO_EV
 from ..grid import build_molecular_grid
 from ..integrals import xc
@@ -21,6 +20,7 @@ from ..integrals.overlap import build_overlap_kinetic, condition_number
 from ..parallel import allreduce_array, allreduce_scalar, bcast_array, is_root, mpi_print
 from ..timing import timer
 from .diis import EDIIS, PulayDIIS
+from .grid_terms import GridTerms, choose_strategy
 from .guess import atomic_superposition, rescale_to_electron_count, spin_split
 from .linalg import energy_weighted_density, solve_generalised
 from .occupations import (
@@ -46,7 +46,10 @@ class SCFResult:
     T: np.ndarray
     V_nuc: np.ndarray
     grid: object
+    #: Cached chi matrix, or None when the run was chunked.
     chi: np.ndarray
+    #: Grid-term evaluator, valid either way.
+    terms: object
     molecule: object
     basis: object
     unrestricted: bool = False
@@ -78,10 +81,6 @@ class SCFResult:
     def gap_ev(self) -> float:
         h, l = self.homo_lumo()
         return (l - h) * HARTREE_TO_EV
-
-
-def _density_on_points(chi: np.ndarray, P: np.ndarray) -> np.ndarray:
-    return np.einsum("km,mn,kn->k", chi, P, chi, optimize=True)
 
 
 def _total_energy(P, T, V_nuc_mat, rho, V_H, weights, alpha, E_nn,
@@ -138,17 +137,21 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
 
     grid = build_molecular_grid(molecule, grid_cfg.n_r, grid_cfg.n_a,
                                 partition=grid_cfg.partition)
-    with timer("scf.chi"):
-        chi = chi_matrix(basis, molecule.positions, grid.local_points)
+    chunk = choose_strategy(grid, n_basis, grid_cfg.chunk_size,
+                            grid_cfg.memory_budget_mb)
+    terms = GridTerms(basis, molecule, grid, chunk_size=chunk)
+    chi = terms.chi
     weights = grid.local_weights
     if verbose:
+        how = ("cached" if terms.cached
+               else f"chunked, {chunk:,} points at a time")
         mpi_print(f"  DV grid            : {len(grid)} points "
                   f"({grid.n_r}r x {grid.n_a}th x {2 * grid.n_a}ph per atom), "
-                  f"chi {grid.chi_memory_mb(n_basis):.1f} MB/rank")
+                  f"chi {grid.chi_memory_mb(n_basis, chunk):.1f} MB/rank ({how})")
 
     with timer("scf.v_nuc"):
         v_nuc = nuclear_potential(grid.local_points, molecule.positions, molecule.charges)
-        V_nuc = allreduce_array((chi * (weights * v_nuc)[:, None]).T @ chi)
+        V_nuc = terms.potential_matrix(v_nuc)
     E_nn = molecule.nuclear_repulsion()
 
     # ---- initial density --------------------------------------------------
@@ -181,30 +184,33 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
             # --- density on the grid, from the current P -------------------
             with timer("scf.density"):
                 if unrestricted:
-                    rho_a = _density_on_points(chi, P_a)
-                    rho_b = _density_on_points(chi, P_b)
+                    rho_a = terms.density(P_a)
+                    rho_b = terms.density(P_b)
                     rho = rho_a + rho_b
                 else:
                     rho_a = rho_b = None
-                    rho = _density_on_points(chi, P)
+                    rho = terms.density(P)
 
             # --- Hartree potential (needs the density on the whole grid) ---
             with timer("scf.hartree"):
                 rho_full = _gather_full(grid, rho)
                 V_H = hartree_potential(grid, rho_full, molecule.positions,
                                         l_max=l_max, eval_points=grid.local_points)
-                J = allreduce_array((chi * (weights * V_H)[:, None]).T @ chi)
 
-            # --- exchange-correlation --------------------------------------
+            # --- Coulomb and exchange-correlation, in one pass over the grid --
             with timer("scf.xc"):
+                wanted = {"J": V_H}
                 if unrestricted:
-                    Vxc_a = allreduce_array(
-                        (chi * (weights * xc.potential_spin(rho_a, alpha))[:, None]).T @ chi)
-                    Vxc_b = allreduce_array(
-                        (chi * (weights * xc.potential_spin(rho_b, alpha))[:, None]).T @ chi)
+                    wanted["Vxc_a"] = xc.potential_spin(rho_a, alpha)
+                    wanted["Vxc_b"] = xc.potential_spin(rho_b, alpha)
                 else:
-                    Vxc = allreduce_array(
-                        (chi * (weights * xc.potential(rho, alpha))[:, None]).T @ chi)
+                    wanted["Vxc"] = xc.potential(rho, alpha)
+                built = terms.potential_matrices(wanted)
+                J = built["J"]
+                if unrestricted:
+                    Vxc_a, Vxc_b = built["Vxc_a"], built["Vxc_b"]
+                else:
+                    Vxc = built["Vxc"]
 
             energies = _total_energy(P, T, V_nuc, rho, V_H, weights, alpha, E_nn,
                                      rho_a, rho_b)
@@ -253,12 +259,12 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
 
     # ---- final quantities from the converged density ----------------------
     if unrestricted:
-        rho_a = _density_on_points(chi, P_a)
-        rho_b = _density_on_points(chi, P_b)
+        rho_a = terms.density(P_a)
+        rho_b = terms.density(P_b)
         rho = rho_a + rho_b
     else:
         rho_a = rho_b = None
-        rho = _density_on_points(chi, P)
+        rho = terms.density(P)
     rho_full = _gather_full(grid, rho)
     V_H = hartree_potential(grid, rho_full, molecule.positions, l_max=l_max,
                             eval_points=grid.local_points)
@@ -285,7 +291,7 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
     return SCFResult(
         converged=converged, n_iterations=len(history), energies=energies,
         eps=eps, C=C, P=P, occupations=occ, S=S, T=T, V_nuc=V_nuc,
-        grid=grid, chi=chi, molecule=molecule, basis=basis,
+        grid=grid, chi=chi, terms=terms, molecule=molecule, basis=basis,
         unrestricted=unrestricted, n_alpha=n_alpha, n_beta=n_beta,
         eps_a=eps_a, eps_b=eps_b, C_a=C_a, C_b=C_b, P_a=P_a, P_b=P_b,
         occ_a=occ_a, occ_b=occ_b, history=history,

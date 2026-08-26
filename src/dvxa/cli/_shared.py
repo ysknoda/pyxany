@@ -89,13 +89,28 @@ def resource_estimate(cfg, molecule, basis) -> str:
         f"  (l_max = {cfg.grid.poisson_l_max})",
         f"  nb x nb matrices     {nb * nb * 8 / 1024**2:.1f} MB each",
     ]
+    from ..grid import build_molecular_grid
+    from ..scf.grid_terms import choose_strategy
+
+    grid = build_molecular_grid(molecule, cfg.grid.n_r, cfg.grid.n_a,
+                                partition=cfg.grid.partition)
+    chunk = choose_strategy(grid, nb, cfg.grid.chunk_size, cfg.grid.memory_budget_mb)
     budget = cfg.grid.memory_budget_mb
-    if chi_mb > budget / 4:
-        rows = int(max(1, (budget / 4) * 1024**2 / (nb * 8)))
-        lines.append(f"  -> chi exceeds the memory budget ({budget:.0f} MB); it will be "
-                     f"processed in chunks of {rows:,} points")
+    if chunk is None:
+        lines.append(f"  -> chi ({grid.chi_memory_mb(nb):.1f} MB/rank) fits the "
+                     f"{budget:.0f} MB budget and will be cached")
     else:
-        lines.append(f"  -> chi fits the memory budget ({budget:.0f} MB) and will be cached")
+        lines.append(f"  -> chi exceeds the {budget:.0f} MB budget; the grid will be "
+                     f"walked in chunks of {chunk:,} points "
+                     f"({grid.chi_memory_mb(nb, chunk):.1f} MB/rank), at the cost of "
+                     f"one extra chi evaluation per SCF iteration")
+        lines.append("     (the force evaluation still builds chi and its gradient "
+                     "explicitly and is the memory high-water mark)")
+    from ..parallel import SIZE
+
+    if SIZE > 1:
+        lines.append(f"  -> running on {SIZE} ranks: the grid is split, so each rank "
+                     f"holds about 1/{SIZE} of the points above")
     return "\n".join(lines)
 
 

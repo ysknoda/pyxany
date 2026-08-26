@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import numpy as np
-
 from ..io.report import format_results
 from ..io.results import result_dict, write_json, write_npz, write_text
 from ..io.xyz import write_xyz
@@ -45,8 +43,7 @@ def execute(args) -> int:
 
         dipole = None
         if cfg.properties.dipole:
-            rho = np.einsum("km,mn,kn->k", result.chi, result.P, result.chi, optimize=True)
-            dipole = dipole_moment(molecule, result.grid, rho)
+            dipole = dipole_moment(molecule, result.grid, result.terms.density(result.P))
 
         text = format_results(result, cfg, forces=forces, dipole=dipole)
         if verbose:

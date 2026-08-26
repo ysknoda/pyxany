@@ -63,9 +63,16 @@ would need, and introduces no softening parameter.
 
 Two things that matter at scale:
 
-- **`memory_budget_mb`** decides whether the chi matrix is cached or processed
-  in chunks. Caching is faster; chunking is what makes a large cluster fit at
-  all. `--dry-run` tells you which will happen.
+- **`memory_budget_mb`** decides whether the chi matrix is cached or the grid is
+  walked in chunks. Caching is faster; chunking bounds memory at the cost of one
+  extra chi evaluation per SCF iteration, and gives numerically identical
+  results (`tests/test_chunking.py` asserts agreement to 1e-9 on energies and
+  forces). `--dry-run` reports which will happen and at what size.
+
+  The **force evaluation** builds chi and its gradient explicitly — the gradient
+  block is three times the size of chi — so it, not the SCF, is a run's memory
+  high-water mark. Set `forces.enabled: false` for a single-point energy on a
+  system where that is tight.
 - **`screening_tol`** skips atom pairs whose basis functions cannot overlap.
   For an extended structure this turns the `O(N²)` pair loop over `S` and `T`
   into a linear one; for a compact cluster where every atom is close to every
