@@ -278,6 +278,9 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
 
     if verbose:
         _print_footer(converged, len(history), energies, n_electrons)
+        if not converged:
+            for line in diagnose_non_convergence(history, eps, occ, scf_cfg):
+                mpi_print(f"  {line}")
 
     return SCFResult(
         converged=converged, n_iterations=len(history), energies=energies,
@@ -376,6 +379,66 @@ def _print_row(it, E, dE, err, d_rms, extra, method):
     tail = "  ".join(f"{v:>10.4f}" for v in extra)
     mpi_print(f"  {it:>3}  {E:>17.9f}  {dE:>10.2e}  {err:>10.2e}  "
               f"{d_rms:>10.2e}  {tail:>22}  {method}")
+
+
+def diagnose_non_convergence(history, eps, occ, scf_cfg) -> list[str]:
+    """Explain *why* an SCF stalled, with the setting that usually fixes it.
+
+    Three distinguishable situations, checked in order:
+
+    1. the energy is still moving -- it simply ran out of iterations;
+    2. the energy has settled but the density has not, and the frontier
+       orbitals are nearly degenerate -- occupation swaps between them from
+       one iteration to the next, which is what Fermi smearing is for;
+    3. the energy has settled but the density has not, with a healthy gap --
+       the mixing is too aggressive.
+
+    Blaming degeneracy in case 1 would be wrong, so the energy-stability test
+    comes first.
+    """
+    lines: list[str] = ["", ""]
+    recent = np.array([h["E"] for h in history[-20:]])
+    spread = float(recent.std()) if len(recent) > 2 else float("inf")
+    drift = float(abs(recent[-1] - recent[0])) if len(recent) > 2 else float("inf")
+    energy_settled = spread < 1000.0 * scf_cfg.e_tol and drift < 1e4 * scf_cfg.e_tol
+
+    gap = float("nan")
+    if eps is not None and occ is not None:
+        finite = np.isfinite(eps)
+        filled = eps[finite & (occ > 1e-8)]
+        empty = eps[finite & (occ <= 1e-8)]
+        if len(filled) and len(empty):
+            gap = float(empty.min() - filled.max())
+
+    if not energy_settled:
+        lines += [
+            f"  [diagnosis] the energy is still moving ({spread:.1e} Ha spread over the",
+            f"  last {len(recent)} iterations). It ran out of iterations rather than",
+            "  stalling; raise scf.max_iter, or lower scf.mix_ediis if the early",
+            "  iterations are swinging.",
+        ]
+    elif np.isfinite(gap) and gap < 0.02 and scf_cfg.smearing <= 0.0:
+        width = float(np.clip(2.0 * max(gap, 1e-3), 0.002, 0.02))
+        lines += [
+            f"  [diagnosis] the energy is stable to {spread:.1e} Ha but the density is",
+            f"  not settling, and the HOMO-LUMO gap is only "
+            f"{gap * HARTREE_TO_EV:.4f} eV ({gap:.2e} Ha).",
+            "  Near-degenerate frontier orbitals let the occupation swap between",
+            "  iterations. Fermi smearing removes the ambiguity:",
+            "",
+            f"      dvxa run <input.yaml> --set scf.smearing={width:g}",
+            "",
+            "  Report E_free rather than E_total when smearing is on, and check that",
+            "  the result is insensitive to the width you chose.",
+        ]
+    else:
+        gap_note = (f" (gap {gap * HARTREE_TO_EV:.3f} eV)" if np.isfinite(gap) else "")
+        lines += [
+            f"  [diagnosis] the energy is stable to {spread:.1e} Ha but the density is",
+            f"  not settling{gap_note}. Try a smaller scf.mix_diis (currently",
+            f"  {scf_cfg.mix_diis:g}), or scf.smearing > 0 if the frontier is crowded.",
+        ]
+    return lines
 
 
 def _print_footer(converged, n_it, energies, n_electrons):

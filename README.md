@@ -123,6 +123,27 @@ estimate and is then relaxed with the code's own forces.
 Setting `--scheme hydrogen` uses ordinary hydrogen everywhere instead, which is
 the comparison the reference paper is about.
 
+## When the SCF will not converge
+
+A cluster with a crowded frontier often has two orbitals a fraction of a
+millihartree apart. The occupation then swaps between them from iteration to
+iteration and the density never settles, even though the energy is already
+stable to five digits. `dvxa` recognises this and says so:
+
+```
+  [NOT CONVERGED] after 150 iterations
+  [diagnosis] the energy is stable to 3.2e-04 Ha but the density is
+  not settling, and the HOMO-LUMO gap is only 0.0099 eV (3.63e-04 Ha).
+  Near-degenerate frontier orbitals let the occupation swap between
+  iterations. Fermi smearing removes the ambiguity:
+
+      dvxa run <input.yaml> --set scf.smearing=0.002
+```
+
+On the Cd₄Se₄H₁₂ example that takes it from 150 iterations without converging to
+17 iterations converged, at a *lower* total energy. Report `E_free` rather than
+`E_total` when smearing is on, and check the result against a second width.
+
 ## Accuracy
 
 Every physical ingredient is validated against an independent reference rather

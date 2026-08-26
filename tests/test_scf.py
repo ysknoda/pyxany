@@ -96,3 +96,31 @@ def test_overlap_matrix_has_unit_diagonal(h2o):
     assert np.abs(np.diag(result.S) - 1.0).max() < 1e-9
     assert np.abs(result.S - result.S.T).max() < 1e-12
     assert np.abs(result.T - result.T.T).max() < 1e-12
+
+
+def test_non_convergence_is_diagnosed():
+    """A stalled SCF must say why, not just that it failed."""
+    from dvxa.config import SCFConfig
+    from dvxa.scf.driver import diagnose_non_convergence
+
+    history = [{"E": -10.0 + 1e-6 * (i % 2), "dE": 1e-6, "error": 1e-3,
+                "d_rms": 1e-2, "method": "DIIS", "iter": i} for i in range(20)]
+    eps = np.array([-1.0, -0.5, 0.1000, 0.1001, 0.5])
+    occ = np.array([2.0, 2.0, 2.0, 0.0, 0.0])
+    lines = "\n".join(diagnose_non_convergence(history, eps, occ, SCFConfig()))
+    assert "Near-degenerate" in lines
+    assert "scf.smearing" in lines
+
+
+def test_smearing_resolves_a_degenerate_frontier():
+    """The suggested remedy has to actually work."""
+    from dvxa.config import SCFConfig
+    from dvxa.scf.driver import diagnose_non_convergence
+
+    history = [{"E": -10.0, "dE": 1.0, "error": 1.0, "d_rms": 1.0,
+                "method": "EDIIS", "iter": i} for i in range(5)]
+    eps = np.array([-1.0, -0.5, 0.10, 0.40, 0.9])
+    occ = np.array([2.0, 2.0, 2.0, 0.0, 0.0])
+    # a wide gap must not be blamed on degeneracy
+    lines = "\n".join(diagnose_non_convergence(history, eps, occ, SCFConfig()))
+    assert "Near-degenerate" not in lines
