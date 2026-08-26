@@ -1,0 +1,123 @@
+"""XYZ and YAML input handling, including the strict-validation behaviour."""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from dvxa.config import Config, ConfigError
+from dvxa.io.xyz import XYZError, append_frame, n_frames, read_xyz, write_xyz
+from dvxa.io.yaml_input import load_config, load_molecule
+
+CO_XYZ = """2
+CO molecule
+C   0.000000   0.000000   0.000000
+O   0.000000   0.000000   1.128323
+"""
+
+
+def write(tmp_path, name, text):
+    p = tmp_path / name
+    p.write_text(text)
+    return p
+
+
+def test_xyz_round_trip(tmp_path):
+    src = write(tmp_path, "co.xyz", CO_XYZ)
+    mol = read_xyz(src)
+    out = tmp_path / "out.xyz"
+    write_xyz(out, mol, "round trip")
+    again = read_xyz(out)
+    assert mol.symbols == again.symbols
+    assert np.abs(mol.positions - again.positions).max() < 1e-9
+
+
+def test_bohr_units_are_honoured(tmp_path):
+    src = write(tmp_path, "co.xyz", CO_XYZ)
+    ang = read_xyz(src, units="angstrom")
+    bohr = read_xyz(src, units="bohr")
+    assert np.abs(bohr.positions).max() < np.abs(ang.positions).max()
+
+
+def test_unknown_species_is_rejected(tmp_path):
+    src = write(tmp_path, "bad.xyz", "2\nbad\nXx 0 0 0\nO 0 0 1\n")
+    with pytest.raises(XYZError, match="neither a supported element"):
+        read_xyz(src)
+
+
+def test_declared_pseudo_species_is_accepted(tmp_path):
+    src = write(tmp_path, "ps.xyz", "2\npseudo\nCd 0 0 0\nHCd 0 0 1.7\n")
+    mol = read_xyz(src, species={"HCd": {"alpha": 1.5}})
+    assert mol[1].is_pseudo
+    assert mol[1].Z == pytest.approx(1.5)
+    assert mol.n_electrons == pytest.approx(49.5)
+
+
+def test_pseudo_species_round_trips(tmp_path):
+    src = write(tmp_path, "ps.xyz", "2\npseudo\nCd 0 0 0\nHCd 0 0 1.7\n")
+    mol = read_xyz(src, species={"HCd": {"alpha": 1.5}})
+    out = tmp_path / "again.xyz"
+    write_xyz(out, mol)
+    again = read_xyz(out, species={"HCd": {"alpha": 1.5}})
+    assert again.symbols == ["Cd", "HCd"]
+    assert again[1].Z == pytest.approx(1.5)
+
+
+def test_malformed_files_give_useful_errors(tmp_path):
+    for text, pattern in (("two\nx\nC 0 0 0\n", "atom count"),
+                          ("2\nc\nC 0 0\nO 0 0 1\n", "symbol x y z"),
+                          ("2\nc\nC a b c\nO 0 0 1\n", "not numbers")):
+        with pytest.raises(XYZError, match=pattern):
+            read_xyz(write(tmp_path, "x.xyz", text))
+
+
+def test_trajectory_frames(tmp_path):
+    src = write(tmp_path, "traj.xyz", CO_XYZ)
+    mol = read_xyz(src)
+    append_frame(src, mol, "frame 2")
+    append_frame(src, mol, "frame 3")
+    assert n_frames(src) == 3
+    assert read_xyz(src, frame=2).symbols == ["C", "O"]
+
+
+def test_yaml_resolves_the_structure_path_relatively(tmp_path):
+    write(tmp_path, "co.xyz", CO_XYZ)
+    write(tmp_path, "co.yaml",
+          "molecule:\n  name: co\n  structure: co.xyz\nbasis:\n  set: sz\n")
+    cfg = load_config(tmp_path / "co.yaml")
+    assert cfg.structure_path().exists()
+    assert len(load_molecule(cfg)) == 2
+
+
+def test_unknown_keys_are_errors_not_silent_defaults():
+    with pytest.raises(ConfigError, match="unknown key"):
+        Config.from_dict({"molecule": {"structure": "x.xyz"}, "scf": {"alfa": 0.7}})
+    with pytest.raises(ConfigError, match="unknown top-level section"):
+        Config.from_dict({"molecul": {}})
+
+
+def test_out_of_range_values_are_rejected():
+    for section, values, pattern in (
+        ("scf", {"alpha": 5.0}, "alpha"),
+        ("grid", {"n_r": 2}, "n_r"),
+        ("forces", {"method": "magic"}, "method"),
+        ("grid", {"partition": "none"}, "overcounts"),
+    ):
+        with pytest.raises(ConfigError, match=pattern):
+            Config.from_dict({"molecule": {"structure": "x.xyz"}, section: values})
+
+
+def test_missing_structure_is_reported():
+    with pytest.raises(ConfigError, match="structure"):
+        Config.from_dict({"molecule": {"name": "x"}})
+
+
+def test_dotted_overrides():
+    cfg = Config.from_dict({"molecule": {"structure": "x.xyz"}})
+    cfg.apply_overrides({"scf.alpha": "0.75", "grid.n_r": "40",
+                         "forces.enabled": "false"})
+    assert cfg.scf.alpha == 0.75
+    assert cfg.grid.n_r == 40
+    assert cfg.forces.enabled is False
+    with pytest.raises(ConfigError, match="has no key"):
+        cfg.apply_overrides({"scf.nonsense": "1"})

@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dvxa"
+version = "0.1.0"
+description = "DV-Xalpha (Discrete Variational Xalpha) all-electron molecular orbital code"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "Yusuke Noda" }]
+keywords = ["DV-Xalpha", "quantum chemistry", "electronic structure",
+            "density functional theory", "semiconductor clusters"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.11",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+fast = ["numba>=0.59"]
+mpi  = ["mpi4py>=3.1"]
+plot = ["matplotlib>=3.7"]
+all  = ["dvxa[fast,mpi,plot]"]
+dev  = ["pytest>=8", "pytest-cov", "ruff"]
+
+[project.scripts]
+dvxa = "dvxa.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yusuke/dvxa"
+Issues = "https://github.com/yusuke/dvxa/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dvxa"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/dvxa/data/tables" = "dvxa/data/tables"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: long-running tests (deselect with '-m \"not slow\"')",
+    "mpi: requires running under mpirun with >1 rank",
+]
+filterwarnings = ["error::RuntimeWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "NPY"]
+ignore = ["E741"]  # ambiguous variable name 'l' -- standard for angular momentum

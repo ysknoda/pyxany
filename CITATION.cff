@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+title: "dvxa: all-electron DV-Xalpha molecular orbital calculations"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: Noda
+    given-names: Yusuke
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/yusuke/dvxa"
+keywords:
+  - DV-Xalpha
+  - electronic structure
+  - density functional theory
+  - semiconductor clusters
+  - pseudo-hydrogen passivation
+references:
+  - type: article
+    authors:
+      - family-names: Ellis
+        given-names: D. E.
+      - family-names: Painter
+        given-names: G. S.
+    title: "Discrete variational method for the energy-band problem with general crystal potentials"
+    journal: "Physical Review B"
+    volume: 2
+    start: 2887
+    year: 1970
+  - type: article
+    authors:
+      - family-names: Becke
+        given-names: A. D.
+    title: "A multicenter numerical integration scheme for polyatomic molecules"
+    journal: "The Journal of Chemical Physics"
+    volume: 88
+    start: 2547
+    year: 1988
+  - type: article
+    authors:
+      - family-names: Deng
+        given-names: H.-X.
+      - family-names: Li
+        given-names: S.-S.
+      - family-names: Li
+        given-names: J.
+      - family-names: Wei
+        given-names: S.-H.
+    title: "Effect of hydrogen passivation on the electronic structure of ionic semiconductor nanostructures"
+    journal: "Physical Review B"
+    volume: 85
+    start: 195328
+    year: 2012

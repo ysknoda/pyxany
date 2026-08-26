@@ -1,0 +1,45 @@
+# group IV: the counting rule gives alpha = 1, i.e. ordinary hydrogen
+# Relax only the terminators with:  dvxa opt si5h12.yaml --freeze-core
+molecule:
+  name: si5h12
+  structure: si5h12.xyz
+  charge: 0
+  mult: 1
+  units: angstrom
+basis:
+  set: dz
+grid:
+  n_r: 30
+  n_a: 12
+  poisson_l_max: 6
+scf:
+  max_iter: 150
+  e_tol: 1.0e-06
+  d_tol: 1.0e-05
+  alpha: 0.7
+forces:
+  enabled: true
+  method: analytic
+properties:
+  population: true
+  dipole: true
+output:
+  dir: ./results
+  prefix: si5h12
+  figure: true
+  json: true
+passivation:
+  scheme: pseudo_hydrogen
+  species:
+    HSi:
+      passivates: Si
+      role: cation
+      Z_val: 4
+      coordination: 4
+      alpha: 1.0
+  basis: derived
+optimise:
+  enabled: false
+  freeze: core
+  f_max: 0.001
+  max_steps: 60
