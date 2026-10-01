@@ -73,114 +73,78 @@ def _angles(vectors: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return theta, phi
 
 
-# Below this radius the only physically meaningful multipole of a regular
-# density is the spherical one: rho_lm(r) -> c_lm r^l as r -> 0, so every l >= 1
-# component is already vanishing there and what the angular projection actually
-# returns is quadrature noise.  The outer integrand carries a factor r^(1-l),
-# which turns that noise into a spike -- measured at 1.0e9 for the O atom of
-# water at l = 6, against 4.8e1 for the rest of the range.  Imposing the exact
-# r^l behaviour below this radius removes the spike; the region it covers
-# contributes O(r^2) ~ 1e-4 to the outer integral, far below the quadrature
-# error of the rest.
-INNER_MULTIPOLE_RADIUS = 1e-2   # Bohr
-
-# The inner multipole integral is divided by r^(l+1).  Below the radius where
-# that factor falls to this value, the division amplifies double-precision
-# round-off past usefulness and the exact r^l small-radius form is used instead.
-_AMPLIFICATION_FLOOR = 1e-6
-
-
-def _cumulative_integral(r: np.ndarray, f: np.ndarray) -> np.ndarray:
-    """``int_{r[0]}^{r} f ds`` at every node, for every column of ``f``.
-
-    Integrates the cubic spline of the integrand, which is exact for a cubic and
-    converges as O(n_r^-4).  One CubicSpline call covers all (l, m) columns.
-    """
-    anti = CubicSpline(r, f, axis=0).antiderivative()
-    return anti(r) - anti(r[0])[None, :]
+# Gauss-Legendre order of each radial segment integral in the Poisson solve.
+_SEGMENT_ORDER = 8
 
 
 def _radial_poisson_multipoles(r: np.ndarray, rho_lm: np.ndarray,
                                l_of: np.ndarray) -> np.ndarray:
     """Radial multipole potentials for every ``(l, m)`` column at once.
 
-        V_l(r) = 4pi/(2l+1) [ r^-(l+1) int_0^r s^(l+2) rho_l(s) ds
-                            + r^l      int_r^inf s^(1-l) rho_l(s) ds ]
+        V_l(r) = 4pi/(2l+1) [ int_0^r (s/r)^(l+1) s rho_l(s) ds
+                            + int_r^inf (r/s)^l   s rho_l(s) ds ]
 
-    Both integrals are *cumulative*, which is why they cannot be formed from
-    partial sums of the Gauss-Legendre radial rule.  A Gauss rule is exact only
-    over its whole interval; its partial sums are not approximations to
-    ``int_0^{r_k}`` at all and converge as O(1/n_r).  Measured on a unit
-    Gaussian at n_r = 30 the partial sums were 0.107 electrons out of 1.0 wrong
-    while the full sum was exact to ten digits -- which is why this went
-    unnoticed.  Integrating the spline instead restores O(n_r^-4): the error in
-    V against the closed form ``erf(sqrt(a) r)/r`` falls from 5.1e-3 to 1.2e-4
-    at n_r = 30, and from 8.4e-5 to 2.4e-8 at n_r = 240.
+    This is the Green's-function form of the radial Poisson equation, written so
+    that every power that appears is a ratio <= 1. The familiar form
+    ``r^-(l+1) int_0^r s^(l+2) rho ds`` is the same quantity but divides one
+    tiny number by another near the nucleus; for l >= 8 on a heavy-atom grid
+    that amplified spline and projection noise without bound (measured on the
+    GaAs4 cluster with off-centre Gaussian test charges: E_H wrong by 1.6e3 Ha at
+    l = 8), and the previous remedy -- overwriting rho_l and V_l with r^l power
+    laws inside an l-dependent radius that reached 0.2-0.3 Bohr at l = 10 --
+    discarded real core structure (the GaAs4 SCF moved by 0.15 Ha between
+    l = 8 and l = 10).
 
-    Every ``l >= 1`` component also needs protection near the nucleus, where
-    both integrands carry a large negative power of r.  Physically
-    ``rho_l(r) -> c r^l`` and ``V_l(r) -> c' r^l`` as ``r -> 0`` -- exactly, for
-    any regular density -- so inside the radius where those powers stop being
-    numerically trustworthy the asymptotic form is imposed instead of the ratio
-    being evaluated.  Both radii follow from the same rule: the r at which the
-    amplifying power drops to ``_AMPLIFICATION_FLOOR``.
+    Here both integrals are accumulated node by node,
 
-    ``r`` must be sorted ascending.  ``rho_lm`` is (n_r, n_lm) and ``l_of`` is
-    the angular momentum of each column.
+        I_k = I_(k-1) (r_(k-1)/r_k)^(l+1) + int_(r_(k-1))^(r_k) (s/r_k)^(l+1) s rho ds
+        O_k = O_(k+1) (r_k/r_(k+1))^l     + int_(r_k)^(r_(k+1)) (r_k/s)^l   s rho ds
+
+    so noise at small s is *damped* by the ratio rather than amplified, and no
+    near-nucleus override is needed. Each segment integral applies an 8-point
+    Gauss-Legendre rule to the cubic spline of r^2 rho_l (not partial sums of the
+    global radial rule, which are not cumulative integrals at all). Below the
+    first node rho_l is continued as ``rho_l(r_0) (s/r_0)^l``, its exact
+    small-r form for a regular density.
+
+    ``r`` must be sorted ascending; ``rho_lm`` is (n_r, n_lm); ``l_of`` gives the
+    angular momentum of each column.
     """
-    safe = np.maximum(r, 1e-14)
-    rho = rho_lm.copy()
-    l_values = np.unique(l_of.astype(int))
+    r = np.asarray(r, dtype=float)
+    lf = np.asarray(l_of, dtype=float)[None, None, :]          # (1, 1, n_lm)
+    # Spline r^2 rho_l, not rho_l: it vanishes at the origin and spans far fewer
+    # decades through the core, so a cubic follows it between the sparse outer
+    # nodes (measured: E_H error 0.10 Ha -> 4e-3 Ha on the GaAs4 test charges).
+    spline = CubicSpline(r, r[:, None] ** 2 * rho_lm, axis=0)
+    t, wt = np.polynomial.legendre.leggauss(_SEGMENT_ORDER)
 
-    # -- 1. impose rho_l ~ r^l where r^(1-l) would amplify projection noise ---
-    # Measured without this: the l = 6 outer integrand for the O atom of water
-    # reached 1.0e9 at the innermost node against 4.8e1 over the rest of the
-    # range, and a cubic spline through that spike rings across the whole grid.
-    for l in l_values:
-        if l < 1:
-            continue
-        cut = INNER_MULTIPOLE_RADIUS if l == 1 else max(
-            INNER_MULTIPOLE_RADIUS, _AMPLIFICATION_FLOOR ** (1.0 / (l - 1)))
-        below = safe < cut
-        if not below.any() or below.all():
-            continue
-        anchor = int(np.argmax(~below))
-        cols = np.flatnonzero(l_of == l)
-        rows = np.flatnonzero(below)
-        shape = (safe[below][:, None] / safe[anchor]) ** float(l)
-        rho[np.ix_(rows, cols)] = rho[anchor, cols][None, :] * shape
+    # segments [lo_k, hi_k], k = 0..n_r-1, with lo_0 = 0
+    lo = np.concatenate([[0.0], r[:-1]])
+    hi = r
+    half = 0.5 * (hi - lo)
+    s = lo[:, None] + half[:, None] * (t[None, :] + 1.0)        # (n_r, q)
+    ws = half[:, None] * wt[None, :]
+    rho_s = spline(s) / (s * s)[:, :, None]                     # (n_r, q, n_lm)
+    first = s[0][:, None] / r[0]
+    rho_s[0] = rho_lm[0][None, :] * np.where(lf[0] > 0, first ** lf[0], 1.0)
 
-    # -- 2. the two cumulative integrals -------------------------------------
-    inner = _cumulative_integral(r, safe[:, None] ** (l_of + 2.0)[None, :] * rho)
-    # The spline starts at r[0]; add the analytic [0, r[0]] shell, over which
-    # rho_l is constant to O(r[0]).
-    inner = inner + (rho[0] * safe[0] ** (l_of + 3.0) / (l_of + 3.0))[None, :]
+    # inner: segment k measured against its upper end r_k
+    ratio_in = (s[:, :, None] / hi[:, None, None]) ** (lf + 1.0)
+    seg_in = np.einsum("kq,kqj->kj", ws * s, rho_s * ratio_in)
+    # outer: segment k+1 measured against its lower end r_k  (lo_(k+1) = r_k)
+    seg_out = np.einsum("kq,kqj->kj", ws * s,
+                        rho_s * (lo[:, None, None] / np.maximum(s[:, :, None], 1e-300)) ** lf)
 
-    outward = _cumulative_integral(r, safe[:, None] ** (1.0 - l_of)[None, :] * rho)
-    outer = outward[-1][None, :] - outward
-
-    v = (4.0 * np.pi / (2.0 * l_of + 1.0))[None, :] * (
-        inner / safe[:, None] ** (l_of + 1.0)[None, :]
-        + safe[:, None] ** l_of[None, :] * outer
-    )
-
-    # -- 3. impose V_l ~ r^l where r^-(l+1) would amplify spline round-off ----
-    # At r = 1.3e-3 and l = 12 that factor is ~1e38, which produced |V_l| ~ 1e22.
-    # l = 0 is exempt and needs no help: its numerator vanishes as r^3, so
-    # inner/r stays finite and carries the real nuclear-region potential.
-    for l in l_values:
-        if l < 1:
-            continue
-        cut = _AMPLIFICATION_FLOOR ** (1.0 / (l + 1))
-        below = safe < cut
-        if not below.any() or below.all():
-            continue
-        anchor = int(np.argmax(~below))
-        cols = np.flatnonzero(l_of == l)
-        rows = np.flatnonzero(below)
-        shape = (safe[below][:, None] / safe[anchor]) ** float(l)
-        v[np.ix_(rows, cols)] = v[anchor, cols][None, :] * shape
-    return v
+    n_r = len(r)
+    inner = np.empty_like(seg_in)
+    outer = np.empty_like(seg_in)
+    inner[0] = seg_in[0]
+    for k in range(1, n_r):
+        inner[k] = inner[k - 1] * (r[k - 1] / r[k]) ** (lf[0, 0] + 1.0) + seg_in[k]
+    outer[-1] = 0.0          # beyond the last node (tens of Bohr) rho is negligible
+    for k in range(n_r - 2, -1, -1):
+        outer[k] = outer[k + 1] * (r[k] / r[k + 1]) ** lf[0, 0] + seg_out[k + 1]
+    return (4.0 * np.pi / (2.0 * lf[0, 0] + 1.0)) * (inner + outer)
 
 
 def hartree_potential(grid, rho: np.ndarray, positions: np.ndarray,

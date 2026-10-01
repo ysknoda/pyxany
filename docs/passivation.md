@@ -57,11 +57,13 @@ Slater function is fitted to the result. Two limits make that checkable:
   reproduce the basis set's own hydrogen value. That constant is fixed entirely
   by the requirement that a unit-charge pseudo-hydrogen *be* a hydrogen.
 
-  **Limitation:** the terminator always gets this one 1s function, calibrated
-  to the single-zeta (`sz`) hydrogen exponent, whatever `basis.set` is. A real
-  hydrogen in `dz` carries two 1s functions, so the equivalence above holds
-  exactly only in `sz`; in Si5H12 with `dz`, alpha = 1 terminators give an inner
-  Si charge of -0.42 e against -0.03 e with real hydrogens.
+  The terminator then receives **every hydrogen function of the chosen basis
+  set**, each contracted by the single ratio ζ(α)/ζ(1) (Slater exponents times
+  the ratio, Gaussian exponents times its square). An α = 1 terminator is
+  therefore bit-for-bit a hydrogen in `sz`, `dz`, `dzp` and the Gaussian sets
+  alike (asserted in `tests/test_pseudo_h_basis.py`). Earlier versions gave it
+  only the one SZ-calibrated 1s, which in Si5H12/DZ moved the inner Si charge
+  to -0.42 e against -0.03 e with real hydrogens.
 
 | α | 1/4 | 1/3 | 5/12 | 1/2 | 7/12 | 2/3 | 3/4 | 1 | 5/4 | 4/3 | 3/2 | 5/3 | 7/4 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|

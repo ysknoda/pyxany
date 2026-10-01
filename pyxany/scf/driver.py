@@ -201,7 +201,7 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
     # on.  `ts_current` is the entropy of the occupations that produced the P
     # being evaluated, and stays 0 when smearing is off.
     ts_current = 0.0
-    l_max = grid_cfg.poisson_l_max
+    l_max = grid_cfg.l_max
 
     if verbose:
         _print_table_header(unrestricted)

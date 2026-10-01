@@ -84,3 +84,36 @@ def test_gradient_form_kinetic_energy_reduces_to_one_centre():
     _S, T = overlap_kinetic_2c([STO(1, 0, 0, zeta, 0)], [STO(1, 0, 0, zeta, 1)],
                                [0, 0, 0], [0, 0, 1e-6], 0.661, 0.661, n_r=60, n_a=16)
     assert abs(T[0, 0] - zeta * zeta / 2.0) < 1e-6
+
+
+def test_overlap_kinetic_gradient_matches_finite_differences():
+    """d/dR [tr(P T) - tr(W S)] for the S and T the SCF uses, incl. d functions."""
+    from conftest import make_config, make_molecule
+
+    from pyxany.basis import build_basis
+    from pyxany.integrals.overlap import build_overlap_kinetic, overlap_kinetic_gradient
+
+    geom = [("C", 0, 0, 0), ("O", 0.1, -0.05, 1.128), ("H", -0.9, 0.3, -0.4)]
+    cfg = make_config(basis={"set": "dzp"})
+    rng = np.random.default_rng(0)
+    mol = make_molecule("m", geom)
+    n = len(build_basis(mol, cfg))
+    P = rng.normal(size=(n, n))
+    P += P.T
+    W = rng.normal(size=(n, n))
+    W += W.T
+    grad = overlap_kinetic_gradient(mol, build_basis(mol, cfg), P, W)
+    h = 1e-4
+    fd = np.zeros_like(grad)
+    for A in range(3):
+        for x in range(3):
+            vals = []
+            for sign in (1, -1):
+                m = make_molecule("m", geom)
+                pos = m.positions
+                pos[A, x] += sign * h
+                m.positions = pos
+                S, T = build_overlap_kinetic(m, build_basis(m, cfg))
+                vals.append(np.sum(P * T) - np.sum(W * S))
+            fd[A, x] = (vals[0] - vals[1]) / (2 * h)
+    assert np.abs(grad - fd).max() < 1e-8 * np.abs(fd).max()

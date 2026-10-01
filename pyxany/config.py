@@ -21,7 +21,7 @@ class ConfigError(ValueError):
 @dataclass
 class MoleculeConfig:
     name: str = "molecule"
-    structure: str = ""          # path to an .xyz file
+    structure: str = ""  # path to an .xyz file
     charge: int = 0
     mult: int = 1
     units: str = "angstrom"
@@ -34,26 +34,29 @@ class MoleculeConfig:
         elif self.units.lower() in _BOHR:
             self.units = "bohr"
         else:
-            raise ConfigError(f"{ctx}: molecule.units must be angstrom or bohr, "
-                              f"got {self.units!r}")
+            raise ConfigError(f"{ctx}: molecule.units must be angstrom or bohr, got {self.units!r}")
         if self.mult < 1:
             raise ConfigError(f"{ctx}: molecule.mult must be >= 1, got {self.mult}")
 
 
 @dataclass
 class PassivationConfig:
-    scheme: str = "none"         # none | pseudo_hydrogen | hydrogen
+    scheme: str = "none"  # none | pseudo_hydrogen | hydrogen
     species: dict = field(default_factory=dict)
     basis: str = "derived"
 
     def validate(self, ctx: str) -> None:
         if self.scheme not in ("none", "pseudo_hydrogen", "hydrogen"):
-            raise ConfigError(f"{ctx}: passivation.scheme must be none, "
-                              f"pseudo_hydrogen or hydrogen; got {self.scheme!r}")
+            raise ConfigError(
+                f"{ctx}: passivation.scheme must be none, "
+                f"pseudo_hydrogen or hydrogen; got {self.scheme!r}"
+            )
         for label, spec in self.species.items():
             if "alpha" not in spec and "Z" not in spec:
-                raise ConfigError(f"{ctx}: passivation.species['{label}'] needs an "
-                                  f"'alpha' (fractional nuclear charge)")
+                raise ConfigError(
+                    f"{ctx}: passivation.species['{label}'] needs an "
+                    f"'alpha' (fractional nuclear charge)"
+                )
 
 
 @dataclass
@@ -79,12 +82,19 @@ class GridConfig:
     n_r: int = 30
     n_a: int = 12
     partition: str = "becke"
-    poisson_l_max: int = 6
+    #: 'auto' resolves to n_a - 1, the highest multipole the angular grid can
+    #: resolve; anything lower leaves a force error set by the truncation.
+    poisson_l_max: Any = "auto"
     screening_tol: float = 1e-10
     pair_n_r: int = 40
     pair_n_a: int = 14
     chunk_size: Any = "auto"
     memory_budget_mb: float = 4096.0
+
+    @property
+    def l_max(self) -> int:
+        """The multipole cut-off actually used ('auto' -> n_a - 1)."""
+        return self.n_a - 1 if self.poisson_l_max == "auto" else int(self.poisson_l_max)
 
     def validate(self, ctx: str) -> None:
         if self.n_r < 5 or self.n_a < 4:
@@ -97,14 +107,22 @@ class GridConfig:
                 f"overcounts overlapping regions by roughly the number of atoms. "
                 f"It exists only for the demonstration in tests/test_grid.py."
             )
-        # Capped at 10, not 12: near the nucleus the radial solver divides the
-        # inner multipole integral by r^(l+1), and beyond l = 10 that amplifies
-        # round-off faster than the r^l asymptotic guard can absorb, leaving
-        # visible spikes in V (max|V| ~ 1.8e3 against a physical ~28 at l = 12).
-        # Nothing is lost: the Hartree energy of water is already converged to
-        # 2.4e-4 Ha between l_max 6 (the default) and 12.
-        if not (0 <= self.poisson_l_max <= 10):
-            raise ConfigError(f"{ctx}: grid.poisson_l_max must be between 0 and 10")
+        # The radial solver is stable at any l (ratio-damped Green's function),
+        # so the limit is the angular grid: an n_a x 2n_a Gauss-Legendre product
+        # projects onto Y_lm orthonormally only while 2 l <= 2 n_a - 1.
+        # --set coerces against the current value, which may be the string "auto"
+        if isinstance(self.poisson_l_max, str) and self.poisson_l_max.strip().isdigit():
+            self.poisson_l_max = int(self.poisson_l_max)
+        if self.poisson_l_max != "auto" and (
+                isinstance(self.poisson_l_max, bool) or not isinstance(self.poisson_l_max, int)):
+            raise ConfigError(f"{ctx}: grid.poisson_l_max must be 'auto' or an integer; "
+                              f"got {self.poisson_l_max!r}")
+        if not (0 <= self.l_max <= self.n_a - 1):
+            raise ConfigError(
+                f"{ctx}: grid.poisson_l_max must be between 0 and n_a - 1 = {self.n_a - 1} "
+                f"(the angular grid cannot resolve higher multipoles); "
+                f"got {self.poisson_l_max}"
+            )
         if isinstance(self.chunk_size, str) and self.chunk_size != "auto":
             raise ConfigError(f"{ctx}: grid.chunk_size must be an integer or 'auto'")
 
@@ -154,8 +172,10 @@ class ForcesConfig:
 
     def validate(self, ctx: str) -> None:
         if self.method not in ("analytic", "finite_difference"):
-            raise ConfigError(f"{ctx}: forces.method must be 'analytic' or "
-                              f"'finite_difference'; got {self.method!r}")
+            raise ConfigError(
+                f"{ctx}: forces.method must be 'analytic' or "
+                f"'finite_difference'; got {self.method!r}"
+            )
 
 
 @dataclass
@@ -164,7 +184,7 @@ class OptimiseConfig:
     method: str = "lbfgs"
     f_max: float = 1e-3
     max_steps: int = 100
-    freeze: Any = "none"           # none | core | [indices]
+    freeze: Any = "none"  # none | core | [indices]
     trajectory: bool = True
 
     def validate(self, ctx: str) -> None:
@@ -177,8 +197,9 @@ class OptimiseConfig:
         if self.method not in ("lbfgs", "cg"):
             raise ConfigError(f"{ctx}: optimise.method must be 'lbfgs' or 'cg'")
         if isinstance(self.freeze, str) and self.freeze not in ("none", "core"):
-            raise ConfigError(f"{ctx}: optimise.freeze must be 'none', 'core' or a "
-                              f"list of atom indices")
+            raise ConfigError(
+                f"{ctx}: optimise.freeze must be 'none', 'core' or a list of atom indices"
+            )
 
 
 @dataclass
@@ -190,9 +211,11 @@ class PropertiesConfig:
     esp: dict = field(default_factory=lambda: {"enabled": False, "n_pts": 20, "margin": 3.0})
 
     #: allowed keys of each sub-dict, so a typo is an error here too
-    _SUBKEYS = {"dos": {"sigma", "n_points"},
-                "bde": {"enabled"},
-                "esp": {"enabled", "n_pts", "margin"}}
+    _SUBKEYS = {
+        "dos": {"sigma", "n_points"},
+        "bde": {"enabled"},
+        "esp": {"enabled", "n_pts", "margin"},
+    }
 
     def validate(self, ctx: str) -> None:
         # These sub-dicts used to skip validation entirely, so
@@ -315,13 +338,16 @@ class Config:
         for dotted, value in overrides.items():
             section, _, key = dotted.partition(".")
             if section not in _SECTIONS or not key:
-                raise ConfigError(f"--set {dotted}: expected SECTION.KEY with SECTION "
-                                  f"one of {', '.join(sorted(_SECTIONS))}")
+                raise ConfigError(
+                    f"--set {dotted}: expected SECTION.KEY with SECTION "
+                    f"one of {', '.join(sorted(_SECTIONS))}"
+                )
             obj = getattr(self, section)
             if not hasattr(obj, key):
                 valid = ", ".join(sorted(f.name for f in fields(obj)))
-                raise ConfigError(f"--set {dotted}: '{section}' has no key '{key}'. "
-                                  f"Valid keys: {valid}")
+                raise ConfigError(
+                    f"--set {dotted}: '{section}' has no key '{key}'. Valid keys: {valid}"
+                )
             setattr(obj, key, _coerce(getattr(obj, key), value, dotted))
         self.validate("<overrides>")
 

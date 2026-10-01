@@ -72,7 +72,7 @@ def resource_estimate(cfg, molecule, basis) -> str:
     n_pts = len(molecule) * cfg.grid.n_r * n_ang
     nb = len(basis)
     chi_mb = n_pts * nb * 8 / 1024**2
-    n_lm = (cfg.grid.poisson_l_max + 1) ** 2
+    n_lm = (cfg.grid.l_max + 1) ** 2
     hartree_ops = len(molecule) * n_pts * n_lm
     lines = [
         "  RESOURCE ESTIMATE",
@@ -86,7 +86,7 @@ def resource_estimate(cfg, molecule, basis) -> str:
         f"  S/T pairs            {_n_pairs(molecule, basis, cfg)} of "
         f"{len(molecule) * (len(molecule) - 1) // 2} after screening",
         f"  Hartree work         {hartree_ops:,.0f} harmonic evaluations per iteration"
-        f"  (l_max = {cfg.grid.poisson_l_max})",
+        f"  (l_max = {cfg.grid.l_max})",
         f"  nb x nb matrices     {nb * nb * 8 / 1024**2:.1f} MB each",
     ]
     from ..grid import build_molecular_grid

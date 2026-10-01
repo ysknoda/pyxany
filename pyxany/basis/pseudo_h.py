@@ -131,3 +131,17 @@ def describe(alpha: float, xc_alpha: float = DEFAULT_ALPHA) -> dict:
         "electrons": float(np.dot(w, sol.density * 4.0 * np.pi * r * r)),
         "converged": bool(sol.converged),
     }
+
+
+def length_scale_ratio(zeta: float) -> float:
+    """``zeta(alpha) / zeta(1)`` for a pseudo-hydrogen with derived exponent ``zeta``.
+
+    A pseudo-hydrogen receives every hydrogen function of the chosen basis set,
+    each contracted by this one ratio (Slater exponents times the ratio,
+    Gaussian exponents times its square), so that ``alpha = 1`` reproduces that
+    basis set's hydrogen exactly whatever its size. Giving the terminator only
+    the single derived 1s instead made it a single-zeta hydrogen inside a DZ
+    calculation: in Si5H12/DZ the inner Si charge was -0.42 e with alpha = 1
+    terminators against -0.03 e with real hydrogens.
+    """
+    return float(zeta) / _hydrogen_reference_zeta()

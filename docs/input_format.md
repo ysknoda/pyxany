@@ -112,9 +112,11 @@ exists in the code purely so `tests/test_grid.py` can demonstrate that, and is
 rejected by the input validator.
 
 **`grid.poisson_l_max`** truncates the multipole expansion of each atom's share
-of the density. `l_max = 6` is a good default; the Hartree energy is converged
-to ~1e-4 relative by `l_max = 4` for compact molecules. Cost scales as
-`(l_max + 1)²`.
+of the density. The default `auto` uses `n_a - 1`, the highest multipole the
+angular grid resolves (larger values are rejected). Lower values are cheaper --
+cost scales as `(l_max + 1)²` -- and are adequate for energies, but the force
+error is set by this truncation: on CO it is 1.6e-2 Ha/Bohr at `l_max = 6`,
+1.3e-3 at 12 and 1e-4 at 16, so keep `auto` for optimisations.
 
 **`scf.alpha`** — 0.7 is the customary DV-Xα value. `alpha = 2/3` makes the
 functional exactly Dirac (LDA) exchange, which is what

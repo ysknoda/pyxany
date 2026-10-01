@@ -85,17 +85,19 @@ def test_force_vanishes_near_the_minimum():
 
 
 @pytest.mark.slow
-def test_force_error_shrinks_with_the_grid():
-    """The analytic-vs-FD residual is a quadrature effect, so refining helps."""
+def test_analytic_forces_match_finite_differences_on_coarse_and_fine_grids():
+    """With the grid-motion and S/T terms, analytic forces are the derivative of
+    the computed energy, not of the continuum functional, so they agree with
+    finite differences even on a coarse grid (measured 2.5e-5 / 5.9e-5 Ha/Bohr,
+    against ~1e-3 before those terms; the FD step itself limits the comparison).
+    """
     molecule = h2_at(0.90)
-    errors = []
     for n_r, n_a in ((30, 12), (50, 16)):
         result, cfg = converged(molecule, grid={"n_r": n_r, "n_a": n_a,
                                                 "poisson_l_max": 6})
         analytic = compute_forces(result, cfg)
         fd = compute_forces_fd(molecule, cfg, step=0.02, verbose=0)
-        errors.append(float(np.abs(analytic - fd).max()))
-    assert errors[-1] < errors[0]
+        assert np.abs(analytic - fd).max() < 1e-4
 
 # A C1 water: unequal O-H lengths, bent out of every mirror plane.  H2 is a poor
 # gradient test on its own -- one axis, two equivalent atoms, and the
@@ -232,13 +234,15 @@ def test_translation_projection_is_off_when_atoms_are_frozen():
     """Projecting the all-atom mean is invalid once part of the molecule is fixed.
 
     The energy is not invariant under translating a subset, so subtracting the
-    all-atom mean injects a uniform spurious force into the moving atoms --
-    measured at 1.8e-3 Ha/Bohr here, larger than the 1e-3 default
-    ``optimise.f_max``, i.e. the optimiser could never converge honestly.
+    all-atom mean injects a uniform spurious force into the moving atoms. With
+    the grid-motion terms the unprojected forces are the derivative of the
+    computed energy: measured 4.5e-5 Ha/Bohr from finite differences on the
+    hydrogens, against 3.0e-4 after projection. l_max = 9 keeps the multipole
+    truncation (6.7e-3 residual at l_max = 4) from swamping the comparison.
     """
     molecule = make_molecule("h2o_c1", ASYMMETRIC_WATER)
     cfg = make_config(basis={"set": "sz"},
-                      grid={"n_r": 30, "n_a": 12, "poisson_l_max": 4},
+                      grid={"n_r": 30, "n_a": 12, "poisson_l_max": 9},
                       scf={"max_iter": 80, "e_tol": 1e-9, "d_tol": 1e-8},
                       forces={"enabled": True})
     result = run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)

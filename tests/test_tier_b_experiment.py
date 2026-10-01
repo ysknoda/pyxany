@@ -84,14 +84,8 @@ def _bond(positions_ang, elements, label):
     )
 
 
-_CO_XFAIL = pytest.mark.xfail(strict=True, reason=(
-    "analytic forces omit the grid-weight derivative term; for CO at n_r=40 it is "
-    "~1e-2 Ha/Bohr (translation residual 1.2e-2), so max|F| cannot reach f_max. "
-    "Remove this mark when that term is implemented (docs/adr/0008-future-work.md)."))
-
-
 @pytest.mark.parametrize("name", ["H2", "CH4", "NH3", "H2O", "HF", "N2",
-                                  pytest.param("CO", marks=_CO_XFAIL), "SiH4", "H2S"])
+                                  "CO", "SiH4", "H2S"])
 def test_relaxed_bond_length_against_experiment(name, tmp_path):
     cfg = make_config(
         basis={"set": BASIS},

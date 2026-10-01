@@ -121,3 +121,84 @@ def becke_weights_own_cell(
     """
     w = becke_weights(points, centres, radii, stiffness)
     return w[np.arange(len(points)), np.asarray(owner)]
+
+
+def _smooth_step_and_derivative(nu: np.ndarray, stiffness: int):
+    """``s(nu)`` and ``ds/dnu`` (chain rule through the iterated polynomial)."""
+    f = np.clip(nu, -1.0, 1.0)
+    df = np.ones_like(f)
+    for _ in range(stiffness):
+        df = df * 1.5 * (1.0 - f * f)
+        f = 1.5 * f - 0.5 * f * f * f
+    return 0.5 * (1.0 - f), -0.5 * df
+
+
+def own_cell_weight_gradient(
+    points: np.ndarray,
+    owner: np.ndarray,
+    coeff: np.ndarray,
+    centres: np.ndarray,
+    radii: np.ndarray,
+    stiffness: int = DEFAULT_STIFFNESS,
+) -> np.ndarray:
+    """``M[A, B] = sum_{k owned by A} coeff_k * d w_A(r_k) / d R_B`` with the points held fixed.
+
+    ``w_A = P_A / Z`` is the own-cell Becke weight of each point, ``Z = sum_C P_C``.
+    With ``P_C = prod_{D != C} s(nu_CD)``, a nuclear displacement enters only
+    through the pair factors that contain it, so
+
+        d w_A / d R_B = sum_C (delta_CA - w_A) / Z * P_C * sum_{D != C} dln s_CD / d R_B
+
+    and ``nu_CD`` depends on ``R_C`` and ``R_D`` alone. Returns an
+    ``(n_atoms, n_atoms, 3)`` array; memory stays ``O(n_points * n_atoms)``.
+
+    The derivative for ``B = A`` with the points moving *with* their atom (the
+    case on an atom-centred grid) follows from translational invariance,
+    ``-sum_{B != A} M[A, B]``; that bookkeeping is left to the caller.
+    """
+    pts = np.asarray(points, dtype=float)
+    C = np.asarray(centres, dtype=float)
+    owner = np.asarray(owner)
+    n_atoms = len(C)
+    out = np.zeros((n_atoms, n_atoms, 3))
+    if n_atoms == 1:
+        return out
+
+    a = size_adjustment(radii)
+    diff = pts[:, None, :] - C[None, :, :]                       # r - R_C
+    dist = np.linalg.norm(diff, axis=2)
+    unit = diff / np.maximum(dist, 1e-300)[:, :, None]
+
+    # P_C at every point, and the per-pair data needed for the derivative
+    pair = {}
+    P = np.ones((len(pts), n_atoms))
+    for i in range(n_atoms):
+        for j in range(n_atoms):
+            if i == j:
+                continue
+            Rij_vec = C[i] - C[j]
+            Rij = np.linalg.norm(Rij_vec)
+            mu = (dist[:, i] - dist[:, j]) / Rij
+            nu = mu + a[i, j] * (1.0 - mu * mu)
+            s, ds = _smooth_step_and_derivative(nu, stiffness)
+            P[:, i] *= s
+            # d ln s / d nu, with s -> 0 only where ds -> 0 faster (f'(+-1) = 0)
+            dln = np.where(s > 1e-300, ds / np.maximum(s, 1e-300), 0.0) * (1.0 - 2.0 * a[i, j] * mu)
+            # d mu / d R_i and d mu / d R_j  (points fixed)
+            dmu_di = -unit[:, i, :] / Rij - mu[:, None] * Rij_vec / Rij**2
+            dmu_dj = unit[:, j, :] / Rij + mu[:, None] * Rij_vec / Rij**2
+            pair[(i, j)] = (dln, dmu_di, dmu_dj)
+
+    Z = P.sum(axis=1)
+    Z = np.where(Z > 1e-300, Z, 1.0)
+    w_own = P[np.arange(len(pts)), owner] / Z
+    for (i, j), (dln, dmu_di, dmu_dj) in pair.items():
+        # coefficient of d P_i / d R_B for each point: coeff (delta_{i,owner} - w_own) / Z
+        alpha = coeff * ((owner == i) - w_own) / Z * P[:, i] * dln
+        for A in range(n_atoms):
+            sel = owner == A
+            if not sel.any():
+                continue
+            out[A, i] += alpha[sel] @ dmu_di[sel]
+            out[A, j] += alpha[sel] @ dmu_dj[sel]
+    return out

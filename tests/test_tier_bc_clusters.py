@@ -4,19 +4,19 @@ Tier B (physics, X-alpha-robust):
 
 * Ionicity ordering. The Mulliken anion charge must follow the
   electronegativity difference of the pair (Pauling: MgO 2.13 > CdSe 0.86 >
-  GaAs 0.37). Measured 2026-10-01: O -1.04, Se -0.66, As -0.33. Signs and
+  GaAs 0.37). Measured 2026-10-01: O -0.89, Se -0.81, As -0.60. Signs and
   ordering only; Mulliken magnitudes are basis-dependent.
 * Pseudo-hydrogen passivation removes gap states. With ordinary hydrogen a
   III-V cluster violates electron counting and has a partly filled frontier
   orbital on the terminators; with fractional-charge terminators the gap opens.
   Measured on GaAs4: gap 0.07 eV with H (frontier weight on terminators 0.31 /
-  0.54) against 5.87 eV with pseudo-H -- the effect reported by Deng et al.,
+  0.54) against 5.31 eV with pseudo-H -- the effect reported by Deng et al.,
   Phys. Rev. B 85, 195328 (2012).
 
 Deliberately *not* tested: the HOMO-LUMO gap ordering of the cluster series
 against bulk band gaps. These 5-7 heavy-atom clusters are dominated by quantum
-confinement and differ in size; measured gaps are Si 6.05 > MgO 5.98 >
-GaAs 5.87 > CdSe 3.34 eV, nothing like the bulk order, and there is no
+confinement and differ in size; measured gaps are MgO 5.85 > Si 5.80 >
+GaAs 5.31 > CdSe 2.49 eV, nothing like the bulk order, and there is no
 physical reason they should be.
 
 Tier C (regression): total energy and gap of each pseudo-passivated example at
@@ -45,10 +45,10 @@ EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
 # (total energy / Ha, HOMO-LUMO gap / eV) at each example's own settings
 PINNED = {
-    "si5h12": (-1443.4140772781, 6.0513),
-    "ga4ash": (-10855.3025990689, 5.8696),
-    "cdse4h": (-15048.6350943098, 3.3376),
-    "mgo6h": (-646.1247099533, 5.9811),
+    "si5h12": (-1443.2765500960, 5.7952),
+    "ga4ash": (-10852.8588868731, 5.3114),
+    "cdse4h": (-15044.3382876139, 2.4883),
+    "mgo6h": (-646.5753034646, 5.8512),
 }
 
 

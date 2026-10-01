@@ -72,7 +72,9 @@ def build_sto_basis(molecule, basis_key: str, pseudo_zeta=None) -> list[STO]:
     """One STO per tabulated exponent, for every atom of ``molecule``.
 
     ``pseudo_zeta`` maps a pseudo-hydrogen species label to the exponent derived
-    for its fractional charge (see :mod:`pyxany.basis.pseudo_h`).
+    for its fractional charge (see :mod:`pyxany.basis.pseudo_h`); the terminator
+    gets this basis set's full hydrogen function list scaled by
+    :func:`~pyxany.basis.pseudo_h.length_scale_ratio`.
     """
     table = sto_exponents(basis_key)
     labels = orbital_labels()
@@ -87,10 +89,16 @@ def build_sto_basis(molecule, basis_key: str, pseudo_zeta=None) -> list[STO]:
                     f"no exponent available for pseudo-hydrogen species "
                     f"'{atom.symbol}'; it must be derived first"
                 )
-            functions.append(
-                STO(n=1, l=0, m=0, zeta=float(zeta), atom_idx=ai,
-                    label=f"{atom.symbol}{ai + 1}_1s")
-            )
+            # every hydrogen function of this basis, contracted by zeta(alpha)/zeta(1)
+            from .pseudo_h import length_scale_ratio
+
+            scale = length_scale_ratio(zeta)
+            for n, l, m, z_h in table["H"]:
+                name = labels.get((n, l, m), f"{n}{l}{m}")
+                functions.append(
+                    STO(n=n, l=l, m=m, zeta=float(z_h) * scale, atom_idx=ai,
+                        label=f"{atom.symbol}{ai + 1}_{name}")
+                )
             continue
 
         entries = table.get(atom.element)

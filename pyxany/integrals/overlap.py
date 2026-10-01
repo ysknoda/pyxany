@@ -91,3 +91,48 @@ def build_overlap_kinetic(molecule, basis, n_r: int = 40, n_a: int = 14,
 def condition_number(S: np.ndarray) -> float:
     ev = np.linalg.eigvalsh(S)
     return float(ev.max() / max(ev.min(), 1e-30))
+
+
+def overlap_kinetic_gradient(molecule, basis, P: np.ndarray, W: np.ndarray,
+                             n_r: int = 40, n_a: int = 14,
+                             screening_tol: float = DEFAULT_SCREENING_TOL,
+                             step: float = 1e-4) -> np.ndarray:
+    """``d/dR [tr(P T) - tr(W S)]`` for the S and T that the SCF actually used.
+
+    The Pulay terms involving S and T must differentiate *these* matrices --
+    built on two-centre grids and one-centre closed forms -- not a DV-grid
+    quadrature of the same integrals, or the two quadrature errors do not
+    cancel (measured on CO/DZ at n_r = 40: 1.3e-3 and 1.7e-3 Ha/Bohr).
+
+    One-centre blocks do not depend on the geometry. A two-centre block
+    depends only on ``R_B - R_A``, so ``d/dR_A = -d/dR_B`` and one central
+    difference per Cartesian direction of ``R_B`` suffices (6 block
+    evaluations per surviving pair; the pair grid moves rigidly with its
+    atoms, so the result is smooth in ``step``). Returns ``(n_atoms, 3)``;
+    rank-local pairs are summed with one Allreduce.
+    """
+    with timer("forces.S_T_gradient"):
+        groups = _groups(molecule, basis)
+        radii = [a.grid_radius() for a in molecule]
+        grad = np.zeros((len(molecule), 3))
+        for ai, aj in round_robin(surviving_pairs(molecule, basis, screening_tol)):
+            mu_idx, nu_idx = groups[ai], groups[aj]
+            if not mu_idx or not nu_idx:
+                continue
+            fa = [basis[m] for m in mu_idx]
+            fb = [basis[n] for n in nu_idx]
+            ix = np.ix_(mu_idx, nu_idx)
+            # factor 2: the (B, A) block is the transpose and contributes equally
+            Pb, Wb = 2.0 * P[ix], 2.0 * W[ix]
+            for x in range(3):
+                e = np.zeros(3)
+                e[x] = step
+                Sp, Tp = overlap_kinetic_2c(fa, fb, molecule[ai].pos, molecule[aj].pos + e,
+                                            radii[ai], radii[aj], n_r=n_r, n_a=n_a)
+                Sm, Tm = overlap_kinetic_2c(fa, fb, molecule[ai].pos, molecule[aj].pos - e,
+                                            radii[ai], radii[aj], n_r=n_r, n_a=n_a)
+                d = (np.sum(Pb * (Tp - Tm)) - np.sum(Wb * (Sp - Sm))) / (2.0 * step)
+                grad[aj, x] += d
+                grad[ai, x] -= d
+        allreduce_array(grad)
+        return grad

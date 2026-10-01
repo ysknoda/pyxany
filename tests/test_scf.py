@@ -141,11 +141,14 @@ def test_smearing_resolves_a_degenerate_frontier():
 # erf(sqrt(a)r)/r at 4th order (tests/test_coulomb.py), Xalpha against Dirac
 # exchange (tests/test_xc.py), and the hydrogenic spectrum
 # (tests/test_pseudo_h_basis.py).
+# Re-pinned 2026-10-01 for the ratio-damped Poisson solver (+0.01 to +18 mHa on this
+# deliberately coarse test grid; the new solver is ~3x more accurate per radial
+# grid size, see pyxany/integrals/coulomb.py).
 REFERENCE_ENERGIES = {
-    "h2": -1.063203,
-    "h2o": -75.220262,
-    "ch3": -39.053417,
-    "co": -111.600903,
+    "h2": -1.063190,
+    "h2o": -75.207301,
+    "ch3": -39.045010,
+    "co": -111.583116,
 }
 
 REFERENCE_GEOMETRIES = {

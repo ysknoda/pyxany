@@ -51,9 +51,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..basis.evaluate import chi_grad_matrix, chi_laplacian_matrix, chi_matrix
+from ..basis.evaluate import chi_grad_matrix, chi_matrix
 from ..integrals import xc
 from ..integrals.coulomb import hartree_potential, nuclear_potential
+from ..integrals.overlap import overlap_kinetic_gradient
 from ..parallel import allreduce_array
 from ..scf.linalg import energy_weighted_density
 from ..timing import timer
@@ -120,13 +121,13 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
             rho = np.einsum("km,mn,kn->k", chi, result.P, chi, optimize=True)
 
         rho_full = _full_density(grid, rho)
-        V_H = hartree_potential(grid, rho_full, positions,
-                                l_max=config.grid.poisson_l_max, eval_points=pts)
+        V_H = hartree_potential(
+            grid, rho_full, positions, l_max=config.grid.l_max, eval_points=pts
+        )
         v_nuc = nuclear_potential(pts, positions, molecule.charges)
 
         with timer("forces.gradients"):
-            D = chi_grad_matrix(basis, positions, pts)        # (npts, nb, 3)
-            L = chi_laplacian_matrix(basis, positions, pts)   # (npts, nb)
+            D = chi_grad_matrix(basis, positions, pts)  # (npts, nb, 3)
 
         grad = np.zeros((len(molecule), 3))
 
@@ -139,43 +140,153 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
             by_atom.setdefault(f.atom_idx, []).append(mu)
 
         if result.unrestricted:
-            spins = ((result.P_a, xc.potential_spin(rho_a, alpha), result.eps_a,
-                      result.C_a, result.occ_a),
-                     (result.P_b, xc.potential_spin(rho_b, alpha), result.eps_b,
-                      result.C_b, result.occ_b))
+            spins = (
+                (
+                    result.P_a,
+                    xc.potential_spin(rho_a, alpha),
+                    result.eps_a,
+                    result.C_a,
+                    result.occ_a,
+                ),
+                (
+                    result.P_b,
+                    xc.potential_spin(rho_b, alpha),
+                    result.eps_b,
+                    result.C_b,
+                    result.occ_b,
+                ),
+            )
         else:
-            spins = ((result.P, xc.potential(rho, alpha), result.eps,
-                      result.C, result.occupations),)
+            spins = (
+                (result.P, xc.potential(rho, alpha), result.eps, result.C, result.occupations),
+            )
 
+        W_total = np.zeros_like(result.P)
         for P_s, v_xc_s, eps_s, C_s, occ_s in spins:
             v_eff = v_nuc + V_H + v_xc_s
-            # h_eff chi_nu evaluated on the grid
-            h_chi = -0.5 * L + v_eff[:, None] * chi                      # (npts, nb)
-            W = energy_weighted_density(C_s, eps_s, occ_s)
+            # Only the potential matrices are built on the DV grid, so only they
+            # are differentiated on it; T and S come from their own builders and
+            # are differentiated by overlap_kinetic_gradient below.
+            v_chi = v_eff[:, None] * chi  # (npts, nb)
+            W_total += energy_weighted_density(C_s, eps_s, occ_s)
             for ai, idx in by_atom.items():
-                Pblk = P_s[np.ix_(idx, range(len(basis)))]               # (n_A, nb)
-                Wblk = W[np.ix_(idx, range(len(basis)))]
-                # int D_mu (h_eff chi_nu) and int D_mu chi_nu
-                Dw = D[:, idx, :] * wts[:, None, None]                   # (npts, n_A, 3)
-                M_h = np.einsum("kax,kn->anx", Dw, h_chi, optimize=True)
-                M_s = np.einsum("kax,kn->anx", Dw, chi, optimize=True)
-                grad[ai] -= 2.0 * np.einsum("an,anx->x", Pblk, M_h, optimize=True)
-                grad[ai] += 2.0 * np.einsum("an,anx->x", Wblk, M_s, optimize=True)
+                Pblk = P_s[np.ix_(idx, range(len(basis)))]  # (n_A, nb)
+                Dw = D[:, idx, :] * wts[:, None, None]  # (npts, n_A, 3)
+                M_v = np.einsum("kax,kn->anx", Dw, v_chi, optimize=True)
+                grad[ai] -= 2.0 * np.einsum("an,anx->x", Pblk, M_v, optimize=True)
+
+
+        # -- grid motion: Becke weights and atom-centred points move with R --
+        with timer("forces.grid"):
+            grad += _grid_motion_gradient(result, config, chi, D, rho, rho_a, rho_b, V_H, v_nuc)
 
         allreduce_array(grad)
+        # -- Pulay terms of T and S, from the matrices the SCF used. Added after
+        # the reduction: overlap_kinetic_gradient already returns the global sum.
+        grad += overlap_kinetic_gradient(
+            molecule,
+            basis,
+            result.P,
+            W_total,
+            n_r=config.grid.pair_n_r,
+            n_a=config.grid.pair_n_a,
+            screening_tol=config.grid.screening_tol,
+        )
         grad += nuclear_repulsion_gradient(molecule)
         forces = -grad
         # Keep the pre-projection residual: it is a direct measure of the
         # grid-derivative error, and therefore of whether a requested force
         # convergence threshold is resolvable at all.  After projection
         # |sum F| is ~1e-16 by construction and says nothing.
-        compute_forces.last_translation_residual = float(
-            np.linalg.norm(forces.sum(axis=0)))
-        wanted = getattr(config.forces, "project_translation", True) \
-            if project is None else project
+        compute_forces.last_translation_residual = float(np.linalg.norm(forces.sum(axis=0)))
+        wanted = getattr(config.forces, "project_translation", True) if project is None else project
         if wanted:
             forces = project_out_translation(forces)
         return forces
+
+
+def _grid_motion_gradient(result, config, chi, D, rho, rho_a, rho_b, V_H, v_nuc):
+    """Derivative of the quadrature itself: ``sum_k d(w_k G(r_k)) / d R_B``.
+
+    The grid-sampled energy is ``sum_k w_k G(r_k)`` with
+    ``G = rho (v_nuc + V_H) + rho eps_xc`` -- V_H enters without the factor 1/2
+    because the Hartree energy is a symmetric double sum over grid points, so
+    moving one point changes both its source and its evaluation role. Every
+    point is rigidly attached to its owner atom and its Becke weight depends on
+    all nuclei, giving two contributions:
+
+    * weight term  ``sum_k raw_k G_k d cell_k / d R_B``, with the owner's own
+      derivative from translational invariance (``-sum_{B != A}``);
+    * point term   ``sum_{k owned by B} w_k grad G(r_k)``, where
+      ``grad G = grad rho (v_nuc + V_H + v_xc) + rho (grad v_nuc + grad V_H)``.
+
+    Rank-local; the caller reduces.
+    """
+    from ..grid.becke import own_cell_weight_gradient
+
+    molecule, grid = result.molecule, result.grid
+    alpha = config.scf.alpha
+    n_atoms = len(molecule)
+    grad = np.zeros((n_atoms, 3))
+    if n_atoms == 1 or grid.partition != "becke":
+        return grad
+
+    sl = grid.local_slice
+    pts, wts = grid.local_points, grid.local_weights
+    owner = grid.owner[sl]
+
+    # energy density and its gradient on the grid
+    if result.unrestricted:
+        e_xc = 2.0 * rho_a * xc.energy_density(
+            2.0 * rho_a, alpha
+        ) + 2.0 * rho_b * xc.energy_density(2.0 * rho_b, alpha)
+        grad_rho_a = 2.0 * np.einsum("kmx,mn,kn->kx", D, result.P_a, chi, optimize=True)
+        grad_rho_b = 2.0 * np.einsum("kmx,mn,kn->kx", D, result.P_b, chi, optimize=True)
+        grad_rho = grad_rho_a + grad_rho_b
+        xc_part = (
+            xc.potential_spin(rho_a, alpha)[:, None] * grad_rho_a
+            + xc.potential_spin(rho_b, alpha)[:, None] * grad_rho_b
+        )
+    else:
+        e_xc = rho * xc.energy_density(rho, alpha)
+        grad_rho = 2.0 * np.einsum("kmx,mn,kn->kx", D, result.P, chi, optimize=True)
+        xc_part = xc.potential(rho, alpha)[:, None] * grad_rho
+    G = rho * (v_nuc + V_H) + e_xc
+
+    grad_v_nuc = np.zeros_like(pts)
+    for pos, Z in zip(molecule.positions, molecule.charges):
+        d = pts - pos
+        r = np.maximum(np.linalg.norm(d, axis=1), 1e-12)
+        grad_v_nuc += Z * d / r[:, None] ** 3
+
+    # grad V_H by central differences of the Poisson solution at shifted points
+    rho_full = _full_density(grid, rho)
+    h = 1e-4
+    grad_V_H = np.zeros_like(pts)
+    for x in range(3):
+        e = np.zeros(3)
+        e[x] = h
+        vp = hartree_potential(
+            grid, rho_full, molecule.positions, l_max=config.grid.l_max, eval_points=pts + e
+        )
+        vm = hartree_potential(
+            grid, rho_full, molecule.positions, l_max=config.grid.l_max, eval_points=pts - e
+        )
+        grad_V_H[:, x] = (vp - vm) / (2.0 * h)
+
+    grad_G = grad_rho * (v_nuc + V_H)[:, None] + xc_part + rho[:, None] * (grad_v_nuc + grad_V_H)
+    for A in range(n_atoms):
+        sel = owner == A
+        grad[A] += wts[sel] @ grad_G[sel]
+
+    radii = np.array([a.grid_radius() for a in molecule])
+    M = own_cell_weight_gradient(pts, owner, grid.raw_weights[sl] * G, molecule.positions, radii)
+    for A in range(n_atoms):
+        for B in range(n_atoms):
+            if B != A:
+                grad[B] += M[A, B]
+                grad[A] -= M[A, B]
+    return grad
 
 
 def _full_density(grid, rho_local):

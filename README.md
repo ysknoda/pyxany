@@ -159,10 +159,10 @@ than against itself; `tests/` runs these as assertions.
 | two-centre overlap | H₂ 1s–1s vs closed form | 1e-9 … 1e-11 |
 | Hartree potential | Gaussian charges vs erf(r)/r | 3e-5 relative on E_H, converging at order 4 |
 | atomic solver | hydrogenic 1s/2s/2p/3d | ε exact, R to 1e-11 |
-| analytic forces | vs central finite differences | 2e-5 Ha/Bohr at a fine grid |
+| analytic forces | vs central finite differences (incl. grid-motion terms) | 2.5e-5 Ha/Bohr (H2, coarse grid) |
 | force sum rule | \|Σ_A F_A\| | 1e-15 |
 | numba vs numpy | total energy | 1e-16 |
-| whole SCF | vs PySCF, same X-alpha functional and Gaussian basis, 12 molecules incl. UKS (dev-only, skipped without PySCF) | E 2.5 mHa at the test grid → 0.3 mHa converged; Mulliken q 3e-4 e; dipole 6e-4 D |
+| whole SCF | vs PySCF, same X-alpha functional and Gaussian basis, 12 molecules incl. UKS (dev-only, skipped without PySCF) | E 3 mHa at the test grid → 0.2 mHa converged; Mulliken q 2e-4 e; dipole 5e-4 D |
 
 Physically, Xα/DZ lands ~1 % above Hartree-Fock for closed-shell molecules
 (CO −111.69 vs −112.79 Ha; H₂O −75.29 vs −76.07 Ha), which is the expected

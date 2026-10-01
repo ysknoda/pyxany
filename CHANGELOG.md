@@ -7,15 +7,25 @@
 - **Tier A cross-validation against PySCF** (`tests/test_tier_a_pyscf.py`):
   same X-alpha functional (`1.05 * LDA_X`) and the same Gaussian basis,
   translated from pyxany's own tables, on 10 closed-shell molecules, a
-  6-31G(d) case and a UKS radical. Mulliken charges agree to 3e-4 e and dipoles
-  to 6e-4 D; the total-energy gap is grid error and shrinks monotonically with
-  the grid (asserted). PySCF is a development-only tool, not a dependency.
+  6-31G(d) case and a UKS radical. Mulliken charges agree to 2e-4 e and dipoles
+  to 5e-4 D; the total-energy gap is grid error and falls below 0.2 mHa on a
+  fine grid (asserted). PySCF is a development-only tool, not a dependency.
 
 - **Tier B/C validation on real molecules and clusters**
   (`tests/test_tier_b_experiment.py`, `tests/test_tier_bc_clusters.py`), with
   experimental data from NIST CCCBDB (`tools/fetch_cccbdb.py`). Tolerances are
   set from the X-alpha functional's own error, measured with PySCF at large
   basis sets; see `docs/adr/0003-validation-tiers.md`.
+
+- `python -m dvxa` as an entry point, for clusters where the console script's
+  directory is off `PATH`.
+- Data-table tests are self-contained again (they compared against the deleted
+  `dv-xa.py` and had been skipping silently): physical invariants plus pinned
+  checksums, 3 → 33 live tests.
+- Pinned total-energy regression values, a convergence-**order** test for the
+  Poisson solver, and an analytic-vs-finite-difference force check on an
+  asymmetric C1 geometry (H₂ alone cannot expose per-atom or per-component
+  errors).
 
 ### Fixed
 
@@ -29,28 +39,29 @@
   passed max|F| = 5.8e-6 at step 7, then ran 60 steps without converging. The
   first evaluation with max|F| < f_max now ends the optimisation (7 steps).
 
-### Known limitations
-
-- The analytic forces omit the grid-weight derivative term. For CO at the
-  default-like grid the remaining error is ~1e-2 Ha/Bohr, larger than the
-  default f_max, so such molecules cannot be optimised to f_max = 1e-3.
-- Pseudo-hydrogen terminators carry a single-zeta 1s function whatever
-  `basis.set` is, so an alpha = 1 terminator equals hydrogen only in `sz`.
-
-### Changed
-
-- **Renamed from `dvxa` to `pyxany`** (distribution, import name, CLI command,
-  `python -m` entry and the `PYXANY_DISABLE_NUMBA` environment variable) and
-  moved from the `src/` layout to a flat layout with the package at the
-  repository root. No `dvxa` compatibility alias is provided. Entries below this
-  one refer to the old name. See `docs/adr/0001-flat-layout-and-rename.md`.
-- Optimisation trajectories are written to `output.dir` like every other output
-  file, instead of the working directory.
-
-Findings from a systematic code review (`/code-check`) of the packaged code,
-including a quantum-chemistry review of the electronic-structure core.
-
-### Fixed
+- **The Hartree solver was inaccurate or unstable for heavy atoms.** It divided
+  ``int_0^r s^(l+2) rho`` by ``r^(l+1)`` and patched the resulting near-nucleus
+  blow-up by overwriting rho_l and V_l with r^l power laws inside a radius that
+  reached 0.2-0.3 Bohr at l = 10. On GaAs4 the SCF energy moved by 0.15 Ha
+  between l_max 8 and 10; with off-centre Gaussian test charges E_H was wrong
+  by 1.6e3 Ha at l = 8. Rewritten as a Green's-function recursion in which
+  every power is a ratio <= 1, integrating the spline of r^2 rho_l: stable at
+  any l, and ~3x more accurate per radial grid size (1s core test charge on Ga:
+  1.9e-2 vs 5.9e-2 Ha at n_r = 30). Total energies change: +0.01 to +18 mHa
+  for the small pinned molecules on the coarse test grid, and Ga/As clusters
+  at n_r = 30 by ~2.5 Ha -- both solvers carry ~0.5 Ha per heavy atom of
+  radial quadrature error there, with opposite signs.
+- **Analytic forces were the derivative of the continuum functional, not of
+  the computed energy.** They omitted the motion of the Becke weights and of
+  the atom-centred grid points, and took the S and T Pulay terms from a DV-grid
+  quadrature instead of the two-centre matrices the SCF uses. Both are now
+  included (each checked against finite differences to 1e-9 relative). Force
+  error vs finite differences: H2 ~1e-3 -> 2.5e-5 Ha/Bohr; CO 2e-2 -> 1.4e-3
+  at l_max = 12. CO can now be geometry-optimised.
+- **Pseudo-hydrogens carried a single-zeta basis whatever `basis.set` was.**
+  They now receive the basis set's full hydrogen function list contracted by
+  zeta(alpha)/zeta(1), so an alpha = 1 terminator is exactly hydrogen in every
+  basis (it was only in `sz`; Si5H12/DZ inner Si charge -0.42 vs -0.03 e).
 
 - **The radial Poisson solver treated partial sums of a Gauss-Legendre rule as
   cumulative integrals.** A Gauss rule is exact only over its whole interval, so
@@ -87,17 +98,24 @@ including a quantum-chemistry review of the electronic-structure core.
 - `dvxa gridcheck` and `dvxa passivate` had no execution-time measurement;
   `passivate` also wrote output from every MPI rank via bare `print()`.
 
-### Added
+### Changed
 
-- `python -m dvxa` as an entry point, for clusters where the console script's
-  directory is off `PATH`.
-- Data-table tests are self-contained again (they compared against the deleted
-  `dv-xa.py` and had been skipping silently): physical invariants plus pinned
-  checksums, 3 → 33 live tests.
-- Pinned total-energy regression values, a convergence-**order** test for the
-  Poisson solver, and an analytic-vs-finite-difference force check on an
-  asymmetric C1 geometry (H₂ alone cannot expose per-atom or per-component
-  errors).
+- **`grid.poisson_l_max` defaults to `auto` = n_a - 1** (11 on the default
+  grid; was 6) and may not exceed n_a - 1. The force error is set by this
+  truncation (CO: 1.6e-2 Ha/Bohr at 6, 1.3e-3 at 12). The Hartree step costs
+  ~(l+1)^2, so an SCF iteration is ~2.5x slower on GaAs4 until adaptive
+  multipole orders land (ADR 0008).
+
+- **Renamed from `dvxa` to `pyxany`** (distribution, import name, CLI command,
+  `python -m` entry and the `PYXANY_DISABLE_NUMBA` environment variable) and
+  moved from the `src/` layout to a flat layout with the package at the
+  repository root. No `dvxa` compatibility alias is provided. Entries below this
+  one refer to the old name. See `docs/adr/0001-flat-layout-and-rename.md`.
+- Optimisation trajectories are written to `output.dir` like every other output
+  file, instead of the working directory.
+
+Findings from a systematic code review (`/code-check`) of the packaged code,
+including a quantum-chemistry review of the electronic-structure core.
 
 ### Known limitations
 

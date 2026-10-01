@@ -89,3 +89,29 @@ def test_grid_block_structure_matches_radii():
     r = np.linalg.norm(block - mol[1].pos, axis=2)
     assert np.allclose(r, grid.radii[1][:, None])
     assert np.allclose(grid.weights, grid.raw_weights * grid.cell_weights)
+
+
+def test_own_cell_weight_gradient_matches_finite_differences():
+    """d w_A(r_k) / d R_B with points fixed, contracted with arbitrary coefficients."""
+    from pyxany.grid.becke import own_cell_weight_gradient
+
+    rng = np.random.default_rng(3)
+    C = np.array([[0, 0, 0], [0.3, 0.1, 2.1], [-1.5, 1.0, 0.4]], float)
+    radii = np.array([0.8, 1.2, 0.5])
+    pts = C[rng.integers(0, 3, 400)] + rng.normal(size=(400, 3)) * 0.9
+    owner = np.argmin(np.linalg.norm(pts[:, None] - C[None], axis=2), axis=1)
+    coeff = rng.normal(size=400)
+    M = own_cell_weight_gradient(pts, owner, coeff, C, radii)
+    h = 1e-6
+    fd = np.zeros_like(M)
+    for B in range(3):
+        for x in range(3):
+            Cp, Cm = C.copy(), C.copy()
+            Cp[B, x] += h
+            Cm[B, x] -= h
+            wp = becke_weights(pts, Cp, radii)[np.arange(400), owner]
+            wm = becke_weights(pts, Cm, radii)[np.arange(400), owner]
+            d = coeff * (wp - wm) / (2 * h)
+            for A in range(3):
+                fd[A, B, x] = d[owner == A].sum()
+    assert np.abs(M - fd).max() < 1e-7 * np.abs(fd).max()

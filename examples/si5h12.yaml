@@ -11,7 +11,7 @@ basis:
 grid:
   n_r: 30
   n_a: 12
-  poisson_l_max: 6
+  poisson_l_max: auto
 scf:
   max_iter: 150
   e_tol: 1.0e-06

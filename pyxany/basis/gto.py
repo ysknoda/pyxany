@@ -54,7 +54,7 @@ def _expand_shells(shells: dict) -> list[tuple[int, int, tuple]]:
 
 
 def build_gto_basis(molecule, basis_key: str, pseudo_zeta=None) -> list:
-    """Contracted GTOs for every atom; pseudo-hydrogens fall back to a 1s STO."""
+    """Contracted GTOs for every atom; pseudo-hydrogens get scaled hydrogen shells."""
     key = basis_key.lower().strip()
     if key not in GTO_KEYS:
         raise ValueError(f"unknown GTO basis '{basis_key}'; choose from {sorted(GTO_KEYS)}")
@@ -66,12 +66,21 @@ def build_gto_basis(molecule, basis_key: str, pseudo_zeta=None) -> list:
     functions: list = []
     for ai, atom in enumerate(molecule):
         if atom.is_pseudo:
-            from .types import STO
+            from .pseudo_h import length_scale_ratio
 
             zeta = pseudo_zeta.get(atom.symbol)
             if zeta is None:
                 raise KeyError(f"no exponent derived for pseudo-hydrogen '{atom.symbol}'")
-            functions.append(STO(1, 0, 0, float(zeta), ai, f"{atom.symbol}{ai + 1}_1s"))
+            # this basis set's hydrogen shells, contracted by zeta(alpha)/zeta(1):
+            # a Gaussian exponent scales with the inverse length squared
+            scale2 = length_scale_ratio(zeta) ** 2
+            counts: dict[tuple[int, int], int] = {}
+            for l, m, prims in _expand_shells(table["H"]):
+                counts[(l, m)] = counts.get((l, m), 0) + 1
+                tag = "spdf"[l] + (f"{m:+d}" if l else "")
+                scaled = tuple((a * scale2, c) for a, c in prims)
+                functions.append(GTO.contracted(l, m, scaled, ai,
+                                                f"{atom.symbol}{ai + 1}_{counts[(l, m)]}{tag}"))
             continue
 
         shells = table.get(atom.element)

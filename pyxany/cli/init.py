@@ -47,7 +47,7 @@ basis:
 grid:
   n_r:           30      # radial points per atom
   n_a:           12      # polar points per atom (2*n_a azimuthal)
-  poisson_l_max: 6       # multipole cut-off of the Hartree expansion
+  poisson_l_max: auto    # multipole cut-off of the Hartree expansion (n_a - 1)
   screening_tol: 1.0e-10
 
 scf:
