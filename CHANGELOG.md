@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **Tier A cross-validation against PySCF** (`tests/test_tier_a_pyscf.py`):
+  same X-alpha functional (`1.05 * LDA_X`) and the same Gaussian basis,
+  translated from pyxany's own tables, on 10 closed-shell molecules, a
+  6-31G(d) case and a UKS radical. Mulliken charges agree to 3e-4 e and dipoles
+  to 6e-4 D; the total-energy gap is grid error and shrinks monotonically with
+  the grid (asserted). PySCF is a development-only tool, not a dependency.
+
 ### Changed
 
 - **Renamed from `dvxa` to `pyxany`** (distribution, import name, CLI command,
