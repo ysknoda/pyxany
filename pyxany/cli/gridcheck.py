@@ -49,7 +49,8 @@ def _gridcheck(args):
         elapsed = time.perf_counter()
         with timer(f"grid {label}"):
             grid = build_molecular_grid(molecule, n_r, n_a,
-                                        partition=cfg.grid.partition)
+                                        partition=cfg.grid.partition,
+                                        radial_by_element=cfg.grid.radial_by_element)
         with timer(f"chi {label}"):
             chi = chi_matrix(basis, molecule.positions, grid.local_points)
         with timer(f"density {label}"):

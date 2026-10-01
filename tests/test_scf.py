@@ -142,13 +142,14 @@ def test_smearing_resolves_a_degenerate_frontier():
 # exchange (tests/test_xc.py), and the hydrogenic spectrum
 # (tests/test_pseudo_h_basis.py).
 # Re-pinned 2026-10-01 for the ratio-damped Poisson solver (+0.01 to +18 mHa on this
-# deliberately coarse test grid; the new solver is ~3x more accurate per radial
+# coarse grid) and again for per-element radial sizes (-0.08 to +4.5 mHa;
+# H gets 30 and C 21 radial points at n_r = 25); the new solver is ~3x more accurate per radial
 # grid size, see pyxany/integrals/coulomb.py).
 REFERENCE_ENERGIES = {
-    "h2": -1.063190,
-    "h2o": -75.207301,
-    "ch3": -39.045010,
-    "co": -111.583116,
+    "h2": -1.063266,
+    "h2o": -75.207356,
+    "ch3": -39.040999,
+    "co": -111.578590,
 }
 
 REFERENCE_GEOMETRIES = {

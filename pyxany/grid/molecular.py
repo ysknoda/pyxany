@@ -36,6 +36,7 @@ class Grid:
     points: np.ndarray
     weights: np.ndarray
     owner: np.ndarray
+    #: Input (second-row) radial size; atoms may carry more, see ``n_r_atom``.
     n_r: int = 0
     n_a: int = 0
     partition: str = "becke"
@@ -47,14 +48,20 @@ class Grid:
     directions: np.ndarray = None
     #: Angular quadrature weights of one atomic sub-grid, shape (n_ang,).
     angular_weights: np.ndarray = None
-    #: Radial nodes per atom, shape (n_atoms, n_r).
-    radii: np.ndarray = None
+    #: Radial nodes of each atom (one array per atom; lengths may differ).
+    radii: list = None
     n_atoms: int = 0
+    #: Radial points of each atom's sub-grid.
+    n_r_atom: np.ndarray = None
     _slice: slice = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if self._slice is None:
             self._slice = local_slice(len(self.points))
+        if self.n_r_atom is None:
+            self.n_r_atom = np.full(self.n_atoms, self.n_r, dtype=int)
+        self._starts = np.concatenate([[0], np.cumsum(np.asarray(self.n_r_atom) * self.n_angular)]) \
+            if self.directions is not None else None
 
     def __len__(self) -> int:
         return len(self.points)
@@ -64,19 +71,13 @@ class Grid:
     def n_angular(self) -> int:
         return len(self.directions)
 
-    @property
-    def block_size(self) -> int:
-        """Points contributed by one atom's sub-grid."""
-        return self.n_r * self.n_angular
-
     def atom_block(self, ai: int) -> slice:
         """Rows of the full grid produced by atom ``ai``'s sub-grid."""
-        nb = self.block_size
-        return slice(ai * nb, (ai + 1) * nb)
+        return slice(int(self._starts[ai]), int(self._starts[ai + 1]))
 
     def as_radial_angular(self, values: np.ndarray, ai: int) -> np.ndarray:
-        """Reshape a per-point array's atom-``ai`` block to ``(n_r, n_angular)``."""
-        return values[self.atom_block(ai)].reshape(self.n_r, self.n_angular)
+        """Reshape a per-point array's atom-``ai`` block to ``(n_r_atom[ai], n_angular)``."""
+        return values[self.atom_block(ai)].reshape(int(self.n_r_atom[ai]), self.n_angular)
 
     # -- MPI-local view ----------------------------------------------------
     @property
@@ -135,8 +136,15 @@ def build_molecular_grid(
     n_a: int,
     partition: str = "becke",
     stiffness: int = DEFAULT_STIFFNESS,
+    radial_by_element: bool = True,
 ) -> Grid:
     """Superposition of atom-centred TA-radial x Gauss-Legendre-angular grids.
+
+    ``n_r`` is the radial size for second-row atoms. With ``radial_by_element``
+    each atom gets ``ceil(n_r * ratio)`` points, the ratio measured per element
+    (data/tables/radial_points.json) so that every element reaches the
+    ionisation-energy accuracy C-F reach at ``n_r``: Ga and As get 47 at
+    ``n_r = 30``, Cd 60. Pseudo-hydrogens use hydrogen's ratio.
 
     The volume element is ``dV = r^2 dr d(cos theta) d phi`` -- the angular
     weights carry no ``sin(theta)`` factor (see :mod:`pyxany.grid.angular`).
@@ -151,16 +159,18 @@ def build_molecular_grid(
         dirs, w_ang = spherical_product(n_a)
         n_ang = len(dirs)
 
+        n_r_atom = radial_sizes(molecule, n_r) if radial_by_element \
+            else np.full(len(molecule), n_r, dtype=int)
         all_pts, all_wts, all_owner, all_radii = [], [], [], []
         for ai, atom in enumerate(molecule):
-            r, w_r = treutler_ahlrichs_m4(n_r, atom.grid_radius())
+            r, w_r = treutler_ahlrichs_m4(int(n_r_atom[ai]), atom.grid_radius())
             all_radii.append(r)
             # outer product of radial and angular grids
             pts = (r[:, None, None] * dirs[None, :, :]).reshape(-1, 3) + atom.pos
             wts = (w_r[:, None] * r[:, None] ** 2 * w_ang[None, :]).reshape(-1)
             all_pts.append(pts)
             all_wts.append(wts)
-            all_owner.append(np.full(n_r * n_ang, ai, dtype=np.int32))
+            all_owner.append(np.full(len(r) * n_ang, ai, dtype=np.int32))
 
         points = np.vstack(all_pts)
         raw_weights = np.concatenate(all_wts)
@@ -181,7 +191,18 @@ def build_molecular_grid(
                     n_r=n_r, n_a=n_a, partition=partition,
                     raw_weights=raw_weights, cell_weights=cell,
                     directions=dirs, angular_weights=w_ang,
-                    radii=np.array(all_radii), n_atoms=len(molecule))
+                    radii=all_radii, n_atoms=len(molecule), n_r_atom=n_r_atom)
+
+
+def radial_sizes(molecule, n_r: int) -> np.ndarray:
+    """Per-atom radial points: ``ceil(n_r * ratio(element))``, at least 5."""
+    from ..data.loaders import radial_point_ratios
+
+    ratios = radial_point_ratios()
+    # ratios are stored to 4 decimals (47/30 -> 1.5667), so 30 * ratio may land a
+    # hair above the integer it encodes; 0.01 absorbs that rounding only
+    return np.array([max(5, int(np.ceil(n_r * ratios.get(a.element, 1.0) - 0.01)))
+                     for a in molecule], dtype=int)
 
 
 def two_centre_grid(centre, n_r: int, n_a: int, scale: float = 1.0):

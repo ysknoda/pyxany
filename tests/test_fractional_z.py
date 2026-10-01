@@ -50,13 +50,14 @@ def test_mulliken_charges_reference_the_fractional_nucleus():
     assert pop["charges"].sum() == pytest.approx(0.0, abs=1e-6)
 
 
-def test_pseudo_atom_gets_a_single_1s_function():
+def test_pseudo_atom_gets_the_basis_sets_hydrogen_functions():
+    """A terminator carries as many functions as hydrogen in the same basis (2 in DZ)."""
     mol = pseudo_molecule(0.75)
     cfg = make_config(basis={"set": "dz"})
     basis = build_basis(mol, cfg, derive_exponents(mol))
     pseudo_functions = [f for f in basis if f.atom_idx == 1]
-    assert len(pseudo_functions) == 1
-    assert (pseudo_functions[0].n, pseudo_functions[0].l) == (1, 0)
+    assert len(pseudo_functions) == 2
+    assert all((f.n, f.l) == (1, 0) for f in pseudo_functions)
 
 
 def test_missing_exponent_is_an_explicit_error():

@@ -81,14 +81,32 @@ def test_refining_the_grid_improves_the_integral():
 
 
 def test_grid_block_structure_matches_radii():
-    mol = Molecule([Atom.from_element("C", [0, 0, 0]),
-                    Atom.from_element("O", [0, 0, 2.13])])
+    """Atoms carry different radial sizes; every block must still map to its radii."""
+    mol = Molecule([Atom.from_element("Ga", [0, 0, 0]),
+                    Atom.from_element("H", [0, 0, 3.0]),
+                    Atom.from_element("O", [0, 2.5, 0])])
     grid = build_molecular_grid(mol, 20, 8)
-    assert grid.block_size * grid.n_atoms == len(grid)
-    block = grid.points[grid.atom_block(1)].reshape(grid.n_r, grid.n_angular, 3)
-    r = np.linalg.norm(block - mol[1].pos, axis=2)
-    assert np.allclose(r, grid.radii[1][:, None])
+    assert len(set(grid.n_r_atom)) > 1, "test needs atoms of different radial size"
+    assert sum(grid.n_r_atom) * grid.n_angular == len(grid)
+    for ai in range(len(mol)):
+        block = grid.points[grid.atom_block(ai)].reshape(
+            int(grid.n_r_atom[ai]), grid.n_angular, 3)
+        r = np.linalg.norm(block - mol[ai].pos, axis=2)
+        assert np.allclose(r, grid.radii[ai][:, None])
+        assert np.all(grid.owner[grid.atom_block(ai)] == ai)
     assert np.allclose(grid.weights, grid.raw_weights * grid.cell_weights)
+
+
+def test_radial_sizes_follow_the_measured_table():
+    """n_r is the second-row size; heavier rows get the measured multiple."""
+    from pyxany.grid.molecular import radial_sizes
+
+    mol = Molecule([Atom.from_element(s, [0, 0, 4.0 * i])
+                    for i, s in enumerate(("O", "Si", "Ga", "Cd"))])
+    assert list(radial_sizes(mol, 30)) == [29, 33, 47, 60]
+    uniform = build_molecular_grid(Molecule([mol[0], mol[2]]), 30, 6,
+                                   radial_by_element=False)
+    assert list(uniform.n_r_atom) == [30, 30]
 
 
 def test_own_cell_weight_gradient_matches_finite_differences():

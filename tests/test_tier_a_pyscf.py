@@ -11,17 +11,17 @@ PySCF is a development-only cross-check and deliberately not a declared
 dependency: the module skips when it is not installed.
 
 Tolerances were set from measurements (2026-10-01, PySCF 2.14.0, PySCF grid
-level 9, after the ratio-damped Poisson solver) at the test grid n_r=50, n_a=18,
-poisson_l_max=8, pair 60/20:
+level 9; ratio-damped Poisson solver; per-element radial sizes) at the test grid
+n_r=50, n_a=18, poisson_l_max=8, pair 60/20:
 
-    worst |dE|            3.03 mHa (H2S)  -> tolerance 4 mHa
-    worst MAE(eps_occ)    0.26 mHa (CO)   -> tolerance 0.5 mHa
-    worst |dq| Mulliken   2e-4 e          -> tolerance 2e-3 e
-    worst |d mu|          5e-4 D          -> tolerance 5e-3 D
+    worst |dE|            1.17 mHa (CO)   -> tolerance 2 mHa
+    worst MAE(eps_occ)    0.29 mHa (CO)   -> tolerance 0.5 mHa
+    worst |dq| Mulliken   1e-4 e          -> tolerance 2e-3 e
+    worst |d mu|          8e-4 D (LiH)    -> tolerance 5e-3 D
 
 The energy difference is quadrature error on the pyxany side and vanishes
-with the grid: CO -1.16 / -0.12 / -0.18 mHa, SiH4 +2.61 / +0.34 / +0.08 mHa,
-H2S +3.03 / +0.42 / +0.15 mHa at n_r = 50 / 70 / 90. Below ~0.2 mHa it is at
+with the grid: CO -1.17 / -0.08 / -0.16 mHa, SiH4 +0.97 / +0.22 / +0.04 mHa,
+H2S +0.91 / +0.20 / +0.07 mHa at n_r = 50 / 70 / 90. Below ~0.2 mHa it is at
 the level of PySCF's own grid error, so ``test_energy_converges_to_pyscf``
 asserts convergence to that level rather than strict monotonicity.
 """
@@ -47,7 +47,7 @@ ALPHA = 0.7
 _L = {"s": 0, "p": 1, "d": 2}
 
 TEST_GRID = {"n_r": 50, "n_a": 18, "poisson_l_max": 8, "pair_n_r": 60, "pair_n_a": 20}
-TOL_ENERGY_HA = 4e-3
+TOL_ENERGY_HA = 2e-3
 TOL_EPS_MAE_HA = 5e-4
 TOL_CHARGE_E = 2e-3
 TOL_DIPOLE_D = 5e-3

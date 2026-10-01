@@ -90,6 +90,9 @@ class GridConfig:
     pair_n_a: int = 14
     chunk_size: Any = "auto"
     memory_budget_mb: float = 4096.0
+    #: Scale n_r per element (n_r is then the second-row size); see
+    #: data/tables/radial_points.json and tools/radial_grid_sizes.py.
+    radial_by_element: bool = True
 
     @property
     def l_max(self) -> int:

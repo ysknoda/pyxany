@@ -181,14 +181,18 @@ def hartree_potential(grid, rho: np.ndarray, positions: np.ndarray,
         l_of = np.array([l for l, _ in lm])
 
         # -- steps 1-3: one set of radial multipole potentials per atom -----
-        v_radial = np.zeros((n_atoms, grid.n_r, len(lm)))
+        v_radial = [np.zeros((int(grid.n_r_atom[ai]), len(lm))) for ai in range(n_atoms)]
         rho_cell = grid.cell_weights * rho
         for ai in round_robin(range(n_atoms)):
             rho_a = grid.as_radial_angular(rho_cell, ai)                   # (n_r, n_ang)
             rho_lm = rho_a @ wY                                            # (n_r, n_lm)
             r = grid.radii[ai]
             v_radial[ai] = _radial_poisson_multipoles(r, rho_lm, l_of)
-        allreduce_array(v_radial)
+        # atoms may carry different radial sizes: reduce one flat buffer
+        flat = allreduce_array(np.concatenate([v.ravel() for v in v_radial]))
+        sizes = np.cumsum([0] + [v.size for v in v_radial])
+        v_radial = [flat[sizes[i]:sizes[i + 1]].reshape(v.shape)
+                    for i, v in enumerate(v_radial)]
 
         # -- step 4: sum every atom's potential onto the evaluation points ---
         pts = grid.points if eval_points is None else np.asarray(eval_points, float)

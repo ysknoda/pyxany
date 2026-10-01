@@ -46,6 +46,8 @@ CHECKSUMS = {
     "gto_631gd_pol": "f6c457217d1a29a7",
     "gto_sto3g": "941711c4444cd8a0",
     "orbital_labels": "6224dbe90ee67d95",
+    # measured by tools/radial_grid_sizes.py (2026-10-01), see ADR 0008
+    "radial_points": "55fb40348bcd66e2",
     "sto_dz": "5b3b9a388a2a4628",
     "sto_pol_d": "b11eaa7f0d7f51ae",
     "sto_pol_f": "f5219201d99b068f",

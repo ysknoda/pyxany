@@ -47,15 +47,16 @@ basis:
   nao_n_r: 2000             # radial points for the atomic solve behind 'nao'
 
 grid:
-  n_r:              30      # radial points per atom
+  n_r:              30      # radial points for second-row atoms (scaled per element)
   n_a:              12      # polar points per atom (2*n_a azimuthal)
   partition:        becke   # Becke fuzzy cells; 'none' is rejected, see below
-  poisson_l_max:    6       # multipole cut-off of the Hartree expansion
+  poisson_l_max:    auto    # multipole cut-off of the Hartree expansion (n_a - 1)
   screening_tol:    1.0e-10 # skip atom pairs that cannot overlap this much
   pair_n_r:         40      # radial points of the two-centre S/T grids
   pair_n_a:         14
   chunk_size:       auto    # points per chi block; auto uses memory_budget_mb
   memory_budget_mb: 4096
+  radial_by_element: true   # false: every atom gets exactly n_r
 
 scf:
   max_iter:         100
@@ -110,6 +111,15 @@ runtime:
 overcounts overlapping regions by roughly the number of atoms; the option
 exists in the code purely so `tests/test_grid.py` can demonstrate that, and is
 rejected by the input validator.
+
+**`grid.n_r`** is the radial size for second-row atoms. With
+`radial_by_element: true` (the default) each atom gets `ceil(n_r × ratio)`
+points, the ratio *measured* per element by `tools/radial_grid_sizes.py`: the
+grid error in the ionisation energy of the near-exact X-alpha atom is brought
+to the level C, N, O and F reach at `n_r`. At `n_r = 30`: H 36, C 25, O 29,
+Si 33, Ga/As 47, Cd 60, Pb 71. Without it, a Ga or Cd atom at `n_r = 30` carries
+~0.5 Ha of radial quadrature error in its total energy (energy *differences*
+are affected far less: 6 meV for the Ga ionisation energy).
 
 **`grid.poisson_l_max`** truncates the multipole expansion of each atom's share
 of the density. The default `auto` uses `n_a - 1`, the highest multipole the

@@ -80,8 +80,8 @@ jobs:
           print(f"{wheel}: {len(tables)} data tables")
           for n in tables:
               print("   ", n)
-          if len(tables) != 11:
-              sys.exit(f"expected 11 data tables in the wheel, found {len(tables)}")
+          if len(tables) != 12:
+              sys.exit(f"expected 12 data tables in the wheel, found {len(tables)}")
           PY
       - name: Install the built wheel and smoke-test the CLI
         run: |

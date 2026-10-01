@@ -100,6 +100,12 @@
 
 ### Changed
 
+- **Radial grid size depends on the element.** `grid.n_r` now means the
+  second-row size; each atom gets `ceil(n_r × ratio)`, the ratio measured for
+  all 86 elements by `tools/radial_grid_sizes.py` so that every element
+  reaches the ionisation-energy accuracy of C-F (`data/tables/radial_points.json`).
+  At n_r = 30: H 36, Si 33, Ga/As 47, Cd 60. `grid.radial_by_element: false`
+  restores a uniform grid. Total energies change (Tier C re-pinned).
 - **`grid.poisson_l_max` defaults to `auto` = n_a - 1** (11 on the default
   grid; was 6) and may not exceed n_a - 1. The force error is set by this
   truncation (CO: 1.6e-2 Ha/Bohr at 6, 1.3e-3 at 12). The Hartree step costs

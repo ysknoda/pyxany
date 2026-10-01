@@ -82,7 +82,7 @@ def on_dv_grid(symbol: str, density, r_max: float, n_r: int) -> dict:
     if density is None:
         return {"N": 0.0, "E_ne": 0.0, "E_H": 0.0, "E_x": 0.0}
     mol = Molecule([Atom.from_element(symbol, np.zeros(3))], name=symbol)
-    grid = build_molecular_grid(mol, n_r, 4)
+    grid = build_molecular_grid(mol, n_r, 4, radial_by_element=False)
     rr = np.linalg.norm(grid.points, axis=1)
     rho = np.where(rr <= r_max, np.exp(density(np.log(np.maximum(rr, 1e-12)))), 0.0)
     w = grid.weights

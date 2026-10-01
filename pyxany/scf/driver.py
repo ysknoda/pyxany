@@ -158,7 +158,8 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
                   + ("   [WARNING: near-linear dependence]" if cond > 1e4 else ""))
 
     grid = build_molecular_grid(molecule, grid_cfg.n_r, grid_cfg.n_a,
-                                partition=grid_cfg.partition)
+                                partition=grid_cfg.partition,
+                                radial_by_element=grid_cfg.radial_by_element)
     chunk = choose_strategy(grid, n_basis, grid_cfg.chunk_size,
                             grid_cfg.memory_budget_mb)
     terms = GridTerms(basis, molecule, grid, chunk_size=chunk)
@@ -168,7 +169,7 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
         how = ("cached" if terms.cached
                else f"chunked, {chunk:,} points at a time")
         mpi_print(f"  DV grid            : {len(grid)} points "
-                  f"({grid.n_r}r x {grid.n_a}th x {2 * grid.n_a}ph per atom), "
+                  f"({_radial_summary(grid)}r x {grid.n_a}th x {2 * grid.n_a}ph per atom), "
                   f"chi {grid.chi_memory_mb(n_basis, chunk):.1f} MB/rank ({how})")
 
     with timer("scf.v_nuc"):
@@ -335,6 +336,12 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
 # --------------------------------------------------------------------------
 # helpers
 # --------------------------------------------------------------------------
+def _radial_summary(grid) -> str:
+    """'30' for a uniform grid, '25-47' when radial sizes differ by element."""
+    lo, hi = int(min(grid.n_r_atom)), int(max(grid.n_r_atom))
+    return f"{lo}" if lo == hi else f"{lo}-{hi}"
+
+
 def _gather_full(grid, rho_local: np.ndarray) -> np.ndarray:
     """Assemble the full-grid density from the rank-local slices."""
     from ..parallel import PARALLEL

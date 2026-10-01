@@ -16,19 +16,19 @@ PySCF with the same Gaussian basis (STO-3G, 6-31G), same geometry and
 exchange `1.05 * Slater` (= alpha 0.7 / (2/3)), both on converged grids.
 Tolerances, set from measurement on 2026-10-01 (PySCF 2.14.0, grid level 9;
 pyxany test grid n_r=50, n_a=18, poisson_l_max=8, pair 60/20; re-measured after
-the ratio-damped Poisson solver), on 10 closed-shell molecules, one 6-31G(d)
+the ratio-damped Poisson solver and per-element radial sizes), on 10 closed-shell molecules, one 6-31G(d)
 case and one UKS radical (CH3):
 
 | quantity | worst measured | tolerance |
 |---|---|---|
-| total energy | 3.03 mHa (H2S) | \|dE\| <= 4 mHa |
-| occupied orbital energies | MAE 0.26 mHa (CO) | MAE <= 0.5 mHa |
-| Mulliken charges | 2e-4 e | <= 2e-3 e |
-| dipole | 5e-4 D | <= 5e-3 D |
+| total energy | 1.17 mHa (CO) | \|dE\| <= 2 mHa |
+| occupied orbital energies | MAE 0.29 mHa (CO) | MAE <= 0.5 mHa |
+| Mulliken charges | 1e-4 e | <= 2e-3 e |
+| dipole | 8e-4 D | <= 5e-3 D |
 
 The energy gap is quadrature error on the pyxany side and vanishes with the
-grid (CO -1.16 / -0.12 / -0.18, SiH4 +2.61 / +0.34 / +0.08, H2S +3.03 / +0.42 /
-+0.15 mHa at n_r = 50 / 70 / 90); the finest grid must agree to 0.5 mHa.
+grid (CO -1.17 / -0.08 / -0.16, SiH4 +0.97 / +0.22 / +0.04, H2S +0.91 / +0.20 /
++0.07 mHa at n_r = 50 / 70 / 90); the finest grid must agree to 0.5 mHa.
 
 PySCF is installed on the development machine only and
 is **not** listed in `pyproject.toml`; these tests skip when it is absent.

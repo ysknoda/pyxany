@@ -68,8 +68,12 @@ def out_path(cfg, suffix: str) -> Path:
 
 def resource_estimate(cfg, molecule, basis) -> str:
     """What ``--dry-run`` prints: grid size, memory and a rough cost estimate."""
+    from ..grid.molecular import radial_sizes
+
     n_ang = cfg.grid.n_a * 2 * cfg.grid.n_a
-    n_pts = len(molecule) * cfg.grid.n_r * n_ang
+    n_r_atom = (radial_sizes(molecule, cfg.grid.n_r) if cfg.grid.radial_by_element
+                else [cfg.grid.n_r] * len(molecule))
+    n_pts = int(sum(n_r_atom)) * n_ang
     nb = len(basis)
     chi_mb = n_pts * nb * 8 / 1024**2
     n_lm = (cfg.grid.l_max + 1) ** 2
@@ -80,8 +84,8 @@ def resource_estimate(cfg, molecule, basis) -> str:
         f"  atoms                {len(molecule)}",
         f"  basis functions      {nb}",
         f"  electrons            {molecule.n_electrons:g}",
-        f"  grid points          {n_pts:,}  ({cfg.grid.n_r} radial x {n_ang} angular"
-        f" per atom)",
+        f"  grid points          {n_pts:,}  ({min(n_r_atom)}-{max(n_r_atom)} radial x "
+        f"{n_ang} angular per atom)",
         f"  chi matrix           {chi_mb:,.1f} MB  (full, one rank)",
         f"  S/T pairs            {_n_pairs(molecule, basis, cfg)} of "
         f"{len(molecule) * (len(molecule) - 1) // 2} after screening",
@@ -93,7 +97,8 @@ def resource_estimate(cfg, molecule, basis) -> str:
     from ..scf.grid_terms import choose_strategy
 
     grid = build_molecular_grid(molecule, cfg.grid.n_r, cfg.grid.n_a,
-                                partition=cfg.grid.partition)
+                                partition=cfg.grid.partition,
+                                radial_by_element=cfg.grid.radial_by_element)
     chunk = choose_strategy(grid, nb, cfg.grid.chunk_size, cfg.grid.memory_budget_mb)
     budget = cfg.grid.memory_budget_mb
     if chunk is None:

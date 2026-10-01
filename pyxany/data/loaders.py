@@ -59,6 +59,18 @@ def gto_polarisation_exponents() -> dict:
 
 
 @lru_cache(maxsize=None)
+def radial_point_ratios() -> dict[str, float]:
+    """``{element: n_r(element) / n_r(second row)}`` measured by tools/radial_grid_sizes.py.
+
+    The criterion is the grid error in the ionisation energy of the near-exact
+    X-alpha atom: each element gets the radial points that bring it to the
+    accuracy C, N, O, F reach at the input ``n_r`` (see the table's header).
+    """
+    return {s: float(v["ratio_to_second_row"])
+            for s, v in _load("radial_points")["elements"].items()}
+
+
+@lru_cache(maxsize=None)
 def orbital_labels() -> dict:
     """{(n, l, m): "2pz"} short orbital labels."""
     out = {}
