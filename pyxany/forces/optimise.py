@@ -30,6 +30,10 @@ from .finite_difference import compute_forces_fd
 SCIPY_METHOD = {"lbfgs": "L-BFGS-B", "cg": "CG"}
 
 
+class _Converged(Exception):
+    """Raised from the objective to stop scipy once max|F| < f_max."""
+
+
 @dataclass
 class OptimisationResult:
     converged: bool
@@ -119,7 +123,6 @@ def optimise_geometry(molecule, config, verbose: int = 1) -> OptimisationResult:
         else:
             forces = compute_forces(result, config, project=project)
         state["n"] += 1
-        state["scf"] = result
         f_move = forces[moving]
         f_max = float(np.abs(f_move).max())
         if verbose:
@@ -132,7 +135,20 @@ def optimise_geometry(molecule, config, verbose: int = 1) -> OptimisationResult:
             append_frame(traj_path, current,
                          f"step {state['n']}  E = {result.total_energy:.9f} Ha  "
                          f"max|F| = {f_max:.3e} Ha/Bohr")
-        state["best"] = (result.total_energy, forces.copy())
+        record = (result.total_energy, forces.copy(), current.positions.copy(), result)
+        # Keep the evaluation the result will report: the lowest energy (which is
+        # where L-BFGS-B ends, res.x) -- not simply the last one, which is often a
+        # rejected line-search trial whose geometry, energy and forces do not
+        # belong to the minimiser's answer.
+        if state["best"] is None or result.total_energy < state["best"][0]:
+            state["best"] = record
+        if f_max < opt_cfg.f_max:
+            # Converged by the stated criterion. On a finite grid E and the
+            # analytic forces are not exactly consistent, so the point where F
+            # vanishes need not be the energy minimum; L-BFGS-B would reject it
+            # and stall at the energy minimum with |F| above f_max.
+            state["best"] = record
+            raise _Converged
         # scipy minimises E and wants dE/dx = -F
         return result.total_energy, (-f_move).ravel()
 
@@ -145,10 +161,13 @@ def optimise_geometry(molecule, config, verbose: int = 1) -> OptimisationResult:
         options = {"maxiter": opt_cfg.max_steps, "gtol": opt_cfg.f_max}
         if method == "L-BFGS-B":
             options["ftol"] = 1e-12
-        res = minimize(energy_and_gradient, x0, jac=True, method=method,
-                       options=options)
+        try:
+            minimize(energy_and_gradient, x0, jac=True, method=method, options=options)
+        except _Converged:
+            pass
 
-    energy, forces = state["best"]
+    energy, forces, positions, state["scf"] = state["best"]
+    current.positions = positions
     f_max = float(np.abs(forces[moving]).max())
     converged = f_max < opt_cfg.f_max
     if verbose:

@@ -35,17 +35,36 @@ PySCF is installed on the development machine only and
 is **not** listed in `pyproject.toml`; these tests skip when it is absent.
 
 **Tier B -- experiment (loose; physical sanity).** Experimental geometries and
-values from NIST CCCBDB, fetched rate-limited and cached on disk.
-Pass/fail uses only quantities X-alpha should get right qualitatively:
+values from NIST CCCBDB (`tools/fetch_cccbdb.py`, rate-limited, raw pages
+cached; parsed values with primary references in
+`tests/data/cccbdb_experimental.json`). Tolerances come from the functional's
+own measured error, obtained with PySCF at a large basis so that basis error is
+removed, plus the measured STO basis error -- not from guesses:
 
-- equilibrium bond lengths within +-3 % (UNCERTAIN, ~70 % confidence; to be
-  backed by a literature value for alpha = 0.7 before finalising);
-- HOMO-LUMO gap **ordering** within a series, not absolute values;
-- sign and ordering of Mulliken charges;
-- dipole magnitude order and direction (CO excluded: its sign is delicate).
+- **bond lengths** (geometry optimised, DZP): intrinsic X-alpha error -0.2 %
+  (N2) to +4.0 % (H2), X-H bonds +1.2 to +1.8 % (cc-pVTZ); pyxany DZP measured
+  -0.3 % to +4.2 %. Tolerance **5 %**. LiH excluded (STO Li basis: +5.8 %
+  against intrinsic +1.8 %). The originally proposed 3 % would have failed H2
+  on the functional alone.
+- **dipoles** (experimental geometry, DZP): intrinsic X-alpha / aug-cc-pVTZ
+  0.94-1.07 x experiment; pyxany DZP 0.74-1.07 (no diffuse functions).
+  Tolerance: **ratio in [0.65, 1.35] and correct direction** (LiH, NH3, H2O,
+  HF, H2S); CO excluded (0.11 D, small difference of large terms).
+- **Mulliken charges**: signs (LiH, NH3, H2O, HF) and the ordering
+  q_H(NH3) < q_H(H2O) < q_H(HF). Excluded: CH4 (C at -1.1 e, Mulliken
+  artefact), SiH4 (Si sign flips between DZ and DZP), H2S.
+- **clusters**: anion charge ordering MgO < CdSe < GaAs < 0 (electronegativity
+  difference 2.13 > 0.86 > 0.37), and pseudo-hydrogen opening the gap that
+  plain hydrogen closes in GaAs4 (0.07 -> 5.87 eV), the effect of Deng et al.
+  (2012).
 
-Not used for pass/fail: total energies, absolute gaps, Koopmans-like orbital
-ionisation energies.
+**Withdrawn:** the HOMO-LUMO gap ordering Si < GaAs < CdSe < MgO. Measured
+6.05 / 5.87 / 3.34 / 5.98 eV: these 5-7 heavy-atom clusters are dominated by
+quantum confinement and differ in size, so there is no physical reason for them
+to follow the bulk order.
+
+Not used for pass/fail: total energies, absolute gaps, orbital ionisation
+energies.
 
 **Tier C -- regression.** Current values pinned.
 

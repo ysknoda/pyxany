@@ -11,6 +11,32 @@
   to 6e-4 D; the total-energy gap is grid error and shrinks monotonically with
   the grid (asserted). PySCF is a development-only tool, not a dependency.
 
+- **Tier B/C validation on real molecules and clusters**
+  (`tests/test_tier_b_experiment.py`, `tests/test_tier_bc_clusters.py`), with
+  experimental data from NIST CCCBDB (`tools/fetch_cccbdb.py`). Tolerances are
+  set from the X-alpha functional's own error, measured with PySCF at large
+  basis sets; see `docs/adr/0003-validation-tiers.md`.
+
+### Fixed
+
+- **Geometry optimisation could report a geometry that was not its answer.**
+  The returned molecule, energy and forces were those of the last evaluation,
+  often a rejected line-search trial point. They are now the lowest-energy
+  evaluation, i.e. scipy's solution.
+- **Optimisation ignored a point that met the force criterion.** On a finite
+  grid the energy and analytic forces are slightly inconsistent, so L-BFGS-B
+  stalled at the energy minimum with max|F| above f_max: H2O/DZ at n_r = 40
+  passed max|F| = 5.8e-6 at step 7, then ran 60 steps without converging. The
+  first evaluation with max|F| < f_max now ends the optimisation (7 steps).
+
+### Known limitations
+
+- The analytic forces omit the grid-weight derivative term. For CO at the
+  default-like grid the remaining error is ~1e-2 Ha/Bohr, larger than the
+  default f_max, so such molecules cannot be optimised to f_max = 1e-3.
+- Pseudo-hydrogen terminators carry a single-zeta 1s function whatever
+  `basis.set` is, so an alpha = 1 terminator equals hydrogen only in `sz`.
+
 ### Changed
 
 - **Renamed from `dvxa` to `pyxany`** (distribution, import name, CLI command,

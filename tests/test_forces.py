@@ -268,3 +268,66 @@ def test_raw_translation_residual_is_recorded():
     assert translation_residual(forces) < 1e-12          # by construction
     raw = compute_forces.last_translation_residual        # the informative one
     assert raw > 1e-6, "the raw residual should be a real, non-trivial number"
+
+
+def _fake_optimiser_backend(monkeypatch, energy_min_bohr, force_zero_bohr, k=0.5):
+    """Replace SCF and forces with a harmonic H2 whose E-minimum and F-zero differ.
+
+    On a finite DV grid the energy and the analytic forces are not exactly
+    consistent, so the bond length where E is lowest and the one where F = 0
+    differ slightly. This stand-in reproduces that in microseconds.
+    """
+    from types import SimpleNamespace
+
+    import pyxany.forces.optimise as opt
+
+    def fake_scf(mol, basis, config, verbose=0):
+        r = float(np.linalg.norm(mol.positions[1] - mol.positions[0]))
+        return SimpleNamespace(total_energy=k * (r - energy_min_bohr) ** 2, molecule=mol)
+
+    def fake_forces(result, config, project=True):
+        pos = result.molecule.positions
+        d = pos[1] - pos[0]
+        r = float(np.linalg.norm(d))
+        f1 = -2.0 * k * (r - force_zero_bohr) * d / r
+        return np.array([-f1, f1])
+
+    monkeypatch.setattr(opt, "build_basis", lambda mol, cfg: None)
+    monkeypatch.setattr(opt, "run_scf", fake_scf)
+    monkeypatch.setattr(opt, "compute_forces", fake_forces)
+
+
+def _h2(r_bohr):
+    from pyxany.molecule import Atom, Molecule
+
+    return Molecule([Atom.from_element("H", np.zeros(3)),
+                     Atom.from_element("H", np.array([0.0, 0.0, r_bohr]))], name="h2")
+
+
+def test_optimiser_returns_the_geometry_its_energy_and_forces_belong_to(monkeypatch, tmp_path):
+    """The result must not be the last line-search trial point but a coherent one."""
+    from pyxany.forces.optimise import optimise_geometry
+
+    _fake_optimiser_backend(monkeypatch, 1.40, 1.40)
+    cfg = make_config(optimise={"enabled": True, "f_max": 1e-4, "max_steps": 50},
+                      output={"dir": str(tmp_path), "prefix": "t"})
+    res = optimise_geometry(_h2(1.70), cfg, verbose=0)
+    r = float(np.linalg.norm(res.molecule.positions[1] - res.molecule.positions[0]))
+    assert res.converged
+    assert res.energy == pytest.approx(0.5 * (r - 1.40) ** 2, abs=1e-14)
+    assert np.abs(res.forces).max() < 1e-4
+
+
+def test_optimiser_accepts_a_force_converged_point_despite_grid_inconsistency(
+        monkeypatch, tmp_path):
+    """Measured on H2O/dz at n_r=40: max|F| hit 5.8e-6 on one evaluation, but L-BFGS
+    settled on the energy minimum where max|F| = 3.6e-4 and ran out of steps."""
+    from pyxany.forces.optimise import optimise_geometry
+
+    # F = 0 sits 1e-3 Bohr from the energy minimum: |F| = 1e-3 Ha/Bohr at E_min
+    _fake_optimiser_backend(monkeypatch, 1.400, 1.401)
+    cfg = make_config(optimise={"enabled": True, "f_max": 3e-4, "max_steps": 50},
+                      output={"dir": str(tmp_path), "prefix": "t"})
+    res = optimise_geometry(_h2(1.70), cfg, verbose=0)
+    assert res.converged
+    assert np.abs(res.forces).max() < 3e-4

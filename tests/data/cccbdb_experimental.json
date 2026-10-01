@@ -1,0 +1,557 @@
+{
+ "_source": "NIST CCCBDB, Release 22 (https://cccbdb.nist.gov), exp2x.asp",
+ "_retrieved": "2026-10-01",
+ "_units": {
+  "geometry": "Angstrom",
+  "dipole": "Debye",
+  "ionisation_energy": "eV (adiabatic)"
+ },
+ "H2": {
+  "geometry_angstrom": [
+   [
+    "H",
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    "H",
+    0.0,
+    0.0,
+    0.7414
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rHH",
+    "value": 0.741,
+    "reference": "1979HUB/HER",
+    "comment": "re"
+   }
+  ],
+  "dipole_debye": {
+   "value": 0.0,
+   "reference": null
+  },
+  "ionisation_energy_ev": {
+   "value": 15.426,
+   "reference": "webbook"
+  },
+  "cas": "1333740",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=1333740&charge=0"
+ },
+ "LiH": {
+  "geometry_angstrom": [
+   [
+    "Li",
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    "H",
+    0.0,
+    0.0,
+    1.5949
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rLiH",
+    "value": 1.595,
+    "reference": "NISTdiatomic",
+    "comment": "re  7Li 1H"
+   }
+  ],
+  "dipole_debye": {
+   "value": 5.88,
+   "reference": "NSRDS-NBS10"
+  },
+  "ionisation_energy_ev": {
+   "value": 7.9,
+   "reference": "webbook"
+  },
+  "cas": "7580678",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7580678&charge=0"
+ },
+ "CH4": {
+  "geometry_angstrom": [
+   [
+    "C",
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    "H",
+    0.6276,
+    0.6276,
+    0.6276
+   ],
+   [
+    "H",
+    0.6276,
+    -0.6276,
+    -0.6276
+   ],
+   [
+    "H",
+    -0.6276,
+    0.6276,
+    -0.6276
+   ],
+   [
+    "H",
+    -0.6276,
+    -0.6276,
+    0.6276
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rCH",
+    "value": 1.087,
+    "reference": "1979Hir:213",
+    "comment": "re"
+   },
+   {
+    "name": "aHCH",
+    "value": 109.471,
+    "reference": "1974sve/kov",
+    "comment": null
+   }
+  ],
+  "dipole_debye": {
+   "value": 0.0,
+   "reference": "NSRDS-NBS10"
+  },
+  "ionisation_energy_ev": {
+   "value": 12.61,
+   "reference": "webbook"
+  },
+  "cas": "74828",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=74828&charge=0"
+ },
+ "NH3": {
+  "geometry_angstrom": [
+   [
+    "N",
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    "H",
+    0.0,
+    -0.9377,
+    -0.3816
+   ],
+   [
+    "H",
+    0.8121,
+    0.4689,
+    -0.3816
+   ],
+   [
+    "H",
+    -0.8121,
+    0.4689,
+    -0.3816
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rNH",
+    "value": 1.012,
+    "reference": "1966Herzberg",
+    "comment": null
+   },
+   {
+    "name": "aHNH",
+    "value": 106.67,
+    "reference": "1966Herzberg",
+    "comment": null
+   },
+   {
+    "name": "aXNH",
+    "value": 112.15,
+    "reference": "1966Herzberg",
+    "comment": "from symmetry. X is on symmetry axis."
+   }
+  ],
+  "dipole_debye": {
+   "value": 1.476,
+   "reference": "1970Shi:3572-3576"
+  },
+  "ionisation_energy_ev": {
+   "value": 10.07,
+   "reference": "webbook"
+  },
+  "cas": "7664417",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7664417&charge=0"
+ },
+ "H2O": {
+  "geometry_angstrom": [
+   [
+    "O",
+    0.0,
+    0.0,
+    0.1173
+   ],
+   [
+    "H",
+    0.0,
+    0.7572,
+    -0.4692
+   ],
+   [
+    "H",
+    0.0,
+    -0.7572,
+    -0.4692
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rOH",
+    "value": 0.958,
+    "reference": "1979Hoy/Bun:1",
+    "comment": "re"
+   },
+   {
+    "name": "aHOH",
+    "value": 104.4776,
+    "reference": "1979Hoy/Bun:1",
+    "comment": "equilibrium"
+   }
+  ],
+  "dipole_debye": {
+   "value": 1.857,
+   "reference": "1991Sho/Ebe:5875-5882"
+  },
+  "ionisation_energy_ev": {
+   "value": 12.621,
+   "reference": "webbook"
+  },
+  "cas": "7732185",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7732185&charge=0"
+ },
+ "HF": {
+  "geometry_angstrom": [
+   [
+    "F",
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    "H",
+    0.0,
+    0.0,
+    0.9168
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rHF",
+    "value": 0.917,
+    "reference": "NISTdiatomic",
+    "comment": "re"
+   }
+  ],
+  "dipole_debye": {
+   "value": 1.827,
+   "reference": "NISTDiatomic"
+  },
+  "ionisation_energy_ev": {
+   "value": 16.03,
+   "reference": "webbook"
+  },
+  "cas": "7664393",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7664393&charge=0"
+ },
+ "N2": {
+  "geometry_angstrom": [
+   [
+    "N",
+    0.0,
+    0.0,
+    0.5488
+   ],
+   [
+    "N",
+    0.0,
+    0.0,
+    -0.5488
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rNN",
+    "value": 1.098,
+    "reference": "1979HUB/HER",
+    "comment": "re"
+   }
+  ],
+  "dipole_debye": {
+   "value": 0.0,
+   "reference": "NSRDS-NBS10"
+  },
+  "ionisation_energy_ev": {
+   "value": 15.581,
+   "reference": "webbook"
+  },
+  "cas": "7727379",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7727379&charge=0"
+ },
+ "CO": {
+  "geometry_angstrom": [
+   [
+    "C",
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    "O",
+    0.0,
+    0.0,
+    1.1282
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rCO",
+    "value": 1.128,
+    "reference": "NISTdiatomic",
+    "comment": "re"
+   }
+  ],
+  "dipole_debye": {
+   "value": 0.112,
+   "reference": "NSRDS-NBS10"
+  },
+  "ionisation_energy_ev": {
+   "value": 14.014,
+   "reference": "webbook"
+  },
+  "cas": "630080",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=630080&charge=0"
+ },
+ "SiH4": {
+  "geometry_angstrom": [
+   [
+    "Si",
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    "H",
+    0.8544,
+    0.8544,
+    0.8544
+   ],
+   [
+    "H",
+    -0.8544,
+    -0.8544,
+    0.8544
+   ],
+   [
+    "H",
+    -0.8544,
+    0.8544,
+    -0.8544
+   ],
+   [
+    "H",
+    0.8544,
+    -0.8544,
+    -0.8544
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rSiH",
+    "value": 1.48,
+    "reference": "1955Boyd:922",
+    "comment": "+- 0.0004"
+   },
+   {
+    "name": "aHSiH",
+    "value": 109.47122,
+    "reference": null,
+    "comment": null
+   }
+  ],
+  "dipole_debye": {
+   "value": 0.0,
+   "reference": "NSRDS-NBS10"
+  },
+  "ionisation_energy_ev": {
+   "value": 11.0,
+   "reference": "webbook"
+  },
+  "cas": "7803625",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7803625&charge=0"
+ },
+ "H2S": {
+  "geometry_angstrom": [
+   [
+    "S",
+    0.0,
+    0.0,
+    0.103
+   ],
+   [
+    "H",
+    0.0,
+    0.9616,
+    -0.8239
+   ],
+   [
+    "H",
+    0.0,
+    -0.9616,
+    -0.8239
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rSH",
+    "value": 1.336,
+    "reference": "1975Coo/DeL:237",
+    "comment": null
+   },
+   {
+    "name": "aHSH",
+    "value": 92.11,
+    "reference": "1975Coo/DeL:237",
+    "comment": null
+   }
+  ],
+  "dipole_debye": {
+   "value": 0.977,
+   "reference": "1984Vis/Dyk:231-239"
+  },
+  "ionisation_energy_ev": {
+   "value": 10.457,
+   "reference": "webbook"
+  },
+  "cas": "7783064",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7783064&charge=0"
+ },
+ "C6H6": {
+  "geometry_angstrom": [
+   [
+    "C",
+    0.0,
+    1.397,
+    0.0
+   ],
+   [
+    "C",
+    1.2098,
+    0.6985,
+    0.0
+   ],
+   [
+    "C",
+    1.2098,
+    -0.6985,
+    0.0
+   ],
+   [
+    "C",
+    0.0,
+    -1.397,
+    0.0
+   ],
+   [
+    "C",
+    -1.2098,
+    -0.6985,
+    0.0
+   ],
+   [
+    "C",
+    -1.2098,
+    0.6985,
+    0.0
+   ],
+   [
+    "H",
+    0.0,
+    2.481,
+    0.0
+   ],
+   [
+    "H",
+    2.1486,
+    1.2405,
+    0.0
+   ],
+   [
+    "H",
+    2.1486,
+    -1.2405,
+    0.0
+   ],
+   [
+    "H",
+    0.0,
+    -2.481,
+    0.0
+   ],
+   [
+    "H",
+    -2.1486,
+    -1.2405,
+    0.0
+   ],
+   [
+    "H",
+    -2.1486,
+    1.2405,
+    0.0
+   ]
+  ],
+  "internal_coordinates": [
+   {
+    "name": "rCC",
+    "value": 1.397,
+    "reference": "1966Herzberg",
+    "comment": null
+   },
+   {
+    "name": "rCH",
+    "value": 1.084,
+    "reference": "1966Herzberg",
+    "comment": null
+   },
+   {
+    "name": "aCCC",
+    "value": 120.0,
+    "reference": "1966Herzberg",
+    "comment": null
+   },
+   {
+    "name": "aHCC",
+    "value": 120.0,
+    "reference": "1966Herzberg",
+    "comment": null
+   }
+  ],
+  "dipole_debye": {
+   "value": 0.0,
+   "reference": "NSRDS-NBS10"
+  },
+  "ionisation_energy_ev": {
+   "value": 9.244,
+   "reference": "webbook"
+  },
+  "cas": "71432",
+  "url": "https://cccbdb.nist.gov/exp2x.asp?casno=71432&charge=0"
+ }
+}
