@@ -15,18 +15,18 @@ from pathlib import Path
 import pytest
 
 from conftest import make_config, make_molecule
-from dvxa.basis import build_basis
-from dvxa.parallel import PARALLEL, SIZE, local_slice, round_robin
-from dvxa.scf import run_scf
+from pyxany.basis import build_basis
+from pyxany.parallel import PARALLEL, SIZE, local_slice, round_robin
+from pyxany.scf import run_scf
 
 PROBE = """
 import json, sys
 sys.path.insert(0, {src!r}); sys.path.insert(0, {tests!r})
 from conftest import make_config, make_molecule
-from dvxa.basis import build_basis
-from dvxa.forces import compute_forces
-from dvxa.parallel import SIZE, is_root
-from dvxa.scf import run_scf
+from pyxany.basis import build_basis
+from pyxany.forces import compute_forces
+from pyxany.parallel import SIZE, is_root
+from pyxany.scf import run_scf
 mol = make_molecule("h2o", [("O",0,0,0.1173),("H",0,0.7572,-0.4692),("H",0,-0.7572,-0.4692)])
 cfg = make_config(basis={{"set":"sz"}}, grid={{"n_r":25,"n_a":10,"poisson_l_max":4}},
                   scf={{"max_iter":60,"e_tol":1e-9,"d_tol":1e-8}}, forces={{"enabled":True}})
@@ -66,7 +66,7 @@ def test_energy_and_forces_match_serial(tmp_path):
     """Run the same calculation on 1 and N ranks and compare."""
     root = Path(__file__).resolve().parent.parent
     script = tmp_path / "probe.py"
-    script.write_text(PROBE.format(src=str(root / "src"), tests=str(root / "tests")))
+    script.write_text(PROBE.format(src=str(root), tests=str(root / "tests")))
 
     import json
 

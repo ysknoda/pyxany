@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dvxa.config import Config
-from dvxa.constants import ANG_TO_BOHR
-from dvxa.molecule import Atom, Molecule
+from pyxany.config import Config
+from pyxany.constants import ANG_TO_BOHR
+from pyxany.molecule import Atom, Molecule
 
 
 def make_molecule(name, geometry_angstrom, charge=0, multiplicity=1):

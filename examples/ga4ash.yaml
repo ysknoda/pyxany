@@ -1,5 +1,5 @@
 # III-V: As terminators carry alpha = 3/4
-# Relax only the terminators with:  dvxa opt ga4ash.yaml --freeze-core
+# Relax only the terminators with:  pyxany opt ga4ash.yaml --freeze-core
 molecule:
   name: ga4ash
   structure: ga4ash.xyz

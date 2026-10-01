@@ -3,7 +3,7 @@
 ## Before submitting
 
 ```bash
-dvxa run cluster.yaml --dry-run
+pyxany run cluster.yaml --dry-run
 ```
 
 reports grid size, the memory one rank needs for the chi matrix, how many atom
@@ -19,7 +19,7 @@ is solved once on rank 0 and broadcast. Console output and file writes happen
 on rank 0 only.
 
 ```bash
-mpirun -n 128 dvxa run cluster.yaml
+mpirun -n 128 pyxany run cluster.yaml
 ```
 
 Keep BLAS single-threaded so ranks do not oversubscribe the node:
@@ -34,7 +34,7 @@ ones to 1e-8.
 ## Long jobs
 
 ```bash
-nohup setsid mpirun -n 128 dvxa run big.yaml --log big.out &
+nohup setsid mpirun -n 128 pyxany run big.yaml --log big.out &
 ```
 
 `--log` mirrors everything to a file, and `setsid` detaches the job so it

@@ -7,9 +7,9 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
-from dvxa.constants import ANG_TO_BOHR
-from dvxa.molecule import Atom, Molecule
-from dvxa.passivation import (
+from pyxany.constants import ANG_TO_BOHR
+from pyxany.molecule import Atom, Molecule
+from pyxany.passivation import (
     ANION,
     CATION,
     VASP_CHARGES,
@@ -141,10 +141,10 @@ def test_terminated_cluster_has_a_clean_gap():
     signature that the electron-counting rule was satisfied.
     """
     from conftest import make_config
-    from dvxa.basis import build_basis
-    from dvxa.basis.pseudo_h import derive_exponents
-    from dvxa.properties import basis_function_weights, mulliken
-    from dvxa.scf import run_scf
+    from pyxany.basis import build_basis
+    from pyxany.basis.pseudo_h import derive_exponents
+    from pyxany.properties import basis_function_weights, mulliken
+    from pyxany.scf import run_scf
 
     result_p = passivate(cluster(tetrahedral("Si", "Si", 2.352)),
                          "pseudo_hydrogen", coordination=4)
@@ -178,8 +178,8 @@ def test_terminated_cluster_has_a_clean_gap():
 def _octahedral_pair(a_symbol, b_symbol, n=6):
     """One A site with n octahedral B neighbours, and each B bonded back to A."""
     import numpy as np
-    from dvxa.constants import ANG_TO_BOHR
-    from dvxa.molecule import Atom, Molecule
+    from pyxany.constants import ANG_TO_BOHR
+    from pyxany.molecule import Atom, Molecule
     dirs = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0],
                      [0, -1, 0], [0, 0, 1], [0, 0, -1]], float)[:n]
     atoms = [Atom.from_element(a_symbol, np.zeros(3))]
@@ -197,7 +197,7 @@ def test_a_tie_away_from_tetrahedral_coordination_is_refused():
     expressions agree whenever the coordinations are equal.  They agree only at
     coordination 4: at 6, (8-4)/6 = 2/3 against (2*6-4)/6 = 4/3.
     """
-    from dvxa.passivation.counting import assign_roles
+    from pyxany.passivation.counting import assign_roles
     molecule, neighbours = _octahedral_pair("Ti", "C")
     with pytest.raises(ValueError, match="anion or the cation"):
         assign_roles(molecule, neighbours)
@@ -213,7 +213,7 @@ def test_a_transition_metal_is_never_the_anion_against_a_main_group_partner():
     The electron-balance check cannot catch this: a symmetric role inversion in
     a stoichiometric AB compound leaves the total electron count unchanged.
     """
-    from dvxa.passivation.counting import assign_roles
+    from pyxany.passivation.counting import assign_roles
     molecule, neighbours = _octahedral_pair("Mn", "O")
     with pytest.raises(ValueError, match="d-block element is not the anion"):
         assign_roles(molecule, neighbours)
@@ -223,7 +223,7 @@ def test_a_transition_metal_is_never_the_anion_against_a_main_group_partner():
 
 @pytest.mark.parametrize("cation,anion", [("Mg", "O"), ("Cd", "Se"), ("Ga", "As")])
 def test_unambiguous_binaries_still_resolve_without_help(cation, anion):
-    from dvxa.passivation.counting import assign_roles
+    from pyxany.passivation.counting import assign_roles
     molecule, neighbours = _octahedral_pair(cation, anion)
     roles = assign_roles(molecule, neighbours)
     assert roles[0] == "cation", cation
@@ -233,7 +233,7 @@ def test_unambiguous_binaries_still_resolve_without_help(cation, anion):
 def test_the_two_counting_rules_coincide_only_at_tetrahedral_coordination():
     """Pins the fact the tie rule depends on."""
     from fractions import Fraction
-    from dvxa.passivation.counting import terminator_charge
+    from pyxany.passivation.counting import terminator_charge
 
     def charge(role, z, n):
         """None when the combination is physically impossible (alpha <= 0)."""

@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 from scipy.special import erf
 
-from dvxa.grid import build_molecular_grid
-from dvxa.integrals.coulomb import hartree_potential
-from dvxa.molecule import Atom, Molecule
+from pyxany.grid import build_molecular_grid
+from pyxany.integrals.coulomb import hartree_potential
+from pyxany.molecule import Atom, Molecule
 
 SIGMA = 0.8
 

@@ -7,9 +7,9 @@ import math
 import numpy as np
 import pytest
 
-from dvxa.basis.types import STO
-from dvxa.grid import becke_weights, build_molecular_grid, spherical_product
-from dvxa.molecule import Atom, Molecule
+from pyxany.basis.types import STO
+from pyxany.grid import becke_weights, build_molecular_grid, spherical_product
+from pyxany.molecule import Atom, Molecule
 
 
 def chain(n, spacing=2.6):

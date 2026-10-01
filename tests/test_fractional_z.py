@@ -6,12 +6,12 @@ import numpy as np
 import pytest
 
 from conftest import make_config
-from dvxa.basis import build_basis
-from dvxa.basis.pseudo_h import derive_exponents
-from dvxa.constants import ANG_TO_BOHR
-from dvxa.molecule import Atom, Molecule
-from dvxa.properties import mulliken
-from dvxa.scf import run_scf
+from pyxany.basis import build_basis
+from pyxany.basis.pseudo_h import derive_exponents
+from pyxany.constants import ANG_TO_BOHR
+from pyxany.molecule import Atom, Molecule
+from pyxany.properties import mulliken
+from pyxany.scf import run_scf
 
 
 def pseudo_molecule(alpha=0.5, distance=1.5):

@@ -7,10 +7,10 @@ import math
 import numpy as np
 import pytest
 
-from dvxa.basis.types import GTO, STO
-from dvxa.grid.radial import log_squared_map
-from dvxa.integrals.onecentre import kinetic_1c, overlap_1c
-from dvxa.integrals.twocentre import overlap_kinetic_2c
+from pyxany.basis.types import GTO, STO
+from pyxany.grid.radial import log_squared_map
+from pyxany.integrals.onecentre import kinetic_1c, overlap_1c
+from pyxany.integrals.twocentre import overlap_kinetic_2c
 
 
 def test_sto_normalisation():

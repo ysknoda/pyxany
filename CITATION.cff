@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "dvxa: all-electron DV-Xalpha molecular orbital calculations"
+title: "pyxany: all-electron DV-Xalpha molecular orbital calculations"
 message: "If you use this software, please cite it as below."
 type: software
 authors:
@@ -7,7 +7,7 @@ authors:
     given-names: Yusuke
 version: 0.1.0
 license: MIT
-repository-code: "https://github.com/yusuke/dvxa"
+repository-code: "https://github.com/yusuke/pyxany"
 keywords:
   - DV-Xalpha
   - electronic structure

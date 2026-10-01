@@ -9,13 +9,13 @@ import importlib.util, json, sys
 from pathlib import Path
 
 SRC = Path("/Users/yusuke/Claude_Code/dv-xa/dv-xa.py")
-DEST = Path(__file__).resolve().parent.parent / "src" / "dvxa" / "data" / "tables"
+DEST = Path(__file__).resolve().parent.parent / "pyxany" / "data" / "tables"
 
 
 def load_legacy():
-    spec = importlib.util.spec_from_file_location("dvxa_legacy", SRC)
+    spec = importlib.util.spec_from_file_location("pyxany_legacy", SRC)
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["dvxa_legacy"] = mod
+    sys.modules["pyxany_legacy"] = mod
     spec.loader.exec_module(mod)
     return mod
 

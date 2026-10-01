@@ -7,15 +7,15 @@ import itertools
 import numpy as np
 import pytest
 
-from dvxa.basis.harmonics import (
+from pyxany.basis.harmonics import (
     MAX_L,
     lm_pairs,
     real_sph_harm,
     solid_harmonic,
     solid_harmonic_grad,
 )
-from dvxa.basis.solid_harmonics import real_spherical_harmonics
-from dvxa.integrals.coulomb import lm_index_pairs, real_sph_harmonics
+from pyxany.basis.solid_harmonics import real_spherical_harmonics
+from pyxany.integrals.coulomb import lm_index_pairs, real_sph_harmonics
 
 
 def sphere_quadrature(n_theta=60, n_phi=120):

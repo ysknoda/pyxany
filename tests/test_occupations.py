@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dvxa.scf.occupations import (
+from pyxany.scf.occupations import (
     aufbau_occupations,
     density_matrix,
     fermi_occupations,

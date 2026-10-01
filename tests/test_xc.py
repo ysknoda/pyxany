@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from dvxa.integrals import xc
+from pyxany.integrals import xc
 
 
 def test_potential_is_the_functional_derivative():

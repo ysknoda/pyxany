@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed
+
+- **Renamed from `dvxa` to `pyxany`** (distribution, import name, CLI command,
+  `python -m` entry and the `PYXANY_DISABLE_NUMBA` environment variable) and
+  moved from the `src/` layout to a flat layout with the package at the
+  repository root. No `dvxa` compatibility alias is provided. Entries below this
+  one refer to the old name. See `docs/adr/0001-flat-layout-and-rename.md`.
+- Optimisation trajectories are written to `output.dir` like every other output
+  file, instead of the working directory.
+
 Findings from a systematic code review (`/code-check`) of the packaged code,
 including a quantum-chemistry review of the electronic-structure core.
 

@@ -1,6 +1,6 @@
 # Forces
 
-`dvxa` computes nuclear forces two ways.
+`pyxany` computes nuclear forces two ways.
 
 ## Analytic (default)
 
@@ -15,7 +15,7 @@ dE/dR_A = − Z_A ∫ ρ(r) (r − R_A)/|r − R_A|³ dr                    Hell
 
 with `D_μ = ∇χ_μ`, `ĥ_eff = −½∇² + v_nuc + V_H + v_xc`, and `W` the
 energy-weighted density matrix. Every basis type supplies an exact analytic
-gradient *and* an exact analytic Laplacian (§ `dvxa.basis.types`), so no finite
+gradient *and* an exact analytic Laplacian (§ `pyxany.basis.types`), so no finite
 differences appear anywhere in the derivation.
 
 Cost: roughly one extra SCF iteration.
@@ -27,7 +27,7 @@ it is by construction the exact gradient of the number the code actually
 computes, so it is the arbiter.
 
 ```bash
-dvxa forces molecule.yaml --compare      # both, side by side
+pyxany forces molecule.yaml --compare      # both, side by side
 ```
 
 ## Accuracy, measured
@@ -71,7 +71,7 @@ than a polyatomic at the same grid. **Do not calibrate expectations on H₂.**
 
 - **Geometry optimisation**: analytic forces, with `grid.n_r ≥ 40` and
   `grid.n_a ≥ 14`. Do not set `optimise.f_max` tighter than the force error at
-  your grid — check it once with `dvxa forces --compare`.
+  your grid — check it once with `pyxany forces --compare`.
 - **Publication-quality gradients on a small system**: `forces.method:
   finite_difference`.
 - **Screening or a first relaxation**: analytic at the default grid is fine.

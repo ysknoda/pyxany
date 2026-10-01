@@ -10,11 +10,11 @@ import numpy as np
 import pytest
 
 from conftest import make_config
-from dvxa.basis import build_basis
-from dvxa.forces import compute_forces
-from dvxa.grid import build_molecular_grid
-from dvxa.scf import run_scf
-from dvxa.scf.grid_terms import GridTerms, choose_strategy
+from pyxany.basis import build_basis
+from pyxany.forces import compute_forces
+from pyxany.grid import build_molecular_grid
+from pyxany.scf import run_scf
+from pyxany.scf.grid_terms import GridTerms, choose_strategy
 
 
 def test_choose_strategy_respects_the_budget(h2o):

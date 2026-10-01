@@ -40,7 +40,7 @@ report flags whether the value is one of the standard ones.
 ## Why there are no free parameters here
 
 VASP needs a PAW dataset per pseudo-hydrogen because it is a pseudopotential
-code. `dvxa` is all-electron: a terminator with charge α is *completely*
+code. `pyxany` is all-electron: a terminator with charge α is *completely*
 specified by putting `−α/r` in the nuclear attraction, `α_A Z_B/R` in the nuclear
 repulsion, and α electrons in its 1s. There is nothing left to parameterise.
 
@@ -86,16 +86,16 @@ real molecular bonds:
 Then relax them:
 
 ```bash
-dvxa opt cluster.yaml --freeze-core     # only the terminators move
+pyxany opt cluster.yaml --freeze-core     # only the terminators move
 ```
 
 ## Workflow
 
 ```bash
-dvxa passivate cluster.xyz --coordination 4 \
+pyxany passivate cluster.xyz --coordination 4 \
      -o cluster_h.xyz --emit-yaml cluster_h.yaml
-dvxa opt cluster_h.yaml --freeze-core
-dvxa run cluster_h.yaml
+pyxany opt cluster_h.yaml --freeze-core
+pyxany run cluster_h.yaml
 ```
 
 The report prints every detected bond with the cutoff used, the origin of each

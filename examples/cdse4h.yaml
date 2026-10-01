@@ -1,5 +1,5 @@
 # II-VI: Se terminators carry alpha = 1/2
-# Relax only the terminators with:  dvxa opt cdse4h.yaml --freeze-core
+# Relax only the terminators with:  pyxany opt cdse4h.yaml --freeze-core
 molecule:
   name: cdse4h
   structure: cdse4h.xyz

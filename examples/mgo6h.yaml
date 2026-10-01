@@ -1,5 +1,5 @@
 # rock salt: six-fold coordination gives alpha = 1/3, not the tetrahedral 1/2
-# Relax only the terminators with:  dvxa opt mgo6h.yaml --freeze-core
+# Relax only the terminators with:  pyxany opt mgo6h.yaml --freeze-core
 molecule:
   name: mgo6h
   structure: mgo6h.xyz

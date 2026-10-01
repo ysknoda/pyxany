@@ -6,14 +6,14 @@ import numpy as np
 import pytest
 
 from conftest import make_config, make_molecule
-from dvxa.basis import build_basis
-from dvxa.forces import (
+from pyxany.basis import build_basis
+from pyxany.forces import (
     compute_forces,
     compute_forces_fd,
     nuclear_repulsion_gradient,
     translation_residual,
 )
-from dvxa.scf import run_scf
+from pyxany.scf import run_scf
 
 FORCE_CFG = dict(basis={"set": "dz"}, grid={"n_r": 40, "n_a": 14, "poisson_l_max": 4},
                  scf={"max_iter": 80, "e_tol": 1e-9, "d_tol": 1e-8},
@@ -169,8 +169,8 @@ def test_asymmetric_force_error_shrinks_with_the_grid():
 
 def _pseudo_terminated_molecule():
     """Be with two pseudo-hydrogens of different fractional charge."""
-    from dvxa.constants import ANG_TO_BOHR
-    from dvxa.molecule import Atom, Molecule
+    from pyxany.constants import ANG_TO_BOHR
+    from pyxany.molecule import Atom, Molecule
     return Molecule([
         Atom.from_element("Be", np.array([0.0, 0.0, 0.0])),
         Atom.pseudo_hydrogen("HBe", 0.50, np.array([1.30, 0.0, 0.0]) * ANG_TO_BOHR),
@@ -191,7 +191,7 @@ def test_forces_work_on_a_pseudo_hydrogen_terminated_molecule():
 
     ``optimise_geometry`` and ``compute_forces_fd`` used to call ``build_basis``
     without the pseudo-hydrogen exponents, which only the CLI derived, so
-    ``dvxa opt --freeze-core`` -- the documented way to relax a passivated
+    ``pyxany opt --freeze-core`` -- the documented way to relax a passivated
     cluster -- raised KeyError on every passivated example.  ``build_basis``
     now derives them itself when they are needed and absent.
     """
@@ -211,7 +211,7 @@ def test_forces_work_on_a_pseudo_hydrogen_terminated_molecule():
 def test_optimisation_runs_with_pseudo_hydrogens_and_a_freeze_mask(tmp_path, monkeypatch):
     """The `--freeze-core` workflow end to end: relax only the terminators."""
     monkeypatch.chdir(tmp_path)
-    from dvxa.forces.optimise import optimise_geometry
+    from pyxany.forces.optimise import optimise_geometry
     molecule = _pseudo_terminated_molecule()
     cfg = make_config(basis={"set": "sz"},
                       grid={"n_r": 25, "n_a": 10, "poisson_l_max": 4},

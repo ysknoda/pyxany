@@ -1,8 +1,8 @@
 # Input files
 
 A calculation is described by exactly two files: an `.xyz` structure and a
-`.yaml` holding every setting. `dvxa init <name>` writes a commented pair to
-start from, and `dvxa validate <input.yaml>` prints the fully resolved settings
+`.yaml` holding every setting. `pyxany init <name>` writes a commented pair to
+start from, and `pyxany validate <input.yaml>` prints the fully resolved settings
 without running anything.
 
 ## Structure (`.xyz`)
@@ -39,7 +39,7 @@ molecule:
 
 passivation:                # only for structures containing terminators
   scheme:  none             # none | pseudo_hydrogen | hydrogen
-  species: {}               # written by 'dvxa passivate --emit-yaml'
+  species: {}               # written by 'pyxany passivate --emit-yaml'
   basis:   derived          # derive the 1s exponent from the fractional charge
 
 basis:
@@ -126,7 +126,7 @@ pseudo-hydrogen positions are meant to be determined.
 ## Overriding from the command line
 
 ```bash
-dvxa run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp -o /scratch
+pyxany run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp -o /scratch
 ```
 
 `--set SECTION.KEY=VALUE` is repeatable and validated exactly like the file.
@@ -141,5 +141,5 @@ dvxa run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp -o /scrat
 | `<prefix>_traj.xyz` | optimisation trajectory |
 | `<prefix>_results.png` | six-panel summary figure |
 | `<prefix>_timing.json` | per-section wall times |
-| `<prefix>_scan.csv` | `dvxa scan` output |
+| `<prefix>_scan.csv` | `pyxany scan` output |
 | `<prefix>_matrices.npz` | P, C, S, T, eigenvalues (`output.npz: true`) |

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dvxa"
+name = "pyxany"
 version = "0.1.0"
 description = "DV-Xalpha (Discrete Variational Xalpha) all-electron molecular orbital code"
 readme = "README.md"
@@ -30,25 +30,25 @@ dependencies = [
 fast = ["numba>=0.59"]
 mpi  = ["mpi4py>=3.1"]
 plot = ["matplotlib>=3.7"]
-all  = ["dvxa[fast,mpi,plot]"]
+all  = ["pyxany[fast,mpi,plot]"]
 dev  = ["pytest>=8", "pytest-cov", "ruff"]
 
 [project.scripts]
-dvxa = "dvxa.cli:main"
+pyxany = "pyxany.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yusuke/dvxa"
-Issues = "https://github.com/yusuke/dvxa/issues"
+Homepage = "https://github.com/yusuke/pyxany"
+Issues = "https://github.com/yusuke/pyxany/issues"
 
 [tool.hatch.build.targets.wheel]
-# Everything under src/dvxa ships, including the data/tables/*.json tables --
+# Everything under pyxany/ ships, including the data/tables/*.json tables --
 # hatchling includes non-Python files inside a listed package directory.  Do not
 # add a force-include for the tables as well: that maps them to a path the
 # package entry already claims and the wheel build aborts on the duplicate.
-packages = ["src/dvxa"]
+packages = ["pyxany"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/dvxa", "tests", "docs", "examples", "tools", "README.md", "LICENSE", "CHANGELOG.md", "CITATION.cff"]
+include = ["pyxany", "tests", "docs", "examples", "tools", "README.md", "LICENSE", "CHANGELOG.md", "CITATION.cff"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -61,7 +61,7 @@ filterwarnings = ["error::RuntimeWarning"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-src = ["src", "tests"]
+src = [".", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "NPY"]

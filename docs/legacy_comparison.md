@@ -1,8 +1,8 @@
 # What changed relative to the original `dv-xa.py`
 
-`dvxa` was extracted from a single 6,994-line script. The restructuring itself
+`pyxany` was extracted from a single 6,994-line script. The restructuring itself
 was mechanical, but reading the code turned up several defects that changed
-every number it produced. They are all fixed, so **`dvxa` does not reproduce the
+every number it produced. They are all fixed, so **`pyxany` does not reproduce the
 old outputs** — this page records what was wrong, how it was confirmed, and by
 how much the results move.
 
@@ -125,7 +125,7 @@ returned each rank's partial matrix without summing. `build_Vnuc` and
 
 Same molecules, `dz` basis, `n_r=40, n_a=14`:
 
-| system | dvxa (Xα) | near-HF | ratio | ∫ρ dV / N | Tr(PS) / N |
+| system | pyxany (Xα) | near-HF | ratio | ∫ρ dV / N | Tr(PS) / N |
 |---|---|---|---|---|---|
 | He | −2.753 | −2.862 | 0.962 | 1.000000 | 1.000000 |
 | Ne | −127.385 | −128.547 | 0.991 | 1.000000 | 1.000000 |

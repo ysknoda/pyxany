@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dvxa.config import Config, ConfigError
-from dvxa.io.xyz import XYZError, append_frame, n_frames, read_xyz, write_xyz
-from dvxa.io.yaml_input import load_config, load_molecule
+from pyxany.config import Config, ConfigError
+from pyxany.io.xyz import XYZError, append_frame, n_frames, read_xyz, write_xyz
+from pyxany.io.yaml_input import load_config, load_molecule
 
 CO_XYZ = """2
 CO molecule

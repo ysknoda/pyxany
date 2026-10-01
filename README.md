@@ -1,4 +1,4 @@
-# dvxa
+# pyxany
 
 All-electron **DV-Xα** (Discrete Variational Xα) molecular orbital calculations,
 with a command-line interface aimed at semiconductor cluster models.
@@ -21,8 +21,8 @@ without figures.
 ## Quick start
 
 ```bash
-dvxa init water                  # writes water.yaml + water.xyz
-dvxa run water.yaml              # energy, forces, populations, dipole
+pyxany init water                  # writes water.yaml + water.xyz
+pyxany run water.yaml              # energy, forces, populations, dipole
 ```
 
 A calculation is described by exactly two files: an **`.xyz`** structure and a
@@ -49,20 +49,20 @@ forces:
 
 | command | purpose |
 |---|---|
-| `dvxa run in.yaml` | single-point SCF: energy, forces, populations, dipole |
-| `dvxa opt in.yaml` | geometry optimisation (L-BFGS-B on analytic forces) |
-| `dvxa forces in.yaml --compare` | analytic forces, checked against finite differences |
-| `dvxa scan in.yaml --coord bond:0,1 --range 1.0 1.6 --steps 13` | energy scan → CSV |
-| `dvxa passivate cluster.xyz` | add hydrogen / pseudo-hydrogen terminators |
-| `dvxa gridcheck in.yaml` | integration-grid quality diagnostic |
-| `dvxa validate in.yaml` | check the input and print the resolved settings |
-| `dvxa basis dz --element Se` | basis-set coverage |
-| `dvxa info` | versions, active backend, MPI ranks |
+| `pyxany run in.yaml` | single-point SCF: energy, forces, populations, dipole |
+| `pyxany opt in.yaml` | geometry optimisation (L-BFGS-B on analytic forces) |
+| `pyxany forces in.yaml --compare` | analytic forces, checked against finite differences |
+| `pyxany scan in.yaml --coord bond:0,1 --range 1.0 1.6 --steps 13` | energy scan → CSV |
+| `pyxany passivate cluster.xyz` | add hydrogen / pseudo-hydrogen terminators |
+| `pyxany gridcheck in.yaml` | integration-grid quality diagnostic |
+| `pyxany validate in.yaml` | check the input and print the resolved settings |
+| `pyxany basis dz --element Se` | basis-set coverage |
+| `pyxany info` | versions, active backend, MPI ranks |
 
 Any setting can be overridden without editing the file:
 
 ```bash
-dvxa run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp
+pyxany run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp
 ```
 
 `--dry-run` reports grid size, memory and screening before committing to a job.
@@ -72,8 +72,8 @@ error, `2` SCF not converged, `3` runtime error, `4` optimisation not converged.
 ### Parallel and long runs
 
 ```bash
-mpirun -n 8 dvxa run cluster.yaml
-nohup setsid mpirun -n 128 dvxa run big.yaml --log run.log &
+mpirun -n 8 pyxany run cluster.yaml
+nohup setsid mpirun -n 128 pyxany run big.yaml --log run.log &
 ```
 
 The DV grid is domain-decomposed across ranks; output and file writes happen on
@@ -98,9 +98,9 @@ rock salt (N = M = 6) an oxygen terminator carries 1/3 and a magnesium
 terminator 5/3, while the tetrahedral values would be 1/2 and 3/2.
 
 ```bash
-dvxa passivate cdse_cluster.xyz --coordination 4 \
+pyxany passivate cdse_cluster.xyz --coordination 4 \
      -o cdse_h.xyz --emit-yaml cdse_h.yaml
-dvxa opt cdse_h.yaml --freeze-core      # relax only the terminators
+pyxany opt cdse_h.yaml --freeze-core      # relax only the terminators
 ```
 
 | material | structure | anion → α | cation → α |
@@ -114,7 +114,7 @@ dvxa opt cdse_h.yaml --freeze-core      # relax only the terminators
 
 All of these coincide with the pseudo-hydrogen charges distributed with VASP.
 
-Because `dvxa` is an all-electron code there is **no pseudopotential to
+Because `pyxany` is an all-electron code there is **no pseudopotential to
 parameterise**: a terminator is fully specified by its charge, and its basis
 function is obtained by solving the spherical Kohn-Sham problem for that charge
 rather than being fitted. The X–H\* distance starts from a covalent-radius
@@ -128,7 +128,7 @@ the comparison the reference paper is about.
 A cluster with a crowded frontier often has two orbitals a fraction of a
 millihartree apart. The occupation then swaps between them from iteration to
 iteration and the density never settles, even though the energy is already
-stable to five digits. `dvxa` recognises this and says so:
+stable to five digits. `pyxany` recognises this and says so:
 
 ```
   [NOT CONVERGED] after 150 iterations
@@ -137,7 +137,7 @@ stable to five digits. `dvxa` recognises this and says so:
   Near-degenerate frontier orbitals let the occupation swap between
   iterations. Fermi smearing removes the ambiguity:
 
-      dvxa run <input.yaml> --set scf.smearing=0.002
+      pyxany run <input.yaml> --set scf.smearing=0.002
 ```
 
 On the Cd₄Se₄H₁₂ example that takes it from 150 iterations without converging to

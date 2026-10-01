@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dvxa.basis.atomic_solver import solve_atom
-from dvxa.basis.pseudo_h import _raw_zeta, describe, pseudo_hydrogen_zeta
+from pyxany.basis.atomic_solver import solve_atom
+from pyxany.basis.pseudo_h import _raw_zeta, describe, pseudo_hydrogen_zeta
 
 VASP_ALPHAS = [1 / 4, 1 / 3, 5 / 12, 1 / 2, 7 / 12, 2 / 3, 3 / 4,
                1.0, 5 / 4, 4 / 3, 3 / 2, 5 / 3, 7 / 4]
@@ -25,7 +25,7 @@ def test_non_interacting_limit_is_exactly_hydrogenic(Z):
 
 def test_calibrated_exponent_reproduces_the_tabulated_hydrogen_value():
     """alpha = 1 must give the basis set's own hydrogen exponent, by construction."""
-    from dvxa.data.loaders import sto_table
+    from pyxany.data.loaders import sto_table
 
     assert pseudo_hydrogen_zeta(1.0) == pytest.approx(sto_table("sz")["H"][0][3],
                                                       rel=1e-9)

@@ -9,7 +9,7 @@ F. Barragan and S. Alvarez, "Covalent radii revisited",
 
 The numeric values are read from the ``ase.data.covalent_radii`` transcription
 of that table, which is the same data set.  ASE is used *only* by this
-extraction script -- it is not a runtime dependency of dvxa.  A spot check
+extraction script -- it is not a runtime dependency of pyxany.  A spot check
 against the published paper is printed so the transcription can be verified.
 """
 import json
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from ase.data import chemical_symbols, covalent_radii
 
-DEST = Path(__file__).resolve().parent.parent / "src" / "dvxa" / "data" / "tables"
+DEST = Path(__file__).resolve().parent.parent / "pyxany" / "data" / "tables"
 
 # Values quoted directly from Cordero et al. (2008), Table 2, in Angstrom.
 SPOT_CHECK = {"H": 0.31, "C": 0.76, "N": 0.71, "O": 0.66, "F": 0.57,

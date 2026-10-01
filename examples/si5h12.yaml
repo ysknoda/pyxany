@@ -1,5 +1,5 @@
 # group IV: the counting rule gives alpha = 1, i.e. ordinary hydrogen
-# Relax only the terminators with:  dvxa opt si5h12.yaml --freeze-core
+# Relax only the terminators with:  pyxany opt si5h12.yaml --freeze-core
 molecule:
   name: si5h12
   structure: si5h12.xyz

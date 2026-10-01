@@ -29,9 +29,9 @@ from pathlib import Path
 
 import pytest
 
-from dvxa.data import elements as elem
-from dvxa.data.loaders import coverage_report, gto_table, sto_table
-from dvxa.data.radii import covalent_radius, source as radii_source
+from pyxany.data import elements as elem
+from pyxany.data.loaders import coverage_report, gto_table, sto_table
+from pyxany.data.radii import covalent_radius, source as radii_source
 
 TABLES = Path(elem.__file__).resolve().parent / "tables"
 

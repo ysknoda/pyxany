@@ -11,18 +11,18 @@ import numpy as np
 import pytest
 
 from conftest import make_config, make_molecule
-from dvxa.basis import build_basis
-from dvxa.kernels import backend_name, numpy_impl, poisson_radial
-from dvxa.scf import run_scf
+from pyxany.basis import build_basis
+from pyxany.kernels import backend_name, numpy_impl, poisson_radial
+from pyxany.scf import run_scf
 
 SCRIPT = """
 import json, sys
 sys.path.insert(0, {src!r})
 sys.path.insert(0, {tests!r})
 from conftest import make_config, make_molecule
-from dvxa.basis import build_basis
-from dvxa.scf import run_scf
-from dvxa.kernels import backend_name
+from pyxany.basis import build_basis
+from pyxany.scf import run_scf
+from pyxany.kernels import backend_name
 mol = make_molecule("h2o", [("O",0,0,0.1173),("H",0,0.7572,-0.4692),("H",0,-0.7572,-0.4692)])
 cfg = make_config(basis={{"set":"dz"}}, scf={{"max_iter":60,"e_tol":1e-9,"d_tol":1e-8}})
 res = run_scf(mol, build_basis(mol, cfg), cfg, verbose=0)
@@ -31,7 +31,7 @@ print(json.dumps({{"backend": backend_name(), "E": res.total_energy}}))
 
 
 def test_poisson_backends_agree():
-    from dvxa.grid.radial import log_squared_map
+    from pyxany.grid.radial import log_squared_map
 
     r, w = log_squared_map(400, 1.0)
     rho = np.exp(-(r**2)) / np.pi**1.5
@@ -44,11 +44,11 @@ def test_total_energy_is_backend_independent(tmp_path):
     """Whether numba is active must not change a single digit of the energy."""
     root = Path(__file__).resolve().parent.parent
     script = tmp_path / "probe.py"
-    script.write_text(SCRIPT.format(src=str(root / "src"), tests=str(root / "tests")))
+    script.write_text(SCRIPT.format(src=str(root), tests=str(root / "tests")))
 
     results = {}
     for disable in ("0", "1"):
-        env = dict(os.environ, DVXA_DISABLE_NUMBA=disable)
+        env = dict(os.environ, PYXANY_DISABLE_NUMBA=disable)
         out = subprocess.run([sys.executable, str(script)], capture_output=True,
                              text=True, env=env, check=True)
         payload = out.stdout.strip().splitlines()[-1]
@@ -68,8 +68,8 @@ def test_backend_name_is_reported():
 
 def test_chi_matrix_is_backend_independent(h2o):
     """Compare the active backend against the generic path on the same points."""
-    from dvxa.basis.evaluate import chi_matrix
-    from dvxa.basis.harmonics import solid_harmonic
+    from pyxany.basis.evaluate import chi_matrix
+    from pyxany.basis.harmonics import solid_harmonic
 
     cfg = make_config(basis={"set": "dzp"})
     basis = build_basis(h2o, cfg)
