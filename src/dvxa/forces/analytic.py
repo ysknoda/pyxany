@@ -88,10 +88,15 @@ def hellmann_feynman_gradient(molecule, points, weights, rho) -> np.ndarray:
     return grad
 
 
-def compute_forces(result, config) -> np.ndarray:
+def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
     """Analytic forces (Hartree/Bohr), shape (n_atoms, 3).
 
     ``result`` is a converged :class:`~dvxa.scf.SCFResult`.
+
+    ``project`` overrides ``config.forces.project_translation``.  Pass ``False``
+    when any atom is held fixed: removing the *all-atom* mean is only legitimate
+    while the energy is translation-invariant, which it is not once part of the
+    molecule cannot move.
     """
     with timer("forces.analytic"):
         molecule, basis, grid = result.molecule, result.basis, result.grid
@@ -160,7 +165,15 @@ def compute_forces(result, config) -> np.ndarray:
         allreduce_array(grad)
         grad += nuclear_repulsion_gradient(molecule)
         forces = -grad
-        if getattr(config.forces, "project_translation", True):
+        # Keep the pre-projection residual: it is a direct measure of the
+        # grid-derivative error, and therefore of whether a requested force
+        # convergence threshold is resolvable at all.  After projection
+        # |sum F| is ~1e-16 by construction and says nothing.
+        compute_forces.last_translation_residual = float(
+            np.linalg.norm(forces.sum(axis=0)))
+        wanted = getattr(config.forces, "project_translation", True) \
+            if project is None else project
+        if wanted:
             forces = project_out_translation(forces)
         return forces
 
@@ -182,6 +195,16 @@ def project_out_translation(forces: np.ndarray) -> np.ndarray:
     numerical -- here, the rigid-shift part of the grid-derivative term -- so
     subtracting the mean is not a cosmetic fix but the removal of a known
     error component.
+
+    .. warning::
+
+       This is only valid when **every** atom is free.  Translating a subset of
+       a molecule does change the energy, so with a freeze mask in force the
+       all-atom mean is not an error component and subtracting it injects a
+       uniform spurious force into the moving atoms -- measured at 1.8e-3
+       Ha/Bohr for water on the default grid, against a default
+       ``optimise.f_max`` of 1e-3.  :func:`dvxa.forces.optimise_geometry`
+       therefore turns it off whenever anything is frozen.
     """
     return forces - forces.mean(axis=0)
 

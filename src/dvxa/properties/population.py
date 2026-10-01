@@ -40,15 +40,43 @@ def mulliken_orbital_populations(C: np.ndarray, S: np.ndarray, occ: np.ndarray,
     return pops.T
 
 
-def wiberg_bond_orders(P: np.ndarray, S: np.ndarray, basis, molecule) -> np.ndarray:
-    """``B_AB = sum_{mu in A, nu in B} (P S)_{mu nu} (P S)_{nu mu}``."""
-    PS = P @ S
-    M = PS * PS.T
+def mayer_bond_orders(P: np.ndarray, S: np.ndarray, basis, molecule,
+                      P_alpha: np.ndarray | None = None,
+                      P_beta: np.ndarray | None = None) -> np.ndarray:
+    """``B_AB = sum_{mu in A, nu in B} (P S)_{mu nu} (P S)_{nu mu}``.
+
+    This is the **Mayer** bond order, which is what the expression above is.
+    The *Wiberg* index is ``sum P^2_{mu nu}`` and coincides with it only in an
+    orthonormal basis (Loewdin-orthogonalised, or a ZDO/CNDO scheme).  This
+    code uses a decidedly non-orthogonal STO/GTO basis -- ``dvxa.scf.linalg``
+    exists precisely to handle ``S`` -- so the two are not interchangeable
+    here, and the name matters.
+
+    For an open-shell system the correct expression is
+    ``2 sum_sigma (P_sigma S)_{mu nu} (P_sigma S)_{nu mu}``, which reduces to
+    the closed-shell form only when ``P_alpha == P_beta``.  Pass the two spin
+    density matrices to get it; with only the total ``P`` the closed-shell
+    formula is used (CH3: 0.94439 against a correct 0.94233 for C-H).
+    """
     atom_of = np.array([f.atom_idx for f in basis])
     n = len(molecule)
+    if P_alpha is not None and P_beta is not None:
+        M = sum((Ps * Ps.T) for Ps in (P_alpha @ S, P_beta @ S))
+        M = 2.0 * M
+    else:
+        PS = P @ S
+        M = PS * PS.T
     B = np.zeros((n, n))
     np.add.at(B, (atom_of[:, None], atom_of[None, :]), M)
     return B
+
+
+def wiberg_bond_orders(P: np.ndarray, S: np.ndarray, basis, molecule,
+                       P_alpha: np.ndarray | None = None,
+                       P_beta: np.ndarray | None = None) -> np.ndarray:
+    """Deprecated alias for :func:`mayer_bond_orders` -- see its docstring for
+    why the Mayer name is the correct one in a non-orthogonal basis."""
+    return mayer_bond_orders(P, S, basis, molecule, P_alpha, P_beta)
 
 
 def basis_function_weights(C: np.ndarray, occ: np.ndarray, S: np.ndarray,

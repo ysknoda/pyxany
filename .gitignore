@@ -16,3 +16,7 @@ dist/
 htmlcov/
 results/
 venv/
+*_traj.xyz
+# AI-assisted development tooling (local only)
+.claude/
+.code-check/

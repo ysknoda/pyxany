@@ -33,8 +33,11 @@ def execute(args) -> int:
     threads = {k: os.environ.get(k) for k in
                ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
                 "NUMBA_NUM_THREADS")}
-    print("  thread limits   " + ", ".join(f"{k}={v}" for k, v in threads.items() if v)
-          or "  thread limits   (unset)")
+    # `"prefix " + joined or fallback` parses as `("prefix " + joined) or fallback`,
+    # and the prefix alone is truthy, so the fallback could never fire and an
+    # unset environment printed a bare "thread limits" with nothing after it.
+    limits = ", ".join(f"{k}={v}" for k, v in threads.items() if v)
+    print(f"  thread limits   {limits or '(unset, so the BLAS decides)'}")
     try:
         cfg = numpy.__config__.show(mode="dicts")
         blas = cfg.get("Build Dependencies", {}).get("blas", {}).get("name", "unknown")

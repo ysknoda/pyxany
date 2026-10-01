@@ -83,5 +83,6 @@ def coverage_report() -> list[tuple[str, int, str]]:
         rows.append((f"sto_{name}", len(t), note))
     for name in ("sto3g", "631g"):
         t = gto_table(name)
-        rows.append((f"gto_{name}", len(t), f"covers {', '.join(sorted(t, key=lambda s: element_table()[s]['Z']))}"))
+        covered = ", ".join(sorted(t, key=lambda s: element_table()[s]["Z"]))
+        rows.append((f"gto_{name}", len(t), f"covers {covered}"))
     return rows

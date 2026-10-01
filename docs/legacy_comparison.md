@@ -131,13 +131,35 @@ Same molecules, `dz` basis, `n_r=40, n_a=14`:
 | Ne | −127.385 | −128.547 | 0.991 | 1.000000 | 1.000000 |
 | Ar | −523.857 | −526.817 | 0.994 | 1.000000 | 1.000000 |
 | H₂ | −1.067 | −1.134 | 0.941 | 1.000000 | 1.000000 |
-| CO | −111.539 | −112.79 | 0.989 | 1.000001 | 1.000000 |
-| H₂O | −75.204 | −76.07 | 0.989 | 1.000000 | 1.000000 |
-| CH₃ (doublet) | −39.005 | −39.58 | 0.985 | 1.000000 | 1.000000 |
+| CO | −111.685 | −112.79 | 0.990 | 1.000000 | 1.000000 |
+| H₂O | −75.290 | −76.07 | 0.990 | 1.000000 | 1.000000 |
+| CH₃ (doublet) | −39.062 | −39.58 | 0.987 | 0.999998 | 1.000000 |
 
 Xα without correlation sitting about 1 % above Hartree-Fock is the expected
 behaviour of the functional. The conservation columns are now exact for every
 system, open-shell included.
+
+### Correction after the first release of these numbers
+
+The molecular energies above were revised by ~0.1 Ha after a later review found
+that the radial Poisson solver was treating partial sums of a Gauss–Legendre
+rule as cumulative integrals. A Gauss rule is exact only over its whole
+interval, so the full sum was right to ten digits while the partial sums were
+not integrals at all — 0.107 electrons out of 1.0 wrong at `n_r = 30`, and
+converging only as `O(1/n_r)`. Integrating the cubic spline of the integrand
+instead restores the expected `O(n_r⁻⁴)`:
+
+| quantity | partial sums | spline antiderivative |
+|---|---|---|
+| max abs error in `V` vs `erf(√a·r)/r`, n_r = 30 | 5.1e−3 | 1.2e−4 |
+| … at n_r = 240 | 8.4e−5 | 2.4e−8 |
+| convergence order in `n_r` | ~1 (integrals), ~2 (V) | 4.00 |
+| H₂O/dz at the default grid | −75.138 | −75.295 |
+
+The earlier H₂O value of −75.204 in this table was therefore about 0.09 Ha
+short of the converged −75.290. The defect survived because the tests bounded
+only the *error at one resolution*, which a looser tolerance always absorbs;
+`tests/test_coulomb.py` now asserts the convergence **order**, which it cannot.
 
 ## What was carried over unchanged
 

@@ -7,11 +7,11 @@ import csv
 import numpy as np
 
 from ..basis import build_basis
-from ..constants import ANG_TO_BOHR, BOHR_TO_ANG
+from ..constants import ANG_TO_BOHR
 from ..parallel import is_root, mpi_print
 from ..scf import run_scf
 from ..timing import REGISTRY, timer
-from . import EXIT_INPUT, EXIT_OK
+from . import EXIT_OK
 from ._shared import out_path, prepare, report_timing
 
 

@@ -156,3 +156,22 @@ def test_gridcheck_reports_convergence(project, capsys):
 
 def test_shell_completion():
     assert main(["--print-completion", "bash"]) == EXIT_OK
+
+def test_module_entry_point_matches_the_console_script():
+    """``python -m dvxa`` must work and propagate the same exit codes.
+
+    On a cluster the console script's bin directory is often off PATH, so
+    ``python -m dvxa`` (and ``mpirun ... python -m dvxa``) is the reliable
+    invocation; it must not drift from the ``dvxa`` entry point.
+    """
+    import subprocess
+    import sys
+
+    ok = subprocess.run([sys.executable, "-m", "dvxa", "--version"],
+                        capture_output=True, text=True)
+    assert ok.returncode == EXIT_OK, ok.stderr
+    assert "dvxa" in ok.stdout
+
+    missing = subprocess.run([sys.executable, "-m", "dvxa", "validate", "no_such_file.yaml"],
+                             capture_output=True, text=True)
+    assert missing.returncode == EXIT_INPUT

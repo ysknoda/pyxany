@@ -96,3 +96,175 @@ def test_force_error_shrinks_with_the_grid():
         fd = compute_forces_fd(molecule, cfg, step=0.02, verbose=0)
         errors.append(float(np.abs(analytic - fd).max()))
     assert errors[-1] < errors[0]
+
+# A C1 water: unequal O-H lengths, bent out of every mirror plane.  H2 is a poor
+# gradient test on its own -- one axis, two equivalent atoms, and the
+# translation projection makes F_2 = -F_1 whatever the derivation says, so a
+# wrong per-atom or per-component term cancels instead of showing up.  Here all
+# nine components are independent and non-zero.
+ASYMMETRIC_WATER = [("O", 0.000, 0.000, 0.000),
+                    ("H", 0.950, 0.000, 0.000),
+                    ("H", -0.250, 0.880, 0.140)]
+
+
+def test_analytic_forces_match_finite_differences_on_an_asymmetric_molecule():
+    """Every Cartesian component on every inequivalent atom, against FD.
+
+    Measured residual at this grid is 4.5e-3 Ha/Bohr on a 1.3e-1 Ha/Bohr force
+    (3.5%), and it falls to 1.0e-3 (1.7%) at 50x18 / l_max 6 -- see
+    ``test_asymmetric_force_error_shrinks_with_the_grid`` and docs/forces.md.
+    The residual is the derivative of the quadrature error (the Becke weights
+    and the grid itself move with the nuclei), not an error in the derivation,
+    so the tolerance here is set from that measurement rather than from what the
+    derivation "should" give.  A dropped Pulay or nuclear-attraction term would
+    miss by ~1e-1, twenty times this bound.
+    """
+    molecule = make_molecule("h2o_c1", ASYMMETRIC_WATER)
+    cfg = make_config(basis={"set": "sz"},
+                      grid={"n_r": 30, "n_a": 12, "poisson_l_max": 4},
+                      scf={"max_iter": 80, "e_tol": 1e-9, "d_tol": 1e-8},
+                      forces={"enabled": True})
+    result = run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)
+    assert result.converged
+
+    analytic = compute_forces(result, cfg)
+    fd = compute_forces_fd(molecule, cfg, step=0.02, verbose=0)
+
+    assert np.abs(analytic - fd).max() < 8e-3
+
+    # A max-norm alone lets one bad component hide behind a large good one, so
+    # check each atom and axis, and check the signs of the components that carry
+    # real magnitude.
+    for i in range(len(molecule)):
+        for ax in range(3):
+            assert analytic[i, ax] == pytest.approx(fd[i, ax], abs=8e-3), (
+                f"atom {i} axis {'xyz'[ax]}: {analytic[i, ax]} vs FD {fd[i, ax]}"
+            )
+    significant = np.abs(analytic) > 1e-3
+    assert np.array_equal(np.sign(analytic[significant]), np.sign(fd[significant])), (
+        "analytic and finite-difference forces disagree in sign"
+    )
+
+
+@pytest.mark.slow
+def test_asymmetric_force_error_shrinks_with_the_grid():
+    """Refining the quadrature must close the analytic-FD gap on a C1 geometry.
+
+    This is what distinguishes "the residual is quadrature error" from "the
+    gradient is wrong": a wrong derivation does not converge to the FD result.
+    """
+    errors = []
+    for n_r, n_a, l_max in ((40, 14, 4), (50, 18, 6)):
+        molecule = make_molecule("h2o_c1", ASYMMETRIC_WATER)
+        cfg = make_config(basis={"set": "dz"},
+                          grid={"n_r": n_r, "n_a": n_a, "poisson_l_max": l_max},
+                          scf={"max_iter": 80, "e_tol": 1e-9, "d_tol": 1e-8},
+                          forces={"enabled": True})
+        result = run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)
+        analytic = compute_forces(result, cfg)
+        fd = compute_forces_fd(molecule, cfg, step=0.02, verbose=0)
+        errors.append(float(np.abs(analytic - fd).max()))
+    assert errors[-1] < 0.5 * errors[0], f"residual did not fall with the grid: {errors}"
+
+
+def _pseudo_terminated_molecule():
+    """Be with two pseudo-hydrogens of different fractional charge."""
+    from dvxa.constants import ANG_TO_BOHR
+    from dvxa.molecule import Atom, Molecule
+    return Molecule([
+        Atom.from_element("Be", np.array([0.0, 0.0, 0.0])),
+        Atom.pseudo_hydrogen("HBe", 0.50, np.array([1.30, 0.0, 0.0]) * ANG_TO_BOHR),
+        Atom.pseudo_hydrogen("HBe2", 1.25, np.array([-0.35, 1.22, 0.0]) * ANG_TO_BOHR),
+    ], name="be_ph")
+
+
+def _pseudo_config():
+    # The shared 25x10 test grid is too coarse for a fractional-charge centre
+    # (27.6% analytic-vs-FD residual); 30x12 brings it to 6.9%.
+    return make_config(basis={"set": "sz"},
+                       grid={"n_r": 30, "n_a": 12, "poisson_l_max": 4},
+                       scf={"max_iter": 60}, forces={"enabled": True})
+
+
+def test_forces_work_on_a_pseudo_hydrogen_terminated_molecule():
+    """The passivated-cluster force path must not need a pre-derived exponent.
+
+    ``optimise_geometry`` and ``compute_forces_fd`` used to call ``build_basis``
+    without the pseudo-hydrogen exponents, which only the CLI derived, so
+    ``dvxa opt --freeze-core`` -- the documented way to relax a passivated
+    cluster -- raised KeyError on every passivated example.  ``build_basis``
+    now derives them itself when they are needed and absent.
+    """
+    molecule = _pseudo_terminated_molecule()
+    cfg = _pseudo_config()
+    result = run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)
+    analytic = compute_forces(result, cfg)
+    fd = compute_forces_fd(molecule, cfg, step=0.02, verbose=0)
+    assert np.all(np.isfinite(analytic)) and np.all(np.isfinite(fd))
+    significant = np.abs(analytic) > 2e-3
+    assert np.array_equal(np.sign(analytic[significant]), np.sign(fd[significant]))
+    # Measured 5.4e-3 on a 7.9e-2 force at this grid.  This test exists to show
+    # the fractional-Z path runs and is structurally right, not to pin accuracy.
+    assert np.abs(analytic - fd).max() < 1.2e-2
+
+
+def test_optimisation_runs_with_pseudo_hydrogens_and_a_freeze_mask(tmp_path, monkeypatch):
+    """The `--freeze-core` workflow end to end: relax only the terminators."""
+    monkeypatch.chdir(tmp_path)
+    from dvxa.forces.optimise import optimise_geometry
+    molecule = _pseudo_terminated_molecule()
+    cfg = make_config(basis={"set": "sz"},
+                      grid={"n_r": 25, "n_a": 10, "poisson_l_max": 4},
+                      scf={"max_iter": 60}, forces={"enabled": True},
+                      optimise={"enabled": True, "max_steps": 2, "freeze": "core"},
+                      output={"dir": str(tmp_path / "out"), "prefix": "t",
+                              "figure": False, "json": False, "timing": False})
+    result = optimise_geometry(molecule, cfg, verbose=0)
+    assert np.all(np.isfinite(result.molecule.positions))
+    # The trajectory belongs in output.dir, not in the working directory.
+    assert (tmp_path / "out" / "t_traj.xyz").is_file()
+    assert not list(tmp_path.glob("*_traj.xyz"))
+    # The frozen core must not have moved.
+    assert np.allclose(result.molecule.positions[0], molecule.positions[0])
+
+
+def test_translation_projection_is_off_when_atoms_are_frozen():
+    """Projecting the all-atom mean is invalid once part of the molecule is fixed.
+
+    The energy is not invariant under translating a subset, so subtracting the
+    all-atom mean injects a uniform spurious force into the moving atoms --
+    measured at 1.8e-3 Ha/Bohr here, larger than the 1e-3 default
+    ``optimise.f_max``, i.e. the optimiser could never converge honestly.
+    """
+    molecule = make_molecule("h2o_c1", ASYMMETRIC_WATER)
+    cfg = make_config(basis={"set": "sz"},
+                      grid={"n_r": 30, "n_a": 12, "poisson_l_max": 4},
+                      scf={"max_iter": 80, "e_tol": 1e-9, "d_tol": 1e-8},
+                      forces={"enabled": True})
+    result = run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)
+    projected = compute_forces(result, cfg, project=True)
+    raw = compute_forces(result, cfg, project=False)
+    fd = compute_forces_fd(molecule, cfg, step=0.02, verbose=0)
+
+    shift = raw.mean(axis=0)
+    assert np.linalg.norm(shift) > 1e-4, "no shift to speak of; test is not exercising anything"
+    assert np.allclose(projected, raw - shift)
+
+    # With O frozen, the unprojected gradient is the one that matches dE/dR.
+    moving = [1, 2]
+    assert (np.abs(raw[moving] - fd[moving]).max()
+            < np.abs(projected[moving] - fd[moving]).max())
+
+
+def test_raw_translation_residual_is_recorded():
+    """The reported |sum F| is ~0 by construction; the raw residual is the real
+    grid-quality signal and must be kept."""
+    molecule = make_molecule("h2o_c1", ASYMMETRIC_WATER)
+    cfg = make_config(basis={"set": "sz"},
+                      grid={"n_r": 30, "n_a": 12, "poisson_l_max": 4},
+                      scf={"max_iter": 80}, forces={"enabled": True})
+    result = run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)
+    forces = compute_forces(result, cfg, project=True)
+    assert translation_residual(forces) < 1e-12          # by construction
+    raw = compute_forces.last_translation_residual        # the informative one
+    assert raw > 1e-6, "the raw residual should be a real, non-trivial number"

@@ -173,3 +173,84 @@ def test_terminated_cluster_has_a_clean_gap():
     terminator_q = np.array([pop["charges"][i] for i, a in enumerate(mol)
                              if a.is_pseudo])
     assert np.abs(terminator_q).max() < 0.25, "terminators are not close to neutral"
+
+
+def _octahedral_pair(a_symbol, b_symbol, n=6):
+    """One A site with n octahedral B neighbours, and each B bonded back to A."""
+    import numpy as np
+    from dvxa.constants import ANG_TO_BOHR
+    from dvxa.molecule import Atom, Molecule
+    dirs = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0],
+                     [0, -1, 0], [0, 0, 1], [0, 0, -1]], float)[:n]
+    atoms = [Atom.from_element(a_symbol, np.zeros(3))]
+    atoms += [Atom.from_element(b_symbol, v * 2.1 * ANG_TO_BOHR) for v in dirs]
+    neighbours = {0: list(range(1, n + 1))}
+    for k in range(1, n + 1):
+        neighbours[k] = [0]
+    return Molecule(atoms, name=f"{a_symbol}{b_symbol}"), neighbours
+
+
+def test_a_tie_away_from_tetrahedral_coordination_is_refused():
+    """TiC: both group IV, both 6-coordinate, and the two rules disagree 2:1.
+
+    The old code labelled every tie a cation on the stated grounds that the two
+    expressions agree whenever the coordinations are equal.  They agree only at
+    coordination 4: at 6, (8-4)/6 = 2/3 against (2*6-4)/6 = 4/3.
+    """
+    from dvxa.passivation.counting import assign_roles
+    molecule, neighbours = _octahedral_pair("Ti", "C")
+    with pytest.raises(ValueError, match="anion or the cation"):
+        assign_roles(molecule, neighbours)
+    # An explicit role resolves it.
+    roles = assign_roles(molecule, neighbours, {"Ti": "cation", "C": "anion"})
+    assert roles[0] == "cation" and roles[1] == "anion"
+
+
+def test_a_transition_metal_is_never_the_anion_against_a_main_group_partner():
+    """MnO: valence_electrons is the group number for groups 3-10, so Mn(7)
+    outscores O(6) and the metal would be labelled the anion in its own oxide.
+
+    The electron-balance check cannot catch this: a symmetric role inversion in
+    a stoichiometric AB compound leaves the total electron count unchanged.
+    """
+    from dvxa.passivation.counting import assign_roles
+    molecule, neighbours = _octahedral_pair("Mn", "O")
+    with pytest.raises(ValueError, match="d-block element is not the anion"):
+        assign_roles(molecule, neighbours)
+    roles = assign_roles(molecule, neighbours, {"Mn": "cation", "O": "anion"})
+    assert roles[0] == "cation" and roles[1] == "anion"
+
+
+@pytest.mark.parametrize("cation,anion", [("Mg", "O"), ("Cd", "Se"), ("Ga", "As")])
+def test_unambiguous_binaries_still_resolve_without_help(cation, anion):
+    from dvxa.passivation.counting import assign_roles
+    molecule, neighbours = _octahedral_pair(cation, anion)
+    roles = assign_roles(molecule, neighbours)
+    assert roles[0] == "cation", cation
+    assert roles[1] == "anion", anion
+
+
+def test_the_two_counting_rules_coincide_only_at_tetrahedral_coordination():
+    """Pins the fact the tie rule depends on."""
+    from fractions import Fraction
+    from dvxa.passivation.counting import terminator_charge
+
+    def charge(role, z, n):
+        """None when the combination is physically impossible (alpha <= 0)."""
+        try:
+            return Fraction(terminator_charge(role, z, n)).limit_denominator(64)
+        except ValueError:
+            return None
+
+    compared = 0
+    for n in (3, 4, 5, 6):
+        for z in (4, 5, 6):
+            as_anion, as_cation = charge("anion", z, n), charge("cation", z, n)
+            if as_anion is None or as_cation is None:
+                continue
+            compared += 1
+            if n == 4:
+                assert as_anion == as_cation, (n, z)
+            else:
+                assert as_anion != as_cation, (n, z)
+    assert compared >= 6, "too few valid combinations to make this meaningful"

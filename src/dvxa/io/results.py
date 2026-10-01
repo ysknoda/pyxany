@@ -39,11 +39,21 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
         },
         "energies_hartree": {k: float(v) for k, v in result.energies.items()},
         "orbitals": {
+            # For an unrestricted run these are the ALPHA channel; homo/lumo/gap
+            # below span both channels, and "by_spin" carries each separately.
+            "spin_channel": "alpha" if result.unrestricted else "restricted",
             "eigenvalues_hartree": _finite_list(result.eps),
             "occupations": [float(o) for o in result.occupations],
+            "eigenvalues_beta_hartree": (_finite_list(result.eps_b)
+                                         if result.unrestricted else None),
+            "occupations_beta": ([float(o) for o in result.occ_b]
+                                 if result.unrestricted else None),
             "homo_hartree": float(homo) if np.isfinite(homo) else None,
             "lumo_hartree": float(lumo) if np.isfinite(lumo) else None,
             "gap_ev": float(result.gap_ev()) if np.isfinite(result.gap_ev()) else None,
+            "by_spin": {k: {"homo_hartree": None if not np.isfinite(v[0]) else float(v[0]),
+                            "lumo_hartree": None if not np.isfinite(v[1]) else float(v[1])}
+                        for k, v in result.homo_lumo_by_spin().items()},
         },
         "population": {
             "mulliken_gross": [float(x) for x in pop["gross"]],
@@ -63,6 +73,10 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
         out["forces_hartree_per_bohr"] = [[float(v) for v in row] for row in forces]
         out["max_force"] = float(np.abs(forces).max())
         out["force_translation_residual"] = float(np.linalg.norm(forces.sum(axis=0)))
+        from ..forces.analytic import compute_forces as _compute_forces
+        raw = getattr(_compute_forces, "last_translation_residual", None)
+        # The projected residual is ~0 by construction; this is the informative one.
+        out["force_translation_residual_raw"] = None if raw is None else float(raw)
     if dipole is not None:
         out["dipole_debye"] = [float(v) for v in dipole]
         out["dipole_magnitude_debye"] = float(np.linalg.norm(dipole))

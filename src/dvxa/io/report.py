@@ -10,6 +10,7 @@ from ..properties import (
     mulliken_orbital_populations,
     wiberg_bond_orders,
 )
+from ..properties.population import basis_function_weights
 
 
 def format_results(result, config, forces=None, dipole=None) -> str:
@@ -53,6 +54,13 @@ def format_results(result, config, forces=None, dipole=None) -> str:
     if np.isfinite(homo) and np.isfinite(lumo):
         w(f"\n  HOMO {homo * HARTREE_TO_EV:.4f} eV   LUMO {lumo * HARTREE_TO_EV:.4f} eV   "
           f"gap {result.gap_ev():.4f} eV")
+        if result.unrestricted:
+            w("  (frontier taken over both spin channels)")
+            for spin, (h, l) in result.homo_lumo_by_spin().items():
+                if np.isfinite(h) and np.isfinite(l):
+                    w(f"    {spin:>5}: HOMO {h * HARTREE_TO_EV:9.4f} eV   "
+                      f"LUMO {l * HARTREE_TO_EV:9.4f} eV   "
+                      f"gap {(l - h) * HARTREE_TO_EV:8.4f} eV")
     w("")
 
     if config.properties.population:
@@ -80,7 +88,8 @@ def format_results(result, config, forces=None, dipole=None) -> str:
         pops = mulliken_orbital_populations(result.C, result.S, result.occupations,
                                             basis, mol)
         if len(pops):
-            w("  PER-ORBITAL ATOMIC POPULATIONS (occupied)")
+            spin_note = " -- ALPHA CHANNEL ONLY" if result.unrestricted else ""
+            w(f"  PER-ORBITAL ATOMIC POPULATIONS (occupied){spin_note}")
             hdr = "  " + "MO".rjust(4) + "  " + "  ".join(
                 f"{a.symbol + str(i + 1):>9}" for i, a in enumerate(mol))
             w(hdr)
@@ -106,8 +115,78 @@ def format_results(result, config, forces=None, dipole=None) -> str:
         w(f"  max |F| = {np.abs(forces).max():.8f}   "
           f"|sum F| = {np.linalg.norm(forces.sum(axis=0)):.2e} "
           f"(translational invariance)")
+        # The line above is ~1e-16 by construction once the net translation has
+        # been projected out, so it validates nothing. The pre-projection
+        # residual does: it measures the grid-derivative error, and therefore
+        # whether a requested force convergence is resolvable on this grid.
+        raw = _raw_translation_residual()
+        if raw is not None:
+            w(f"  raw |sum F| before projection = {raw:.2e} "
+              f"(grid-derivative error; refine the grid to reduce it)")
         w("")
+
+    passivation = _passivation_check(result)
+    if passivation:
+        out.extend(passivation)
     return "\n".join(out)
+
+
+def _passivation_check(result) -> list[str]:
+    """Does the terminator actually stay out of the way?
+
+    A pseudo-hydrogen is only doing its job if it contributes no states in the
+    energy range being studied and carries close to no net charge.  Both are the
+    criteria the passivation literature uses, and both are cheap to check, but
+    nothing in a production run was checking them -- the helpers existed and had
+    no callers outside the tests.
+    """
+    mol, basis = result.molecule, result.basis
+    pseudo = [i for i, a in enumerate(mol) if a.is_pseudo]
+    if not pseudo:
+        return []
+
+    out: list[str] = []
+    w = out.append
+    mask = np.array([f.atom_idx in set(pseudo) for f in basis], dtype=bool)
+
+    w("  PASSIVATION CHECK")
+    w("  " + "-" * 62)
+
+    pop = mulliken(result.P, result.S, basis, mol)
+    charges = np.asarray(pop["charges"])[pseudo]
+    w(f"  {len(pseudo)} terminator(s); Mulliken charge "
+      f"min {charges.min():+.4f}  max {charges.max():+.4f}  "
+      f"mean {charges.mean():+.4f}")
+    if np.abs(charges).max() > 0.3:
+        w("  [warning] a terminator carries a large net charge; the counting rule "
+          "or the coordination number is probably wrong.")
+
+    homo, lumo = result.homo_lumo()
+    channels = ([("alpha", result.eps_a, result.occ_a, result.C_a),
+                 ("beta", result.eps_b, result.occ_b, result.C_b)]
+                if result.unrestricted else
+                [("", result.eps, result.occupations, result.C)])
+    worst = 0.0
+    for name, eps, occ, C in channels:
+        if eps is None:
+            continue
+        weights = basis_function_weights(C, occ, result.S, mask)
+        finite = np.isfinite(eps)
+        # Orbitals inside, or on the edge of, the frontier region.
+        near = finite & (eps >= homo - 1e-12) & (eps <= lumo + 1e-12)
+        if not near.any():
+            continue
+        w_near = float(np.abs(weights[near]).max())
+        worst = max(worst, w_near)
+        label = f" ({name})" if name else ""
+        w(f"  max terminator weight on a frontier orbital{label}: {w_near:.4f}")
+    if worst > 0.25:
+        w("  [warning] terminator states appear near the frontier: the gap and the "
+          "frontier orbitals are not those of the cluster interior.")
+    else:
+        w("  terminator contribution near the frontier is small -- passivation looks sound.")
+    w("")
+    return out
 
 
 def _orbital_table(w, eps, occ, label, n_extra: int = 5) -> None:
@@ -124,3 +203,9 @@ def _orbital_table(w, eps, occ, label, n_extra: int = 5) -> None:
             tag = "  <- LUMO"
         w(f"  {rank + 1:>4}  {occ[i]:>7.4f}  {eps[i]:>13.6f}  "
           f"{eps[i] * HARTREE_TO_EV:>12.4f}{tag}")
+
+
+def _raw_translation_residual():
+    """The |sum F| the analytic force routine saw before projecting."""
+    from ..forces.analytic import compute_forces
+    return getattr(compute_forces, "last_translation_residual", None)

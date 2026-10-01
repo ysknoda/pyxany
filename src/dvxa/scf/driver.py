@@ -15,14 +15,14 @@ import numpy as np
 from ..constants import HARTREE_TO_EV
 from ..grid import build_molecular_grid
 from ..integrals import xc
-from ..integrals.coulomb import DEFAULT_L_MAX, hartree_potential, nuclear_potential
+from ..integrals.coulomb import hartree_potential, nuclear_potential
 from ..integrals.overlap import build_overlap_kinetic, condition_number
-from ..parallel import allreduce_array, allreduce_scalar, bcast_array, is_root, mpi_print
+from ..parallel import allreduce_array, allreduce_scalar, bcast_array, mpi_print
 from ..timing import timer
 from .diis import EDIIS, PulayDIIS
 from .grid_terms import GridTerms, choose_strategy
 from .guess import atomic_superposition, rescale_to_electron_count, spin_split
-from .linalg import energy_weighted_density, solve_generalised
+from .linalg import solve_generalised
 from .occupations import (
     density_matrix,
     fermi_occupations,
@@ -69,14 +69,36 @@ class SCFResult:
     def total_energy(self) -> float:
         return self.energies["E_total"]
 
-    def homo_lumo(self) -> tuple[float, float]:
-        """(HOMO, LUMO) eigenvalues in Hartree; nan when there is no LUMO."""
-        occ, eps = self.occupations, self.eps
+    @staticmethod
+    def _frontier(eps, occ) -> tuple[float, float]:
         filled = np.where(occ > 1e-8)[0]
         empty = np.where((occ <= 1e-8) & np.isfinite(eps))[0]
-        homo = float(eps[filled].max()) if len(filled) else float("nan")
-        lumo = float(eps[empty].min()) if len(empty) else float("nan")
-        return homo, lumo
+        return (float(eps[filled].max()) if len(filled) else float("nan"),
+                float(eps[empty].min()) if len(empty) else float("nan"))
+
+    def homo_lumo(self) -> tuple[float, float]:
+        """(HOMO, LUMO) eigenvalues in Hartree; nan when there is no LUMO.
+
+        For an unrestricted run the frontier is taken over **both** spin
+        channels -- the highest occupied level of either and the lowest virtual
+        of either.  Reading the alpha channel alone can name the wrong orbital
+        entirely: for the CH3 radical the beta LUMO lies below the alpha LUMO,
+        so the alpha-only gap is 13.96 eV against a true 3.40 eV.
+        """
+        if not self.unrestricted or self.eps_a is None or self.eps_b is None:
+            return self._frontier(self.eps, self.occupations)
+        homo_a, lumo_a = self._frontier(self.eps_a, self.occ_a)
+        homo_b, lumo_b = self._frontier(self.eps_b, self.occ_b)
+        return (float(np.nanmax([homo_a, homo_b])),
+                float(np.nanmin([lumo_a, lumo_b])))
+
+    def homo_lumo_by_spin(self) -> dict:
+        """Per-channel frontier levels, for a report that wants both."""
+        if not self.unrestricted or self.eps_a is None or self.eps_b is None:
+            homo, lumo = self._frontier(self.eps, self.occupations)
+            return {"restricted": (homo, lumo)}
+        return {"alpha": self._frontier(self.eps_a, self.occ_a),
+                "beta": self._frontier(self.eps_b, self.occ_b)}
 
     def gap_ev(self) -> float:
         h, l = self.homo_lumo()
@@ -174,6 +196,11 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
     eps_a = eps_b = C_a = C_b = occ_a = occ_b = None
     converged = False
     e_prev = float("inf")
+    # With smearing on, the variational quantity is the free energy
+    # F = E_total - sigma*S, not E_total, so that is what convergence is tested
+    # on.  `ts_current` is the entropy of the occupations that produced the P
+    # being evaluated, and stays 0 when smearing is off.
+    ts_current = 0.0
     l_max = grid_cfg.poisson_l_max
 
     if verbose:
@@ -214,8 +241,9 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
 
             energies = _total_energy(P, T, V_nuc, rho, V_H, weights, alpha, E_nn,
                                      rho_a, rho_b)
-            dE = abs(energies["E_total"] - e_prev)
-            e_prev = energies["E_total"]
+            e_current = energies["E_total"] - ts_current
+            dE = abs(e_current - e_prev)
+            e_prev = e_current
 
             # --- Fock matrices and extrapolation ---------------------------
             if unrestricted:
@@ -233,6 +261,9 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
                 P_b = mix * Pb_new + (1.0 - mix) * P_b
                 P = P_a + P_b
                 eps, C, occ = eps_a, C_a, occ_a
+                if scf_cfg.smearing > 0:
+                    ts_current = (smearing_entropy(occ_a, scf_cfg.smearing, 1.0)
+                                  + smearing_entropy(occ_b, scf_cfg.smearing, 1.0))
                 extra = (float(eps_a[np.argsort(eps_a)][max(int(round(n_alpha)) - 1, 0)]),
                          float(eps_b[np.argsort(eps_b)][max(int(round(n_beta)) - 1, 0)]))
             else:
@@ -244,12 +275,15 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
                 P_new = density_matrix(C, occ)
                 d_rms = float(np.sqrt(np.mean((P_new - P) ** 2)))
                 P = mix * P_new + (1.0 - mix) * P
+                if scf_cfg.smearing > 0:
+                    ts_current = smearing_entropy(occ, scf_cfg.smearing, 2.0)
                 homo = float(eps[occ > 1e-8].max()) if np.any(occ > 1e-8) else float("nan")
                 extra = (homo * HARTREE_TO_EV,)
 
             bcast_array(P)
-            history.append({"iter": it, "E": energies["E_total"], "dE": dE,
-                            "error": err, "d_rms": d_rms, "method": method, "mix": mix})
+            history.append({"iter": it, "E": energies["E_total"], "E_free": e_current,
+                            "dE": dE, "error": err, "d_rms": d_rms,
+                            "method": method, "mix": mix})
             if verbose:
                 _print_row(it, energies["E_total"], dE, err, d_rms, extra, method)
 
@@ -447,10 +481,31 @@ def diagnose_non_convergence(history, eps, occ, scf_cfg) -> list[str]:
     return lines
 
 
+# Relative disagreement between int rho dV and Tr(PS) above which the DV grid is
+# too coarse for the basis to be integrated consistently.  Water on the default
+# grid sits at 6.4e-6.
+_GRID_CONSISTENCY_WARN = 1e-4
+
+
 def _print_footer(converged, n_it, energies, n_electrons):
     mpi_print("  " + "-" * 92)
     status = "CONVERGED" if converged else "NOT CONVERGED"
     mpi_print(f"  [{status}] after {n_it} iterations")
     n_int = energies["n_electrons_integrated"]
-    mpi_print(f"  int rho dV = {n_int:.6f}   Tr(PS) = {energies['trace_PS']:.6f}   "
+    trace = energies["trace_PS"]
+    mpi_print(f"  int rho dV = {n_int:.6f}   Tr(PS) = {trace:.6f}   "
               f"(expected {n_electrons:g})")
+    # S and T are built on their own two-centre grids and with exact one-centre
+    # formulas, while rho, V_H and V_xc live on the DV molecular grid.  The two
+    # therefore disagree slightly about how many electrons there are, and the
+    # charge that generates V_H is not exactly the charge the Fock matrix
+    # represents.  It is normally far below every other error, but a large gap
+    # means the DV grid is too coarse for this basis and the energy is not a
+    # clean functional of one density.
+    mismatch = abs(n_int - trace) / max(abs(n_electrons), 1.0)
+    if mismatch > _GRID_CONSISTENCY_WARN:
+        mpi_print(f"  [warning] the DV grid and the overlap matrix disagree on the "
+                  f"electron count by {abs(n_int - trace):.2e} "
+                  f"({mismatch:.1e} relative).")
+        mpi_print(f"            V_H is built from a density normalised differently "
+                  f"from Tr(PS); raise grid.n_r / grid.n_a until this shrinks.")

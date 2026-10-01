@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
 
 from ..parallel import mpi_print
 from ..scf import run_scf

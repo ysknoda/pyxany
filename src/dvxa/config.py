@@ -97,8 +97,14 @@ class GridConfig:
                 f"overcounts overlapping regions by roughly the number of atoms. "
                 f"It exists only for the demonstration in tests/test_grid.py."
             )
-        if not (0 <= self.poisson_l_max <= 12):
-            raise ConfigError(f"{ctx}: grid.poisson_l_max must be between 0 and 12")
+        # Capped at 10, not 12: near the nucleus the radial solver divides the
+        # inner multipole integral by r^(l+1), and beyond l = 10 that amplifies
+        # round-off faster than the r^l asymptotic guard can absorb, leaving
+        # visible spikes in V (max|V| ~ 1.8e3 against a physical ~28 at l = 12).
+        # Nothing is lost: the Hartree energy of water is already converged to
+        # 2.4e-4 Ha between l_max 6 (the default) and 12.
+        if not (0 <= self.poisson_l_max <= 10):
+            raise ConfigError(f"{ctx}: grid.poisson_l_max must be between 0 and 10")
         if isinstance(self.chunk_size, str) and self.chunk_size != "auto":
             raise ConfigError(f"{ctx}: grid.chunk_size must be an integer or 'auto'")
 
@@ -115,6 +121,8 @@ class SCFConfig:
     ediis_iters: int = 8
     mix_ediis: float = 0.25
     mix_diis: float = 0.4
+    # Accepted only so that an input file written against the (unimplemented)
+    # checkpointing docs fails loudly instead of silently running without it.
     checkpoint_every: int = 0
 
     def validate(self, ctx: str) -> None:
@@ -128,6 +136,12 @@ class SCFConfig:
                 raise ConfigError(f"{ctx}: scf.{name} must be in (0, 1]; got {v}")
         if self.smearing < 0:
             raise ConfigError(f"{ctx}: scf.smearing must be >= 0")
+        if self.checkpoint_every:
+            raise ConfigError(
+                f"{ctx}: scf.checkpoint_every is not implemented yet, so setting it "
+                "would give a long job no restart protection while looking as though "
+                "it had. Leave it at 0 and size the job to fit the wall-clock limit."
+            )
 
 
 @dataclass
@@ -154,9 +168,14 @@ class OptimiseConfig:
     trajectory: bool = True
 
     def validate(self, ctx: str) -> None:
-        if self.method not in ("lbfgs", "steepest_descent"):
-            raise ConfigError(f"{ctx}: optimise.method must be 'lbfgs' or "
-                              f"'steepest_descent'")
+        if self.method == "steepest_descent":
+            raise ConfigError(
+                f"{ctx}: optimise.method 'steepest_descent' ran scipy's conjugate "
+                f"gradient, never steepest descent. Use 'cg' for that solver, or "
+                f"'lbfgs' (the default)."
+            )
+        if self.method not in ("lbfgs", "cg"):
+            raise ConfigError(f"{ctx}: optimise.method must be 'lbfgs' or 'cg'")
         if isinstance(self.freeze, str) and self.freeze not in ("none", "core"):
             raise ConfigError(f"{ctx}: optimise.freeze must be 'none', 'core' or a "
                               f"list of atom indices")
@@ -170,8 +189,29 @@ class PropertiesConfig:
     bde: dict = field(default_factory=lambda: {"enabled": False})
     esp: dict = field(default_factory=lambda: {"enabled": False, "n_pts": 20, "margin": 3.0})
 
+    #: allowed keys of each sub-dict, so a typo is an error here too
+    _SUBKEYS = {"dos": {"sigma", "n_points"},
+                "bde": {"enabled"},
+                "esp": {"enabled", "n_pts", "margin"}}
+
     def validate(self, ctx: str) -> None:
-        return
+        # These sub-dicts used to skip validation entirely, so
+        # `properties: {dos: {sigmaa: 0.3}}` was accepted in silence while
+        # `scf: {alfa: 0.7}` was correctly rejected -- the opposite of what this
+        # module's docstring promises.
+        for name, allowed in self._SUBKEYS.items():
+            values = getattr(self, name)
+            if not isinstance(values, dict):
+                raise ConfigError(f"{ctx}: properties.{name} must be a mapping")
+            unknown = set(values) - allowed
+            if unknown:
+                raise ConfigError(
+                    f"{ctx}: properties.{name} has unknown key(s) "
+                    f"{sorted(unknown)}. Valid keys: {sorted(allowed)}"
+                )
+        sigma = self.dos.get("sigma", 0.3)
+        if not (isinstance(sigma, (int, float)) and sigma > 0):
+            raise ConfigError(f"{ctx}: properties.dos.sigma must be > 0; got {sigma}")
 
 
 @dataclass

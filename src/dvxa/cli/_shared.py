@@ -142,3 +142,8 @@ def print_forces(molecule, forces) -> None:
                   f"{fz:>13.8f}  {np.linalg.norm(forces[i]):>11.8f}")
     mpi_print(f"  max |F| = {np.abs(forces).max():.8f} Ha/Bohr   "
               f"|sum F| = {np.linalg.norm(forces.sum(axis=0)):.2e}")
+    from ..forces.analytic import compute_forces
+    raw = getattr(compute_forces, "last_translation_residual", None)
+    if raw is not None:
+        mpi_print(f"  raw |sum F| before projection = {raw:.2e} Ha/Bohr "
+                  f"(grid-derivative error)")

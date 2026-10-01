@@ -110,6 +110,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_p.add_argument("--bond-scale", type=float, default=None,
                      help="override the X-H* distance scale factor")
     p_p.add_argument("-q", "--quiet", action="store_true")
+    p_p.add_argument("--timing", dest="timing", action="store_true", default=None)
+    p_p.add_argument("--no-timing", dest="timing", action="store_false")
 
     p_init = sub.add_parser("init", help="write a template input pair")
     p_init.add_argument("name")

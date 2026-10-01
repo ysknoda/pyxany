@@ -68,7 +68,6 @@ scf:
   ediis_iters:      8       # EDIIS iterations before switching to Pulay DIIS
   mix_ediis:        0.25
   mix_diis:         0.4
-  checkpoint_every: 0
 
 forces:
   enabled:              true
@@ -78,7 +77,7 @@ forces:
 
 optimise:
   enabled:    false
-  method:     lbfgs       # lbfgs | steepest_descent
+  method:     lbfgs       # lbfgs | cg
   f_max:      1.0e-3      # Ha/Bohr
   max_steps:  100
   freeze:     none        # none | core | [0, 3, 4]

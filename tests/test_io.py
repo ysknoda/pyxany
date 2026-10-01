@@ -107,6 +107,20 @@ def test_out_of_range_values_are_rejected():
             Config.from_dict({"molecule": {"structure": "x.xyz"}, section: values})
 
 
+def test_unimplemented_options_are_rejected_not_ignored():
+    """An accepted-but-inert option is worse than a rejected one.
+
+    ``scf.checkpoint_every`` was documented in docs/hpc.md as protecting a long
+    job from a wall-clock kill, and the validator accepted it, but nothing wrote
+    a checkpoint.  A user would have discovered that only after losing the job.
+    """
+    with pytest.raises(ConfigError, match="not implemented"):
+        Config.from_dict({"molecule": {"structure": "x.xyz"},
+                          "scf": {"checkpoint_every": 10}})
+    # 0 (the default, meaning "off") must stay valid.
+    Config.from_dict({"molecule": {"structure": "x.xyz"}, "scf": {"checkpoint_every": 0}})
+
+
 def test_missing_structure_is_reported():
     with pytest.raises(ConfigError, match="structure"):
         Config.from_dict({"molecule": {"name": "x"}})

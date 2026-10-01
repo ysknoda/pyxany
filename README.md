@@ -157,14 +157,14 @@ than against itself; `tests/` runs these as assertions.
 | Xα coefficient | α = 2/3 reproduces Dirac exchange | machine precision |
 | kinetic energy | H 1s, T = ζ²/2 | 10 digits |
 | two-centre overlap | H₂ 1s–1s vs closed form | 1e-9 … 1e-11 |
-| Hartree potential | Gaussian charges vs erf(r)/r | 2e-4 relative on E_H |
+| Hartree potential | Gaussian charges vs erf(r)/r | 3e-5 relative on E_H, converging at order 4 |
 | atomic solver | hydrogenic 1s/2s/2p/3d | ε exact, R to 1e-11 |
 | analytic forces | vs central finite differences | 2e-5 Ha/Bohr at a fine grid |
 | force sum rule | \|Σ_A F_A\| | 1e-15 |
 | numba vs numpy | total energy | 1e-16 |
 
 Physically, Xα/DZ lands ~1 % above Hartree-Fock for closed-shell molecules
-(CO −111.54 vs −112.79 Ha; H₂O −75.20 vs −76.07 Ha), which is the expected
+(CO −111.69 vs −112.79 Ha; H₂O −75.29 vs −76.07 Ha), which is the expected
 behaviour of the functional rather than a numerical error.
 
 ## License

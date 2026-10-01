@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .constants import BOHR_TO_ANG, HARTREE_TO_EV
+from .constants import HARTREE_TO_EV
 from .properties import (
     density_of_states,
     mulliken,

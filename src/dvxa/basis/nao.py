@@ -1,4 +1,23 @@
-"""Numerical atomic orbital (NAO) basis: the atomic solution used directly."""
+"""Numerical atomic orbital (NAO) basis: the atomic solution used directly.
+
+Two properties of the generating atoms are worth knowing before reading
+anything physical into an NAO or its eigenvalue.
+
+**The atomic solver is spin-restricted.**  Orbitals come from the
+spherically-averaged, spin-averaged atom, so for an open-shell element (C, N,
+O, the transition metals) they are not that atom's open-shell orbitals.  That
+is a deliberate and normal choice for a *basis generator* -- the molecular SCF
+is free to be unrestricted -- but it means an NAO is not a physical atomic
+orbital of the free atom.
+
+**Slater X-alpha carries its full self-interaction error.**  An electron is
+repelled by the whole density including itself, and the X-alpha exchange does
+not cancel that.  Hydrogen 1s comes out at about -0.204 Ha instead of the exact
+-0.5, so H NAOs are markedly more diffuse than the true hydrogen 1s.  This is
+expected X-alpha behaviour, not a defect in the solver -- which reproduces the
+hydrogenic spectrum to 1e-11 when given the bare -Z/r potential -- but NAO
+eigenvalues must not be read as ionisation potentials or orbital energies.
+"""
 
 from __future__ import annotations
 

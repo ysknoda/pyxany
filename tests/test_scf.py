@@ -7,6 +7,7 @@ import pytest
 
 from conftest import make_config, make_molecule
 from dvxa.basis import build_basis
+from dvxa.constants import HARTREE_TO_EV
 from dvxa.scf import run_scf
 
 
@@ -124,3 +125,93 @@ def test_smearing_resolves_a_degenerate_frontier():
     # a wide gap must not be blamed on degeneracy
     lines = "\n".join(diagnose_non_convergence(history, eps, occ, SCFConfig()))
     assert "Near-degenerate" not in lines
+
+
+# Total energies at the shared coarse test grid (sz, n_r=25, n_a=10, l_max=4).
+# These are pinned so that a numerical regression anywhere in the chain -- grid,
+# Poisson solver, Xalpha, occupations -- shows up as a failing number rather
+# than as a plausible-looking energy.  The only prior guard was a +/-10% band
+# against Hartree-Fock, which is 50x too loose to see a real defect: the radial
+# Poisson solver was integrating partial sums of a Gauss-Legendre rule as though
+# they were cumulative integrals, which moved H2O by 0.15 Ha (4 eV) and passed.
+#
+# Before changing a value here, establish that the new number is *better* --
+# against a closed form, or by grid convergence -- and say so in the commit.
+# The physics these rest on is checked independently: V_H against
+# erf(sqrt(a)r)/r at 4th order (tests/test_coulomb.py), Xalpha against Dirac
+# exchange (tests/test_xc.py), and the hydrogenic spectrum
+# (tests/test_pseudo_h_basis.py).
+REFERENCE_ENERGIES = {
+    "h2": -1.063203,
+    "h2o": -75.220262,
+    "ch3": -39.053417,
+    "co": -111.600903,
+}
+
+REFERENCE_GEOMETRIES = {
+    "h2": ([("H", 0, 0, 0), ("H", 0, 0, 0.741)], 1),
+    "h2o": ([("O", 0, 0, 0.1173), ("H", 0, 0.7572, -0.4692),
+             ("H", 0, -0.7572, -0.4692)], 1),
+    "ch3": ([("C", 0, 0, 0), ("H", 1.079, 0, 0), ("H", -0.5395, 0.9345, 0),
+             ("H", -0.5395, -0.9345, 0)], 2),
+    "co": ([("C", 0, 0, 0), ("O", 0, 0, 1.128)], 1),
+}
+
+
+@pytest.mark.parametrize("name", sorted(REFERENCE_ENERGIES))
+def test_total_energy_regression(name):
+    geometry, multiplicity = REFERENCE_GEOMETRIES[name]
+    molecule = make_molecule(name, geometry, multiplicity=multiplicity)
+    cfg = make_config()
+    result = run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)
+    assert result.converged
+    # 1e-5 Ha is far below any physical effect but far above BLAS-level jitter,
+    # so this fails on a real numerical change and not on the platform.
+    assert result.total_energy == pytest.approx(REFERENCE_ENERGIES[name], abs=1e-5)
+
+
+def test_multiplicity_must_match_the_electron_count():
+    """A radical left at the default mult=1 must fail, not converge a half state.
+
+    CH3 has 9 electrons; at mult=1 the alpha/beta split is 4.5/4.5, which is not
+    any real spin state, and the SCF used to converge it silently 26 mHa above
+    the true doublet.
+    """
+    molecule = make_molecule("ch3", REFERENCE_GEOMETRIES["ch3"][0], multiplicity=1)
+    cfg = make_config()
+    with pytest.raises(ValueError, match="impossible for 9 electrons"):
+        run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)
+
+
+def test_unrestricted_gap_spans_both_spin_channels(ch3):
+    """The reported gap must not be the alpha channel's.
+
+    For CH3 the beta LUMO lies *below* the alpha LUMO, so taking the alpha
+    channel alone does not merely omit information -- it names the wrong
+    orbital as the LUMO and reports a gap several times too large.
+    """
+    cfg = make_config()
+    result = run_scf(ch3, build_basis(ch3, cfg), cfg, verbose=0)
+    assert result.unrestricted
+
+    by_spin = result.homo_lumo_by_spin()
+    (homo_a, lumo_a), (homo_b, lumo_b) = by_spin["alpha"], by_spin["beta"]
+    assert lumo_b < lumo_a, "test premise: the beta LUMO should be the lower one"
+
+    homo, lumo = result.homo_lumo()
+    assert homo == pytest.approx(max(homo_a, homo_b))
+    assert lumo == pytest.approx(min(lumo_a, lumo_b))
+    # and therefore strictly smaller than either channel's own gap
+    assert result.gap_ev() < (lumo_a - homo_a) * HARTREE_TO_EV
+    assert result.gap_ev() < (lumo_b - homo_b) * HARTREE_TO_EV
+
+
+def test_restricted_frontier_is_unchanged(h2o):
+    """The closed-shell path must not be disturbed by the unrestricted fix."""
+    cfg = make_config()
+    result = run_scf(h2o, build_basis(h2o, cfg), cfg, verbose=0)
+    assert not result.unrestricted
+    homo, lumo = result.homo_lumo()
+    occ, eps = result.occupations, result.eps
+    assert homo == pytest.approx(float(eps[occ > 1e-8].max()))
+    assert list(result.homo_lumo_by_spin()) == ["restricted"]

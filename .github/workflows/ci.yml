@@ -53,3 +53,41 @@ jobs:
         run: pytest -q -m slow
       - name: MPI tests
         run: pytest -q -m mpi
+
+  package:
+    runs-on: ubuntu-latest
+    name: build + install wheel
+    # The test jobs above install with `-e`, which never exercises the wheel
+    # archive builder.  A non-editable build is the only thing that catches a
+    # broken file mapping (e.g. a table included twice at the same path), so it
+    # gets its own job.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Data tables must be inside the wheel
+        run: |
+          python - <<'PY'
+          import glob, sys, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          tables = sorted(n for n in names if n.startswith("dvxa/data/tables/"))
+          print(f"{wheel}: {len(tables)} data tables")
+          for n in tables:
+              print("   ", n)
+          if len(tables) != 11:
+              sys.exit(f"expected 11 data tables in the wheel, found {len(tables)}")
+          PY
+      - name: Install the built wheel and smoke-test the CLI
+        run: |
+          python -m pip install dist/*.whl
+          mkdir -p /tmp/smoke && cd /tmp/smoke   # no source tree on the path
+          dvxa info
+          dvxa basis dz
+          cp "$GITHUB_WORKSPACE"/examples/h2o.yaml "$GITHUB_WORKSPACE"/examples/h2o.xyz .
+          dvxa run h2o.yaml

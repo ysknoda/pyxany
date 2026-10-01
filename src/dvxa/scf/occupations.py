@@ -70,6 +70,17 @@ def fermi_occupations(eps: np.ndarray, n_electrons: float, sigma: float,
     occ = np.zeros(len(eps))
     x = np.clip((e - mu) / sigma, -500.0, 500.0)
     occ[finite] = max_occ / (1.0 + np.exp(x))
+    # The bisection converges on mu whether or not the requested count actually
+    # fits: with too few orbitals it just walks mu to `hi` and returns a smaller
+    # total.  aufbau_occupations raises in that case, and the smeared path must
+    # too, or the SCF converges tidily for the wrong number of electrons.
+    placed = float(occ.sum())
+    if abs(placed - n_electrons) > 1e-6 * max(1.0, abs(n_electrons)):
+        raise ValueError(
+            f"cannot place {n_electrons:g} electrons: only "
+            f"{int(finite.sum())} usable orbitals x max_occ {max_occ:g} available "
+            f"(placed {placed:g} at smearing {sigma:g}). Use a larger basis set."
+        )
     return occ
 
 
@@ -102,4 +113,21 @@ def spin_electron_counts(n_electrons: float, multiplicity: int) -> tuple[float, 
             f"multiplicity {multiplicity} needs {n_unpaired} unpaired electrons "
             f"but the molecule only has {n_electrons:g}"
         )
+    # An integer electron count must split into integer alpha and beta counts,
+    # so N and the number of unpaired electrons have to share parity.  Without
+    # this check a radical left at the default mult=1 converges a half-occupied
+    # state that is not any real spin state: CH3 (9 electrons) at mult=1 gives
+    # 4.5/4.5 and an energy 26 mHa (0.71 eV) above the true doublet, silently.
+    # A fractional N -- a pseudo-hydrogen terminated cluster -- has no parity to
+    # satisfy and is exempt.
+    if abs(n_electrons - round(n_electrons)) < 1e-9:
+        total = int(round(n_electrons))
+        if (total - n_unpaired) % 2 != 0:
+            raise ValueError(
+                f"multiplicity {multiplicity} is impossible for {total} electrons: "
+                f"the alpha/beta split would be {n_alpha:g}/{n_beta:g}, which is not "
+                f"a real spin state. An odd electron count needs an even "
+                f"multiplicity and an even count an odd one; "
+                f"try molecule.mult = {2 if total % 2 else 1}."
+            )
     return n_alpha, max(n_beta, 0.0)

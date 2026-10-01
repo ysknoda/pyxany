@@ -8,7 +8,6 @@ import numpy as np
 import pytest
 
 from dvxa.basis.types import STO
-from dvxa.constants import ANG_TO_BOHR
 from dvxa.grid import becke_weights, build_molecular_grid, spherical_product
 from dvxa.molecule import Atom, Molecule
 

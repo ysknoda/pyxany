@@ -11,6 +11,12 @@ def density_of_states(eps: np.ndarray, sigma: float = 0.3, n_points: int = 600,
     """Return ``(energies, dos)`` with the input eigenvalues in eV.
 
     ``sigma`` is the Gaussian broadening in the same units as ``eps``.
+
+    Each eigenvalue contributes unit weight, so the curve integrates to the
+    number of **orbitals**, not the number of electronic states: for a
+    restricted calculation each spatial orbital holds two electrons, so
+    multiply by 2 if you want states.  The axis is labelled "states/eV" by
+    convention; this is the convention it follows.
     """
     finite = eps[np.isfinite(eps)]
     if len(finite) == 0:

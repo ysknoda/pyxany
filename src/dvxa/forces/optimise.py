@@ -10,6 +10,7 @@ cluster) cheap.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 from scipy.optimize import minimize
@@ -20,8 +21,13 @@ from ..io.xyz import append_frame
 from ..parallel import is_root, mpi_print
 from ..scf import run_scf
 from ..timing import timer
-from .analytic import compute_forces
+from .analytic import compute_forces, project_out_translation
 from .finite_difference import compute_forces_fd
+
+#: config name -> the scipy solver actually used.  `cg` is named for what it is:
+#: the option used to be called `steepest_descent` while running conjugate
+#: gradient, so the banner reported a method that was never run.
+SCIPY_METHOD = {"lbfgs": "L-BFGS-B", "cg": "CG"}
 
 
 @dataclass
@@ -74,17 +80,30 @@ def optimise_geometry(molecule, config, verbose: int = 1) -> OptimisationResult:
     state = {"n": 0, "best": None, "traj": [], "scf": None}
     traj_path = None
     if opt_cfg.trajectory and is_root():
-        traj_path = f"{config.output.prefix}_traj.xyz"
+        # Same directory as every other output file, not the working directory.
+        out_dir = Path(config.output.dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        traj_path = out_dir / f"{config.output.prefix}_traj.xyz"
         open(traj_path, "w").close()
 
     if verbose:
         mpi_print("=" * 78)
-        mpi_print(f"  Geometry optimisation ({opt_cfg.method.upper()})   "
+        mpi_print(f"  Geometry optimisation ({SCIPY_METHOD[opt_cfg.method]})   "
                   f"f_max = {opt_cfg.f_max:g} Ha/Bohr   "
                   f"{len(moving)}/{len(molecule)} atoms free")
         mpi_print("=" * 78)
         mpi_print(f"  {'step':>4}  {'E (Ha)':>17}  {'max|F|':>11}  {'rms F':>11}")
         mpi_print("  " + "-" * 52)
+
+    # Removing the net translation is legitimate only while the whole molecule
+    # is free; with anything frozen it injects a uniform spurious force into the
+    # moving atoms (1.8e-3 Ha/Bohr for water on the default grid, larger than
+    # the default f_max of 1e-3), so scipy would be handed an energy and a
+    # gradient that do not correspond.  Applying it to the finite-difference
+    # branch as well keeps the two forces.method settings consistent.
+    anything_frozen = bool(frozen.any())
+    project = (not anything_frozen) and getattr(
+        config.forces, "project_translation", True)
 
     def energy_and_gradient(x: np.ndarray):
         pos = current.positions
@@ -95,8 +114,10 @@ def optimise_geometry(molecule, config, verbose: int = 1) -> OptimisationResult:
         if config.forces.method == "finite_difference":
             forces = compute_forces_fd(current, config, step=config.forces.fd_step,
                                        atoms=list(moving), verbose=0)
+            if project:
+                forces = project_out_translation(forces)
         else:
-            forces = compute_forces(result, config)
+            forces = compute_forces(result, config, project=project)
         state["n"] += 1
         state["scf"] = result
         f_move = forces[moving]
@@ -117,10 +138,15 @@ def optimise_geometry(molecule, config, verbose: int = 1) -> OptimisationResult:
 
     with timer("optimise"):
         x0 = current.positions[moving].ravel()
-        method = "L-BFGS-B" if opt_cfg.method == "lbfgs" else "CG"
+        # `ftol` is an L-BFGS-B option; CG does not take it and scipy warns and
+        # ignores it, so the energy tolerance was silently dropped on that
+        # branch.  `maxiter` also counts differently between the two.
+        method = SCIPY_METHOD[opt_cfg.method]
+        options = {"maxiter": opt_cfg.max_steps, "gtol": opt_cfg.f_max}
+        if method == "L-BFGS-B":
+            options["ftol"] = 1e-12
         res = minimize(energy_and_gradient, x0, jac=True, method=method,
-                       options={"maxiter": opt_cfg.max_steps,
-                                "gtol": opt_cfg.f_max, "ftol": 1e-12})
+                       options=options)
 
     energy, forces = state["best"]
     f_max = float(np.abs(forces[moving]).max())

@@ -7,35 +7,53 @@ from pathlib import Path
 import yaml
 
 from ..io.xyz import read_xyz, write_xyz
+from ..parallel import is_root, mpi_print
 from ..passivation import format_report, passivate
+from ..timing import REGISTRY, timer
 from . import EXIT_OK
 
 
 def execute(args) -> int:
-    molecule = read_xyz(args.structure)
-    reference = read_xyz(args.reference) if args.reference else None
+    REGISTRY.reset()
+    with timer("total"):
+        code = _passivate(args)
+    # Coordination detection is an O(N^2) neighbour search, so on a 200-atom
+    # cluster it is worth knowing where the time went.
+    if getattr(args, "timing", None):
+        REGISTRY.report(printer=mpi_print, min_seconds=0.0)
+    return code
 
-    result = passivate(
-        molecule, scheme=args.scheme, tolerance=args.tolerance,
-        coordination=args.coordination, reference=reference,
-        bond_scale=args.bond_scale,
-    )
+
+def _passivate(args) -> int:
+    with timer("read structure"):
+        molecule = read_xyz(args.structure)
+        reference = read_xyz(args.reference) if args.reference else None
+
+    with timer("passivate"):
+        result = passivate(
+            molecule, scheme=args.scheme, tolerance=args.tolerance,
+            coordination=args.coordination, reference=reference,
+            bond_scale=args.bond_scale,
+        )
 
     if not args.quiet:
-        print(format_report(result, args.scheme))
+        mpi_print(format_report(result, args.scheme))
 
     out_path = Path(args.output or _default_output(args.structure))
     comment = (f"{molecule.name} passivated ({args.scheme}): "
                f"{result.n_added} terminators, "
                f"{result.molecule.n_electrons:g} electrons")
-    write_xyz(out_path, result.molecule, comment)
+    with timer("write"):
+        if is_root():
+            write_xyz(out_path, result.molecule, comment)
     if not args.quiet:
-        print(f"  structure written to {out_path}")
+        mpi_print(f"  structure written to {out_path}")
 
     if args.emit_yaml:
-        _write_yaml(args, result, out_path)
+        if is_root():
+            _write_yaml(args, result, out_path)
         if not args.quiet:
-            print(f"  input template written to {args.emit_yaml}")
+            mpi_print(f"  input template written to {args.emit_yaml}")
     return EXIT_OK
 
 

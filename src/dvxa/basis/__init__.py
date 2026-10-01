@@ -13,10 +13,19 @@ def build_basis(molecule, config, pseudo_zeta=None) -> BasisSet:
     """Build the basis for ``molecule`` according to ``config.basis.set``.
 
     ``pseudo_zeta`` maps pseudo-hydrogen species labels to the 1s exponent
-    derived for their fractional charge; it is filled in by
-    :mod:`dvxa.basis.pseudo_h` before this is called.
+    derived for their fractional charge.  When it is omitted and the molecule
+    contains pseudo-hydrogens, it is derived here rather than left empty: the
+    exponents depend only on the fractional charges, so every caller would
+    otherwise have to remember to pass them, and the ones that forgot
+    (``forces.optimise`` and ``forces.finite_difference``) made
+    ``dvxa opt --freeze-core`` -- the advertised way to relax a passivated
+    cluster -- fail with a KeyError on every passivated example.
     """
     key = config.basis.set.lower().strip()
+    if pseudo_zeta is None and any(atom.is_pseudo for atom in molecule):
+        from .pseudo_h import derive_exponents
+
+        pseudo_zeta = derive_exponents(molecule)
     if key in STO_KEYS:
         functions = build_sto_basis(molecule, key, pseudo_zeta)
     elif key in GTO_KEYS:

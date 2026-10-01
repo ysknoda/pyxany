@@ -33,10 +33,18 @@ class PassivationResult:
         return {label: sp.to_yaml_entry() for label, sp in sorted(self.species.items())}
 
     def electron_balance(self) -> dict:
+        """Whether the electron count matches the requested spin state.
+
+        An even count is right for a closed shell, but an open-shell cluster
+        (multiplicity > 1) should have an odd one; the general requirement is
+        that N and ``multiplicity - 1`` share parity.
+        """
         n = self.molecule.n_electrons
-        nearest_even = 2.0 * round(n / 2.0)
-        return {"n_electrons": float(n), "nearest_even": nearest_even,
-                "deviation": float(abs(n - nearest_even))}
+        n_unpaired = self.molecule.multiplicity - 1
+        target = 2.0 * round((n - n_unpaired) / 2.0) + n_unpaired
+        return {"n_electrons": float(n), "nearest_even": target,
+                "target": target, "n_unpaired": n_unpaired,
+                "deviation": float(abs(n - target))}
 
 
 def terminator_distance(element: str, neighbour_element: str,
@@ -76,7 +84,9 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
     neighbours = neighbour_lists(molecule, tolerance)
     bonds = bond_report(molecule, neighbours, tolerance)
     ideal, coord_warnings = ideal_coordination(molecule, neighbours, coordination)
-    roles = assign_roles(molecule, neighbours, role_overrides)
+    # `ideal`, not the observed neighbour count: the charge is computed with the
+    # ideal coordination, and a surface site has fewer neighbours than that.
+    roles = assign_roles(molecule, neighbours, role_overrides, ideal)
 
     pos_ang = molecule.positions * BOHR_TO_ANG
     new_atoms = list(molecule.atoms)
@@ -145,13 +155,18 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
     result_mol = Molecule(atoms=new_atoms, charge=molecule.charge,
                           multiplicity=molecule.multiplicity,
                           name=molecule.name)
-    balance = 2.0 * round(result_mol.n_electrons / 2.0)
-    if abs(result_mol.n_electrons - balance) > 1e-6:
+    # A closed shell needs an even count, but an open-shell cluster is supposed
+    # to have an odd one: what must hold in general is that N and the number of
+    # unpaired electrons (multiplicity - 1) share parity.
+    n_unpaired = result_mol.multiplicity - 1
+    target = 2.0 * round((result_mol.n_electrons - n_unpaired) / 2.0) + n_unpaired
+    if abs(result_mol.n_electrons - target) > 1e-6:
+        shell = "even" if n_unpaired == 0 else f"odd (multiplicity {result_mol.multiplicity})"
         warnings.append(
-            f"total electron count is {result_mol.n_electrons:.6f}, not an even "
-            f"integer (nearest is {balance:g}). The electron-counting rule gives a "
-            f"closed shell only when every dangling bond is terminated and the "
-            f"coordination numbers are right."
+            f"total electron count is {result_mol.n_electrons:.6f}, which is not "
+            f"compatible with a {shell} shell (nearest is {target:g}). The "
+            f"electron-counting rule gives a consistent shell only when every "
+            f"dangling bond is terminated and the coordination numbers are right."
         )
 
     return PassivationResult(molecule=result_mol, species=species,

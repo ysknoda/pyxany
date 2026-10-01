@@ -80,5 +80,10 @@ Two things that matter at scale:
 
 ## Checkpointing
 
-Set `scf.checkpoint_every` to write the density matrix periodically, so a job
-killed at a wall-clock limit loses at most that many iterations.
+**Not implemented.** There is no SCF restart: a job killed at a wall-clock limit
+loses all of its work. `scf.checkpoint_every` is rejected by the input validator
+rather than accepted as a no-op, so an input file cannot quietly claim
+protection it does not have.
+
+Until it exists, size the wall-clock request from a `--dry-run` estimate plus a
+margin, and prefer several smaller jobs over one long one.

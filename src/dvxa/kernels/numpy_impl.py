@@ -53,7 +53,9 @@ def numerov_inward(g, h, r, kappa, m, out):
     out[:] = 0.0
     f = 1.0 - h * h * g / 12.0
     out[n - 1] = 1e-30
-    decay = np.exp(-kappa * (r[n - 1] - r[n - 2])) * np.sqrt(r[n - 1] / r[n - 2])
+    # v = u/sqrt(r) ~ exp(-kappa r)/sqrt(r), so v[n-1]/v[n-2] carries
+    # sqrt(r[n-2]/r[n-1]) -- not its reciprocal.
+    decay = np.exp(-kappa * (r[n - 1] - r[n - 2])) * np.sqrt(r[n - 2] / r[n - 1])
     out[n - 2] = out[n - 1] / max(decay, 1e-300)
     bottom = max(m - 1, 1)
     for i in range(n - 2, bottom - 1, -1):
