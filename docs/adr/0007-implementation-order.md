@@ -35,9 +35,16 @@ without changing results (Q26 options A and B):
 | grid build (Becke weights) | 540 s | 9 s | compiled own-cell kernel |
 | Hartree evaluation | 366 s | 21 s | compiled multipole summation |
 | force grad V_H | 6 Hartree evaluations | 1 gradient evaluation | exact derivative kernel |
-| S/T, per pair | 52 ms | 25 ms | compiled basis gradients |
+| S/T, per pair | 52 ms | 22 ms | compiled basis gradients, contiguous layout |
+| S/T gradient (forces) | 622 s | 129 s | exact pair derivative (basis Hessians, Becke weights) instead of 6-point FD |
 | force memory | 24 GB | memory budget | chunked over points |
 | SCF start | diverged | 18 iterations | SAD initial guess |
+
+End to end on Si47H60 (SCF + forces, one node): 2381 s -> 1875 s, peak RSS
+6.9 GB; forces unchanged to 5e-10 Ha/Bohr. What remains is the SCF itself
+(67 %): density and XC builds with chi recomputed per iteration because the
+8 GB chi exceeds the memory budget. Reducing that needs chi sparsity
+(option C) or a larger budget.
 
 Not done: an adaptive multipole order (tried, no measurable gain once the
 summation was compiled); chi sparsity and angular pruning (they change the

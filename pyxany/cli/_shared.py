@@ -24,6 +24,8 @@ def prepare(args) -> tuple[Config, object]:
     cfg = load_config(args.input, overrides)
     if getattr(args, "outdir", None):
         cfg.output.dir = args.outdir
+    if getattr(args, "no_figure", False):
+        cfg.output.figure = False
     if getattr(args, "timing", None) is not None:
         cfg.output.timing = args.timing
     REGISTRY.enabled = cfg.output.timing

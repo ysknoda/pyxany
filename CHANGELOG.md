@@ -58,6 +58,8 @@
 
 ### Fixed
 
+- **`--no-figure` had no effect**: the flag was parsed but never applied, so
+  `run` wrote the figures whenever the input enabled them.
 - **Geometry optimisation could report a geometry that was not its answer.**
   The returned molecule, energy and forces were those of the last evaluation,
   often a rejected line-search trial point. They are now the lowest-energy
@@ -137,8 +139,12 @@ grad V_H to < 1e-8 Ha/Bohr in the forces); each has a test.
   gradient, the Hartree multipole summation and its exact gradient, and the
   basis-function gradients. On a 107-atom Si47H60 cluster (1.07 M points):
   grid build 540 s -> 9 s, one Hartree evaluation 366 s -> 21 s, one S/T pair
-  52 ms -> 25 ms. The force term grad V_H is now one gradient evaluation
+  52 ms -> 22 ms. The force term grad V_H is now one gradient evaluation
   instead of six Hartree evaluations by finite differences.
+- **Exact two-centre S/T gradient in the forces**: the pair quadrature is
+  differentiated directly (basis Hessians, moving sub-grid, Becke weights)
+  instead of by six-point finite differences; 622 s -> 129 s on Si47H60,
+  forces unchanged to 5e-10 Ha/Bohr. Whole SCF + forces: 2381 s -> 1875 s.
 - **Forces walk the grid in chunks** within `grid.memory_budget_mb`; the
   107-atom cluster no longer needs 24 GB for the basis gradients.
 - **Superposition-of-atomic-densities initial guess.** The previous guess

@@ -175,3 +175,11 @@ def test_module_entry_point_matches_the_console_script():
     missing = subprocess.run([sys.executable, "-m", "pyxany", "validate", "no_such_file.yaml"],
                              capture_output=True, text=True)
     assert missing.returncode == EXIT_INPUT
+
+
+def test_no_figure_flag_overrides_the_input(project):
+    pytest.importorskip("matplotlib")
+    yaml = (project / "co.yaml").read_text().replace("figure: false", "figure: true")
+    (project / "co.yaml").write_text(yaml)
+    assert main(["run", str(project / "co.yaml"), "--no-figure", "-q"]) == EXIT_OK
+    assert not list((project / "results").glob("*.png"))
