@@ -254,20 +254,30 @@ def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_
         r = np.maximum(np.linalg.norm(d, axis=1), 1e-12)
         grad_v_nuc += Z * d / r[:, None] ** 3
 
-    # grad V_H by central differences of the Poisson solution at shifted points
+    # grad V_H: exact derivative of the interpolated multipole potential when
+    # the compiled kernel is available, else central differences of it
     rho_full = _full_density(grid, rho)
-    h = 1e-4
-    grad_V_H = np.zeros_like(pts)
-    for x in range(3):
-        e = np.zeros(3)
-        e[x] = h
-        vp = hartree_potential(
-            grid, rho_full, molecule.positions, l_max=config.grid.l_max, eval_points=pts + e
-        )
-        vm = hartree_potential(
-            grid, rho_full, molecule.positions, l_max=config.grid.l_max, eval_points=pts - e
-        )
-        grad_V_H[:, x] = (vp - vm) / (2.0 * h)
+    grad_V_H = hartree_potential(
+        grid,
+        rho_full,
+        molecule.positions,
+        l_max=config.grid.l_max,
+        eval_points=pts,
+        gradient=True,
+    )
+    if grad_V_H is None:
+        h = 1e-4
+        grad_V_H = np.zeros_like(pts)
+        for x in range(3):
+            e = np.zeros(3)
+            e[x] = h
+            vp = hartree_potential(
+                grid, rho_full, molecule.positions, l_max=config.grid.l_max, eval_points=pts + e
+            )
+            vm = hartree_potential(
+                grid, rho_full, molecule.positions, l_max=config.grid.l_max, eval_points=pts - e
+            )
+            grad_V_H[:, x] = (vp - vm) / (2.0 * h)
 
     grad_G = grad_rho * (v_nuc + V_H)[:, None] + xc_part + rho[:, None] * (grad_v_nuc + grad_V_H)
     for A in range(n_atoms):

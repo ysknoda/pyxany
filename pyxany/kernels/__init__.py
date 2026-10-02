@@ -35,6 +35,12 @@ def chi_block_kernel():
     return mod.chi_block if mod is not None else None
 
 
+def chi_grad_block_kernel():
+    """Fast STO gradient evaluator, or None to use the generic numpy path."""
+    mod = _numba()
+    return mod.chi_grad_block if mod is not None else None
+
+
 def poisson_radial(r, w, rho):
     mod = _numba()
     if mod is not None:
@@ -72,7 +78,7 @@ def numerov_inward(g, h, r, kappa, m, out):
     return numpy_impl.numerov_inward(g, h, r, kappa, m, out)
 
 
-__all__ = ["backend_name", "chi_block_kernel", "poisson_radial", "density_from_chi",
+__all__ = ["backend_name", "chi_block_kernel", "chi_grad_block_kernel", "poisson_radial", "density_from_chi",
            "numerov_outward", "numerov_inward"]
 
 
@@ -92,8 +98,12 @@ def becke_own_cell(points, owner, centres, a, stiffness):
     return out
 
 
-def hartree_evaluate(points, centres, radii, v_radial, l_max):
-    """Compiled multipole summation, or None to use the numpy path."""
+def hartree_evaluate(points, centres, radii, v_radial, l_max, gradient: bool = False):
+    """Compiled multipole summation, or None to use the numpy path.
+
+    With ``gradient=True`` returns the exact (n_points, 3) gradient of the
+    same piecewise potential instead of its values.
+    """
     import numpy as np
     from scipy.interpolate import CubicSpline
 
@@ -117,10 +127,11 @@ def hartree_evaluate(points, centres, radii, v_radial, l_max):
         coefs[A, :, :len(r) - 1] = cs.c
         v_first[A] = v[0]
         v_last[A] = v[-1]
-    out = np.empty(len(points))
-    mod.hartree_evaluate(np.ascontiguousarray(points, dtype=float),
-                         np.ascontiguousarray(centres, dtype=float), knots, n_knots, coefs,
-                         v_first, v_last, int(l_max), normalisation_factors(l_max), out)
+    kernel = mod.hartree_evaluate_grad if gradient else mod.hartree_evaluate
+    out = np.empty((len(points), 3)) if gradient else np.empty(len(points))
+    kernel(np.ascontiguousarray(points, dtype=float),
+           np.ascontiguousarray(centres, dtype=float), knots, n_knots, coefs,
+           v_first, v_last, int(l_max), normalisation_factors(l_max), out)
     return out
 
 

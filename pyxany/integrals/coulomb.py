@@ -149,7 +149,8 @@ def _radial_poisson_multipoles(r: np.ndarray, rho_lm: np.ndarray,
 
 def hartree_potential(grid, rho: np.ndarray, positions: np.ndarray,
                       l_max: int = DEFAULT_L_MAX,
-                      eval_points: np.ndarray | None = None) -> np.ndarray:
+                      eval_points: np.ndarray | None = None,
+                      gradient: bool = False) -> np.ndarray | None:
     """V_H from a density sampled on ``grid``, evaluated at ``eval_points``.
 
     Parameters
@@ -163,6 +164,8 @@ def hartree_potential(grid, rho: np.ndarray, positions: np.ndarray,
     eval_points : where to evaluate; defaults to the full grid.  Passing
                   ``grid.local_points`` keeps the reconstruction step
                   distributed under MPI.
+    gradient    : return the exact (n_points, 3) gradient of the potential
+                  instead; needs the compiled kernel, None without it
 
     Under MPI the projection loop is split over atoms and the (small) radial
     multipole arrays are summed, so only the reconstruction cost scales with the
@@ -198,6 +201,8 @@ def hartree_potential(grid, rho: np.ndarray, positions: np.ndarray,
         pts = grid.points if eval_points is None else np.asarray(eval_points, float)
         from ..kernels import hartree_evaluate
 
+        if gradient:
+            return hartree_evaluate(pts, positions, grid.radii, v_radial, l_max, gradient=True)
         V = hartree_evaluate(pts, positions, grid.radii, v_radial, l_max)
         if V is None:
             V = _sum_multipoles(pts, positions, grid.radii, v_radial, l_of, l_max)

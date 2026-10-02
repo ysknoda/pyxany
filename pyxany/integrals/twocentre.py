@@ -69,7 +69,7 @@ def overlap_kinetic_2c(basis_a, basis_b, pos_a, pos_b, radius_a, radius_b,
 
     grad_a = chi_grad_matrix(local_a, positions, points)
     grad_b = chi_grad_matrix(local_b, positions, points)
-    T_block = 0.5 * np.einsum("kmx,k,knx->mn", grad_a, weights, grad_b, optimize=True)
+    T_block = 0.5 * sum((grad_a[:, :, x] * weights[:, None]).T @ grad_b[:, :, x] for x in range(3))
     return S_block, T_block
 
 

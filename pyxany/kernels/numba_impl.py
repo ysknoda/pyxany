@@ -74,6 +74,79 @@ def chi_block(norms, zetas, powers_n, l_arr, m_arr, d, r, out, cols):
 
 
 @nb.njit(cache=True, fastmath=True)
+def _ipow(x, p):
+    v = 1.0
+    for _ in range(p):
+        v *= x
+    return v
+
+
+@nb.njit(cache=True, parallel=True, fastmath=True)
+def _chi_grad_block(norms, zetas, powers_n, lm_index, d, r, out, cols,
+                    offsets, counts, coeffs, powers):
+    """Fill ``out[:, cols, :]`` with STO gradients w.r.t. the electron.
+
+    ``grad chi = g'(r) rhat S_lm + g(r) grad S_lm`` with
+    ``g = N r^p e^(-zeta r)``; ``grad S_lm`` differentiates the monomial table.
+    """
+    n_pts = d.shape[0]
+    n_f = norms.shape[0]
+    for k in nb.prange(n_pts):
+        dx = d[k, 0]
+        dy = d[k, 1]
+        dz = d[k, 2]
+        rk = r[k]
+        rs = rk if rk > 1e-14 else 1e-14
+        for j in range(n_f):
+            e = norms[j] * np.exp(-zetas[j] * rk)
+            p = powers_n[j]
+            g = e * _ipow(rk, p)
+            if p == 0:
+                dg = -zetas[j] * e
+            else:
+                dg = e * (p * _ipow(rk, p - 1) - zetas[j] * _ipow(rk, p))
+            idx = lm_index[j]
+            o = offsets[idx]
+            s = 0.0
+            sx = 0.0
+            sy = 0.0
+            sz = 0.0
+            for t in range(counts[idx]):
+                c = coeffs[o + t]
+                px = powers[o + t, 0]
+                py = powers[o + t, 1]
+                pz = powers[o + t, 2]
+                mx = _ipow(dx, px)
+                my = _ipow(dy, py)
+                mz = _ipow(dz, pz)
+                s += c * mx * my * mz
+                if px > 0:
+                    sx += c * px * _ipow(dx, px - 1) * my * mz
+                if py > 0:
+                    sy += c * py * mx * _ipow(dy, py - 1) * mz
+                if pz > 0:
+                    sz += c * pz * mx * my * _ipow(dz, pz - 1)
+            radial = dg * s / rs
+            col = cols[j]
+            out[k, col, 0] = radial * dx + g * sx
+            out[k, col, 1] = radial * dy + g * sy
+            out[k, col, 2] = radial * dz + g * sz
+
+
+def chi_grad_block(norms, zetas, powers_n, l_arr, m_arr, d, r, out, cols):
+    """Gradient counterpart of :func:`chi_block` (``out`` is (n_pts, nb, 3))."""
+    lm_index = np.array([index_of(int(l), int(m)) for l, m in zip(l_arr, m_arr)], np.int64)
+    _chi_grad_block(np.ascontiguousarray(norms, np.float64),
+                    np.ascontiguousarray(zetas, np.float64),
+                    np.ascontiguousarray(powers_n, np.int64),
+                    lm_index,
+                    np.ascontiguousarray(d, np.float64),
+                    np.ascontiguousarray(r, np.float64),
+                    out, np.ascontiguousarray(cols, np.int64),
+                    _OFFSETS, _COUNTS, _COEFFS, _POWERS)
+
+
+@nb.njit(cache=True, fastmath=True)
 def _poisson_radial_sorted(rs, ws, fs):
     n = rs.shape[0]
     V = np.empty(n)
@@ -291,6 +364,146 @@ def hartree_evaluate(points, centres, knots, n_knots, coefs, v_first, v_last, l_
                     for c in range(l * l, (l + 1) * (l + 1)):
                         acc += v[c] * S[c] * rl * norms[c]
         out[k] = acc
+
+
+@nb.njit(parallel=True, cache=True)
+def hartree_evaluate_grad(points, centres, knots, n_knots, coefs, v_first, v_last, l_max,
+                          norms, out):
+    """Exact gradient of the potential :func:`hartree_evaluate` returns.
+
+    Differentiates the same piecewise radial functions (cubic spline, r^l
+    inside the first node, r^-(l+1) beyond the last) and carries the solid
+    harmonic recursion forward with its x, y, z derivatives. Each term is
+    ``q_l(r) S_lm(x)`` with ``q_l = v_l r^-l``, so
+    ``grad = q_l'(r) rhat S_lm + q_l grad S_lm``.
+    """
+    n_pts = points.shape[0]
+    n_at = centres.shape[0]
+    n_lm = (l_max + 1) * (l_max + 1)
+    for k in nb.prange(n_pts):
+        S = np.empty(n_lm)
+        Sx = np.empty(n_lm)
+        Sy = np.empty(n_lm)
+        Sz = np.empty(n_lm)
+        q = np.empty(n_lm)
+        dq = np.empty(n_lm)
+        gx = 0.0
+        gy = 0.0
+        gz = 0.0
+        for A in range(n_at):
+            x = points[k, 0] - centres[A, 0]
+            y = points[k, 1] - centres[A, 1]
+            z = points[k, 2] - centres[A, 2]
+            r2 = x * x + y * y + z * z
+            r = np.sqrt(r2)
+            nk = n_knots[A]
+            r0 = knots[A, 0]
+            rl_ = knots[A, nk - 1]
+            # -- q_l = v_l r^-l and dq_l/dr ------------------------------------
+            if r < r0:
+                # v_l = v_first (r/r0)^l, so q_l is constant
+                for l in range(l_max + 1):
+                    p = 1.0 / r0 ** l
+                    for c in range(l * l, (l + 1) * (l + 1)):
+                        q[c] = v_first[A, c] * p
+                        dq[c] = 0.0
+            else:
+                inv = 1.0 / r
+                if r > rl_:
+                    for l in range(l_max + 1):
+                        p = (rl_ * inv) ** (l + 1) * inv ** l
+                        for c in range(l * l, (l + 1) * (l + 1)):
+                            q[c] = v_last[A, c] * p
+                            dq[c] = -(2 * l + 1) * q[c] * inv
+                else:
+                    lo = 0
+                    hi = nk - 1
+                    while hi - lo > 1:
+                        mid = (lo + hi) // 2
+                        if knots[A, mid] <= r:
+                            lo = mid
+                        else:
+                            hi = mid
+                    seg = lo
+                    t = r - knots[A, lo]
+                    for l in range(l_max + 1):
+                        p = inv ** l
+                        for c in range(l * l, (l + 1) * (l + 1)):
+                            c0 = coefs[A, 0, seg, c]
+                            c1 = coefs[A, 1, seg, c]
+                            c2 = coefs[A, 2, seg, c]
+                            v = ((c0 * t + c1) * t + c2) * t + coefs[A, 3, seg, c]
+                            dv = (3.0 * c0 * t + 2.0 * c1) * t + c2
+                            q[c] = v * p
+                            dq[c] = (dv - l * v * inv) * p
+            # -- solid harmonics and their Cartesian derivatives ---------------
+            S[0] = 1.0
+            Sx[0] = 0.0
+            Sy[0] = 0.0
+            Sz[0] = 0.0
+            for l in range(1, l_max + 1):
+                f = np.sqrt((2.0 * l - 1.0) / (2.0 * l))
+                cc = (l - 1) * (l - 1) + 2 * (l - 1)
+                cs = (l - 1) * (l - 1)
+                pc = S[cc]
+                pcx = Sx[cc]
+                pcy = Sy[cc]
+                pcz = Sz[cc]
+                if l > 1:
+                    ps = S[cs]
+                    psx = Sx[cs]
+                    psy = Sy[cs]
+                    psz = Sz[cs]
+                else:
+                    ps = 0.0
+                    psx = 0.0
+                    psy = 0.0
+                    psz = 0.0
+                i = l * l + 2 * l
+                S[i] = f * (x * pc - y * ps)
+                Sx[i] = f * (pc + x * pcx - y * psx)
+                Sy[i] = f * (x * pcy - ps - y * psy)
+                Sz[i] = f * (x * pcz - y * psz)
+                i = l * l
+                S[i] = f * (y * pc + x * ps)
+                Sx[i] = f * (y * pcx + ps + x * psx)
+                Sy[i] = f * (pc + y * pcy + x * psy)
+                Sz[i] = f * (y * pcz + x * psz)
+                for m in range(-(l - 1), l):
+                    a1 = (l - 1) * (l - 1) + m + l - 1
+                    c1_ = 2.0 * l - 1.0
+                    num = c1_ * z * S[a1]
+                    nx = c1_ * z * Sx[a1]
+                    ny = c1_ * z * Sy[a1]
+                    nz = c1_ * (S[a1] + z * Sz[a1])
+                    if l >= 2 and abs(m) <= l - 2:
+                        a2 = (l - 2) * (l - 2) + m + l - 2
+                        c2_ = np.sqrt((l - 1.0) ** 2 - m * m)
+                        num -= c2_ * r2 * S[a2]
+                        nx -= c2_ * (2.0 * x * S[a2] + r2 * Sx[a2])
+                        ny -= c2_ * (2.0 * y * S[a2] + r2 * Sy[a2])
+                        nz -= c2_ * (2.0 * z * S[a2] + r2 * Sz[a2])
+                    den = 1.0 / np.sqrt(l * l - m * m)
+                    i = l * l + m + l
+                    S[i] = num * den
+                    Sx[i] = nx * den
+                    Sy[i] = ny * den
+                    Sz[i] = nz * den
+            # -- accumulate q' rhat S + q grad S -------------------------------
+            radial = 0.0
+            for c in range(n_lm):
+                radial += dq[c] * S[c] * norms[c]
+                gx += q[c] * Sx[c] * norms[c]
+                gy += q[c] * Sy[c] * norms[c]
+                gz += q[c] * Sz[c] * norms[c]
+            if r > 1e-300:
+                radial /= r
+                gx += radial * x
+                gy += radial * y
+                gz += radial * z
+        out[k, 0] = gx
+        out[k, 1] = gy
+        out[k, 2] = gz
 
 
 @nb.njit(cache=True)

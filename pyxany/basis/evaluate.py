@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..kernels import chi_block_kernel
+from ..kernels import chi_block_kernel, chi_grad_block_kernel
 from .harmonics import solid_harmonic, solid_harmonic_grad
 
 _SAFE_R = 1e-14
@@ -66,9 +66,20 @@ def chi_grad_matrix(basis, positions, points) -> np.ndarray:
     pts = np.ascontiguousarray(points, dtype=float)
     G = np.empty((len(pts), len(basis), 3), dtype=float)
 
+    fast = chi_grad_block_kernel()
     for ai, idx in _atom_groups(basis).items():
         d = pts - np.asarray(positions[ai], dtype=float)
         r = np.sqrt(np.einsum("ij,ij->i", d, d))
+        if fast is not None and all(basis[mu].kind == "sto" for mu in idx):
+            fast(
+                np.array([basis[mu].norm for mu in idx]),
+                np.array([basis[mu].zeta for mu in idx]),
+                np.array([basis[mu].n - 1 - basis[mu].l for mu in idx], np.int64),
+                np.array([basis[mu].l for mu in idx], np.int64),
+                np.array([basis[mu].m for mu in idx], np.int64),
+                d, r, G, np.array(idx, np.int64),
+            )
+            continue
         safe = np.maximum(r, _SAFE_R)
         rhat = d / safe[:, None]
         for mu in idx:

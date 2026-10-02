@@ -142,3 +142,57 @@ def test_compiled_hartree_summation_matches_numpy(h2o):
     finally:
         kernels.hartree_evaluate = saved
     assert np.abs(fast - ref).max() < 1e-12 * np.abs(ref).max()
+
+
+def test_compiled_chi_gradient_matches_numpy(h2o, monkeypatch):
+    """Includes points on the nuclei, where rhat is undefined."""
+    _numba_or_skip()
+    import pyxany.basis.evaluate as ev
+
+    basis = build_basis(h2o, make_config(basis={"set": "dzp"}))
+    rng = np.random.default_rng(1)
+    pts = np.vstack([h2o.positions, rng.normal(scale=2.0, size=(500, 3))])
+    fast = ev.chi_grad_matrix(basis, h2o.positions, pts)
+    monkeypatch.setattr(ev, "chi_grad_block_kernel", lambda: None)
+    slow = ev.chi_grad_matrix(basis, h2o.positions, pts)
+    assert np.abs(fast - slow).max() < 1e-12 * max(1.0, np.abs(slow).max())
+
+
+def test_compiled_hartree_gradient_matches_finite_differences(h2o):
+    """Off the first and last radial knots, where the piecewise radial
+    functions have a kink and only one-sided derivatives exist."""
+    _numba_or_skip()
+    from pyxany.integrals.coulomb import hartree_potential
+
+    cfg = make_config(basis={"set": "dz"})
+    res = run_scf(h2o, build_basis(h2o, cfg), cfg, verbose=0)
+    grid, rho, lmax = res.grid, res.terms.density(res.P), cfg.grid.l_max
+    rng = np.random.default_rng(2)
+    pts = np.vstack([grid.points[1::97] + 1e-3, rng.normal(scale=6.0, size=(50, 3))])
+    g = hartree_potential(grid, rho, h2o.positions, l_max=lmax, eval_points=pts, gradient=True)
+    h = 1e-5
+    fd = np.empty_like(g)
+    for x in range(3):
+        e = np.zeros(3)
+        e[x] = h
+        vp = hartree_potential(grid, rho, h2o.positions, l_max=lmax, eval_points=pts + e)
+        vm = hartree_potential(grid, rho, h2o.positions, l_max=lmax, eval_points=pts - e)
+        fd[:, x] = (vp - vm) / (2 * h)
+    assert np.abs(g - fd).max() < 1e-6 * max(1.0, np.abs(fd).max())
+
+
+def test_analytic_hartree_gradient_leaves_forces_unchanged(h2o, monkeypatch):
+    _numba_or_skip()
+    import pyxany.forces.analytic as fa
+    from pyxany.integrals.coulomb import hartree_potential
+
+    cfg = make_config(basis={"set": "dz"})
+    res = run_scf(h2o, build_basis(h2o, cfg), cfg, verbose=0)
+    F_exact = fa.compute_forces(res, cfg, project=False)
+
+    def no_gradient(*args, gradient=False, **kwargs):
+        return None if gradient else hartree_potential(*args, **kwargs)
+
+    monkeypatch.setattr(fa, "hartree_potential", no_gradient)
+    F_fd = fa.compute_forces(res, cfg, project=False)
+    assert np.abs(F_exact - F_fd).max() < 1e-7
