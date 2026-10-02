@@ -33,7 +33,8 @@ def execute(args) -> int:
             return EXIT_OK
 
         verbose = cfg.runtime.verbosity
-        result = run_scf(molecule, basis, cfg, verbose=verbose)
+        result = run_scf(molecule, basis, cfg, verbose=verbose, restart=args.restart,
+                         checkpoint_path=out_path(cfg, "_scf.npz"))
 
         forces = None
         if cfg.forces.enabled:
@@ -88,3 +89,11 @@ def _figure(result, cfg, forces) -> None:
         mpi_print("  [note] matplotlib is not installed; skipping the figure")
         return
     summary_figure(result, cfg, out_path(cfg, "_results.png"), forces=forces)
+    from ..plotting import bonding_figures
+    from ..properties import bonding
+
+    from ._shared import output_dir
+
+    stem = (out_path(cfg, "") if cfg.output.prefix
+            else output_dir(cfg) / (result.molecule.name or "pyxany"))
+    bonding_figures(bonding.analyse(result, cfg), result, cfg, str(stem))

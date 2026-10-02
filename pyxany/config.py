@@ -142,8 +142,8 @@ class SCFConfig:
     ediis_iters: int = 8
     mix_ediis: float = 0.25
     mix_diis: float = 0.4
-    # Accepted only so that an input file written against the (unimplemented)
-    # checkpointing docs fails loudly instead of silently running without it.
+    #: Write the SCF state every N iterations (0: only at the end). The file is
+    #: <output.dir>/<prefix>_scf.npz; resume with --restart. See ADR 0004.
     checkpoint_every: int = 0
 
     def validate(self, ctx: str) -> None:
@@ -157,12 +157,8 @@ class SCFConfig:
                 raise ConfigError(f"{ctx}: scf.{name} must be in (0, 1]; got {v}")
         if self.smearing < 0:
             raise ConfigError(f"{ctx}: scf.smearing must be >= 0")
-        if self.checkpoint_every:
-            raise ConfigError(
-                f"{ctx}: scf.checkpoint_every is not implemented yet, so setting it "
-                "would give a long job no restart protection while looking as though "
-                "it had. Leave it at 0 and size the job to fit the wall-clock limit."
-            )
+        if self.checkpoint_every < 0:
+            raise ConfigError(f"{ctx}: scf.checkpoint_every must be >= 0 (0 = only at the end)")
 
 
 @dataclass
@@ -212,12 +208,21 @@ class PropertiesConfig:
     dos: dict = field(default_factory=lambda: {"sigma": 0.3, "n_points": 600})
     bde: dict = field(default_factory=lambda: {"enabled": False})
     esp: dict = field(default_factory=lambda: {"enabled": False, "n_pts": 20, "margin": 3.0})
+    #: Bond overlap population (ADR 0005): pairs to analyse (default: Mayer bond
+    #: order >= min_bond_order) and whether to draw the atom-pair heatmap.
+    overlap_population: dict = field(default_factory=lambda: {
+        "pairs": [], "min_bond_order": 0.2, "heatmap": False, "sigma": 0.3})
+    #: An orbital whose Loewdin weight on pseudo-hydrogen terminators exceeds this
+    #: counts as a terminator state: it triggers the passivation warning and is
+    #: skipped by the core gap. 0.5 ("mostly on the terminators") is a heuristic.
+    terminator_weight_max: float = 0.5
 
     #: allowed keys of each sub-dict, so a typo is an error here too
     _SUBKEYS = {
         "dos": {"sigma", "n_points"},
         "bde": {"enabled"},
         "esp": {"enabled", "n_pts", "margin"},
+        "overlap_population": {"pairs", "min_bond_order", "heatmap", "sigma"},
     }
 
     def validate(self, ctx: str) -> None:
@@ -235,6 +240,8 @@ class PropertiesConfig:
                     f"{ctx}: properties.{name} has unknown key(s) "
                     f"{sorted(unknown)}. Valid keys: {sorted(allowed)}"
                 )
+        if not (0.0 < self.terminator_weight_max <= 1.0):
+            raise ConfigError(f"{ctx}: properties.terminator_weight_max must be in (0, 1]")
         sigma = self.dos.get("sigma", 0.3)
         if not (isinstance(sigma, (int, float)) and sigma > 0):
             raise ConfigError(f"{ctx}: properties.dos.sigma must be > 0; got {sigma}")
@@ -266,6 +273,44 @@ class RuntimeConfig:
                 raise ConfigError(f"{ctx}: runtime.{name} must be auto, on or off")
 
 
+@dataclass
+class TransitionStateConfig:
+    """Slater transition state (ADR 0006). Set exactly one of ``remove``/``excite``.
+
+    ``remove: homo`` | ``remove: 5`` (1-based MO) | ``remove: {atom: 3, shell: 1s}``
+    ``excite: {from: homo, to: lumo}``
+    """
+
+    remove: Any = None
+    excite: Any = None
+    spin: str = "alpha"
+    electrons: float = 0.5
+
+    @property
+    def enabled(self) -> bool:
+        return self.remove is not None or self.excite is not None
+
+    def validate(self, ctx: str) -> None:
+        if self.remove is not None and self.excite is not None:
+            raise ConfigError(f"{ctx}: transition_state takes either 'remove' or 'excite', not both")
+        if self.excite is not None and (not isinstance(self.excite, dict)
+                                        or set(self.excite) != {"from", "to"}):
+            raise ConfigError(f"{ctx}: transition_state.excite needs exactly 'from' and 'to'")
+        if self.spin not in ("alpha", "beta"):
+            raise ConfigError(f"{ctx}: transition_state.spin must be 'alpha' or 'beta'")
+        if not (0.0 < float(self.electrons) <= 1.0):
+            raise ConfigError(f"{ctx}: transition_state.electrons must be in (0, 1]")
+        if self.enabled:
+            from .scf.transition_state import parse_target
+
+            try:
+                for spec in ([self.remove] if self.remove is not None
+                             else [self.excite["from"], self.excite["to"]]):
+                    parse_target(spec)
+            except ValueError as exc:
+                raise ConfigError(f"{ctx}: {exc}") from None
+
+
 _SECTIONS = {
     "molecule": MoleculeConfig,
     "passivation": PassivationConfig,
@@ -277,6 +322,7 @@ _SECTIONS = {
     "properties": PropertiesConfig,
     "output": OutputConfig,
     "runtime": RuntimeConfig,
+    "transition_state": TransitionStateConfig,
 }
 
 
@@ -292,6 +338,7 @@ class Config:
     properties: PropertiesConfig = field(default_factory=PropertiesConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
+    transition_state: TransitionStateConfig = field(default_factory=TransitionStateConfig)
     #: Directory the YAML file lives in, used to resolve relative paths.
     source_dir: Path = field(default_factory=Path)
 
@@ -325,6 +372,9 @@ class Config:
     def validate(self, ctx: str = "<config>") -> None:
         for name in _SECTIONS:
             getattr(self, name).validate(ctx)
+        if self.transition_state.enabled and self.scf.smearing > 0:
+            raise ConfigError(f"{ctx}: a transition state fixes occupations by hand; "
+                              f"scf.smearing must be 0")
         if not self.output.prefix:
             self.output.prefix = self.molecule.name
 

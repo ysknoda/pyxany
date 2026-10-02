@@ -42,6 +42,26 @@ transition_state:
 Deferred: (d) XANES/XES spectra from transition-state dipole intensities
 (ADR 0008).
 
+## Implementation notes (2026-10-02)
+
+- Validated by Janak's theorem: dE/dx by central differences in the number of
+  electrons removed equals -eps(TS) to 1.4e-5 Ha (H2O HOMO, l_max = 13); the
+  residual is set by the multipole truncation (5.8e-3 Ha at l_max = 2), i.e.
+  by the small asymmetry of the truncated Hartree operator.
+- TS vs Delta-SCF for the H2O HOMO: 11.16 vs 11.12 eV (third-order term).
+  X-alpha itself underestimates this IP: PySCF X-alpha/aug-cc-pVTZ Delta-SCF
+  12.04 eV against 12.62 eV measured (CCCBDB), so experiment is not a
+  pass/fail criterion.
+- Core holes on equivalent atoms do **not** localise by themselves from a
+  symmetric start (N2 stayed 0.50/0.50 and gave 399.6 eV). The hole is first
+  taken as the maximally localised combination of the element's core
+  orbitals (a density correction that breaks the symmetry), then from the
+  localised eigenvector's occupation once one exists (> 0.9 on the atom), so
+  the density commutes with F and the SCF converges: N2 1s 408.1 eV, H2O
+  O 1s 536.9 eV (DZ, non-relativistic). Measured XPS values of roughly 409.9
+  and 539.9 eV (Jolly et al. 1984, quoted from memory: UNCERTAIN, ~85 %) are
+  shown for orientation only.
+
 ## Consequences
 
 Requires fractional, user-fixed occupations in the SCF that override aufbau

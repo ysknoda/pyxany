@@ -72,7 +72,8 @@ def freeze_mask(molecule, freeze) -> np.ndarray:
     return mask
 
 
-def optimise_geometry(molecule, config, verbose: int = 1) -> OptimisationResult:
+def optimise_geometry(molecule, config, verbose: int = 1, restart=None,
+                      checkpoint_path=None) -> OptimisationResult:
     """Relax the geometry until ``max|F| < config.optimise.f_max``."""
     opt_cfg = config.optimise
     frozen = freeze_mask(molecule, opt_cfg.freeze)
@@ -114,7 +115,12 @@ def optimise_geometry(molecule, config, verbose: int = 1) -> OptimisationResult:
         pos[moving] = x.reshape(-1, 3)
         current.positions = pos
         basis = build_basis(current, config)
-        result = run_scf(current, basis, config, verbose=0)
+        # start from the previous evaluation's density (ADR 0004); the first may
+        # come from a checkpoint
+        result = run_scf(current, basis, config, verbose=0, initial=state.get("guess"),
+                         restart=restart if state["n"] == 0 else None,
+                         checkpoint_path=checkpoint_path)
+        state["guess"] = {"P": result.P, "P_a": result.P_a, "P_b": result.P_b}
         if config.forces.method == "finite_difference":
             forces = compute_forces_fd(current, config, step=config.forces.fd_step,
                                        atoms=list(moving), verbose=0)

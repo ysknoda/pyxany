@@ -33,7 +33,9 @@ def execute(args) -> int:
             mpi_print(resource_estimate(cfg, molecule, build_molecule_basis(cfg, molecule)))
             return EXIT_OK
 
-        result = optimise_geometry(molecule, cfg, verbose=cfg.runtime.verbosity)
+        result = optimise_geometry(molecule, cfg, verbose=cfg.runtime.verbosity,
+                                   restart=args.restart,
+                                   checkpoint_path=out_path(cfg, "_scf.npz"))
         scf = result.scf
 
         if is_root():

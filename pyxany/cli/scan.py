@@ -29,11 +29,14 @@ def execute(args) -> int:
         mpi_print("  " + "-" * 60)
 
         rows = []
+        guess, restart = None, args.restart
         for v in values:
             trial = molecule.copy()
             _apply(trial, kind, indices, float(v))
             basis = build_basis(trial, cfg, getattr(cfg, "_pseudo_zeta", None))
-            res = run_scf(trial, basis, cfg, verbose=0)
+            # each point starts from the previous point's density (ADR 0004)
+            res = run_scf(trial, basis, cfg, verbose=0, initial=guess, restart=restart)
+            guess, restart = {"P": res.P, "P_a": res.P_a, "P_b": res.P_b}, None
             rows.append({"value": float(v), "energy_hartree": res.total_energy,
                          "converged": bool(res.converged),
                          "n_iterations": res.n_iterations})

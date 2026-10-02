@@ -74,8 +74,10 @@ def test_energy_and_forces_match_serial(tmp_path):
         cmd = ([sys.executable, str(script)] if n == 1
                else ["mpirun", "-n", str(n), sys.executable, str(script)])
         out = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        line = next(ln for ln in out.stdout.splitlines() if ln.startswith("RESULT "))
-        return json.loads(line[len("RESULT "):])
+        # Open MPI may prefix a line with a terminal escape (seen: "\x1b[0mRESULT ..."),
+        # so look for the marker anywhere in the line rather than at its start.
+        line = next(ln for ln in out.stdout.splitlines() if "RESULT " in ln)
+        return json.loads(line[line.index("RESULT ") + len("RESULT "):])
 
     serial = run(1)
     parallel = run(2)

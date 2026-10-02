@@ -66,22 +66,28 @@ def build_parser() -> argparse.ArgumentParser:
                        help="resolve settings and estimate resources, then stop")
         return p
 
-    p_run = common(sub.add_parser("run", help="single-point SCF"))
+    def restartable(p):
+        p.add_argument("--restart", metavar="FILE", default=None,
+                       help="resume from (or, at another geometry, start from) an SCF "
+                            "checkpoint, e.g. <outdir>/<prefix>_scf.npz")
+        return p
+
+    p_run = restartable(common(sub.add_parser("run", help="single-point SCF")))
     p_run.add_argument("--no-figure", action="store_true")
 
-    p_opt = common(sub.add_parser("opt", help="geometry optimisation"))
+    p_opt = restartable(common(sub.add_parser("opt", help="geometry optimisation")))
     p_opt.add_argument("--freeze-core", action="store_true",
                        help="relax only the pseudo-hydrogen terminators")
     p_opt.add_argument("--max-steps", type=int, default=None)
 
-    p_f = common(sub.add_parser("forces", help="forces only"))
+    p_f = restartable(common(sub.add_parser("forces", help="forces only")))
     p_f.add_argument("--method", choices=["analytic", "finite_difference"], default=None)
     p_f.add_argument("--compare", action="store_true",
                      help="compute both analytic and finite-difference forces "
                           "and report the difference")
     p_f.add_argument("--fd-step", type=float, default=None, help="Bohr")
 
-    p_scan = common(sub.add_parser("scan", help="scan a bond length or angle"))
+    p_scan = restartable(common(sub.add_parser("scan", help="scan a bond length or angle")))
     p_scan.add_argument("--coord", required=True, metavar="SPEC",
                         help="'bond:i,j' or 'angle:i,j,k' (0-based atom indices)")
     p_scan.add_argument("--range", nargs=2, type=float, required=True,

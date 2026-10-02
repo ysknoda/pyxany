@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-
 from ..parallel import mpi_print
 from ..scf import run_scf
 from ..timing import REGISTRY, timer
 from . import EXIT_OK, EXIT_SCF
-from ._shared import build_molecule_basis, prepare, print_forces, report_timing
+from ._shared import build_molecule_basis, out_path, prepare, print_forces, report_timing
 
 
 def execute(args) -> int:
@@ -19,7 +18,8 @@ def execute(args) -> int:
         if args.fd_step:
             cfg.forces.fd_step = args.fd_step
         basis = build_molecule_basis(cfg, molecule)
-        result = run_scf(molecule, basis, cfg, verbose=cfg.runtime.verbosity)
+        result = run_scf(molecule, basis, cfg, verbose=cfg.runtime.verbosity,
+                         restart=args.restart, checkpoint_path=out_path(cfg, "_scf.npz"))
 
         if args.compare:
             from ..forces import compare_with_fd

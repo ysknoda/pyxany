@@ -7,6 +7,7 @@ Not in the current scope; recorded so the decision to defer is explicit.
 
 | item | why deferred / prerequisite |
 |---|---|
+| **Cluster-size convergence of the example gaps** | The example clusters (5-7 core atoms) have terminator-dominated LUMOs (Loewdin 0.52-0.72) that relaxing the terminators does not remove. A size series (e.g. Si/GaAs/CdSe with 17, 29, 47, 87 core atoms) is needed before their gaps can stand for the material; cost is set by step 8 (performance). |
 | Adaptive multipole order in the Hartree evaluation | The default l_max = n_a - 1 costs ~2.5x per SCF iteration on GaAs4; far atoms only need low l (tails decay as r^-(l+1)). Planned for step 8 (performance). |
 | **Element-specific X-alpha alpha** (e.g. Schwarz alpha_HF) | Needs an inter-atomic mixing rule and the full Schwarz table from the source paper; breaks Tier A PySCF comparison (ADR 0002). |
 | Multiple initial spin guesses, tried automatically | Next stage after the current scope. |

@@ -285,9 +285,10 @@ def _fake_optimiser_backend(monkeypatch, energy_min_bohr, force_zero_bohr, k=0.5
 
     import pyxany.forces.optimise as opt
 
-    def fake_scf(mol, basis, config, verbose=0):
+    def fake_scf(mol, basis, config, verbose=0, **kwargs):
         r = float(np.linalg.norm(mol.positions[1] - mol.positions[0]))
-        return SimpleNamespace(total_energy=k * (r - energy_min_bohr) ** 2, molecule=mol)
+        return SimpleNamespace(total_energy=k * (r - energy_min_bohr) ** 2, molecule=mol,
+                               P=None, P_a=None, P_b=None)
 
     def fake_forces(result, config, project=True):
         pos = result.molecule.positions

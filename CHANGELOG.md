@@ -4,6 +4,35 @@
 
 ### Added
 
+- **Slater transition state** (ADR 0006): `transition_state:` removes half an
+  electron from a chosen orbital (`homo`, an MO number, or a core shell
+  `{atom, shell}`) or moves it between two, and reports the ionisation or
+  excitation energy. Checked against Janak's theorem by finite differences
+  (1.4e-5 Ha) and Delta-SCF (0.03 eV). Core holes on equivalent atoms are
+  localised explicitly; a symmetric start does not localise them by itself.
+- **Bond overlap population and bonding figures** (ADR 0005). Atom-pair
+  Mulliken overlap populations and their MO decomposition for bonded pairs
+  (Mayer bond order >= 0.2, or pairs named in the input), in the text report
+  and in the JSON output; a COOP-type plot per element-pair type, a level
+  diagram coloured by bonding character, a Loewdin partial DOS by element and
+  angular momentum, and an optional atom-pair heatmap, all as PDF and PNG.
+  The sum rule (net + overlap populations = N) and the MO decomposition are
+  tested.
+- **SCF checkpoint and restart** (ADR 0004). The SCF state is written to
+  `<prefix>_scf.npz` at the end of every SCF and every `scf.checkpoint_every`
+  iterations; `--restart FILE` on `run`, `opt`, `forces` and `scan` resumes it,
+  or uses it as the initial guess at another geometry. A different system is
+  refused. `opt` and `scan` start each SCF from the previous point's density.
+  `scf.checkpoint_every`, previously rejected as unimplemented, is now live.
+- **Loewdin populations and a terminator-aware core gap.** `pyxany run` now
+  reports Loewdin charges and, for pseudo-hydrogen structures, the Loewdin
+  weight of the frontier orbitals on the terminators and the gap between the
+  orbitals that are not terminator states (`properties.terminator_weight_max`,
+  default 0.5). The passivation check used Mulliken weights, which leave [0, 1]
+  with diffuse terminator functions (1.55 on the MgO6 LUMO, Loewdin 0.72).
+  It shows that in the small example clusters the LUMO is substantially on the
+  terminators (0.52-0.72), which relaxing them does not change; see
+  docs/passivation.md.
 - **Tier A cross-validation against PySCF** (`tests/test_tier_a_pyscf.py`):
   same X-alpha functional (`1.05 * LDA_X`) and the same Gaussian basis,
   translated from pyxany's own tables, on 10 closed-shell molecules, a
@@ -86,7 +115,7 @@
   free energy `E_total − σS`. It now converges on the free energy.
 - **`scf.checkpoint_every` was accepted and documented but implemented
   nowhere**, so a long HPC job promised restart protection it did not have. It
-  is now rejected with an explanation and `docs/hpc.md` corrected.
+  was first rejected with an explanation, and is now implemented (see Added).
 - **The package could not be built.** `packages` and a `force-include` both
   mapped the data tables to the same wheel path and hatchling aborted, so
   `pip install .` failed; only editable installs worked, which is what CI used.

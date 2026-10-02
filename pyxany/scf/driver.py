@@ -64,6 +64,8 @@ class SCFResult:
     occ_a: np.ndarray = None
     occ_b: np.ndarray = None
     history: list = field(default_factory=list)
+    #: Slater transition state: orbital indices and energies of the final iteration
+    transition_state: dict | None = None
 
     @property
     def total_energy(self) -> float:
@@ -125,18 +127,27 @@ def _total_energy(P, T, V_nuc_mat, rho, V_H, weights, alpha, E_nn,
     }
 
 
-def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
+def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None = None,
+            restart=None, checkpoint_path=None) -> SCFResult:
     """Run the SCF to convergence.
 
     ``config`` is a :class:`pyxany.config.Config`; only the ``grid``, ``scf`` and
     ``basis`` sections are read here.
+
+    ``initial`` is a starting density ``{"P": ..., "P_a": ..., "P_b": ...}``
+    (e.g. the previous point of an optimisation); ``restart`` is a checkpoint
+    file to resume from or, at another geometry, to start from. With
+    ``checkpoint_path`` the state is written every ``scf.checkpoint_every``
+    iterations (if > 0) and at the end. See :mod:`pyxany.scf.checkpoint`.
     """
     scf_cfg, grid_cfg = config.scf, config.grid
     alpha = scf_cfg.alpha
     n_electrons = molecule.n_electrons
     n_basis = len(basis)
 
-    unrestricted = scf_cfg.unrestricted or molecule.multiplicity > 1 or (
+    ts_cfg = config.transition_state
+    # a half-electron hole in one spin channel makes any system open-shell
+    unrestricted = ts_cfg.enabled or scf_cfg.unrestricted or molecule.multiplicity > 1 or (
         abs(n_electrons - round(n_electrons)) < 1e-8 and int(round(n_electrons)) % 2 == 1
     )
     n_alpha, n_beta = (
@@ -153,6 +164,11 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
                                  n_r=grid_cfg.pair_n_r, n_a=grid_cfg.pair_n_a,
                                  screening_tol=grid_cfg.screening_tol)
     cond = condition_number(S)
+    holes = None
+    if ts_cfg.enabled:
+        from .transition_state import HoleManager
+
+        holes = HoleManager(config, molecule, basis, S)
     if verbose:
         mpi_print(f"  S condition number : {cond:.4g}"
                   + ("   [WARNING: near-linear dependence]" if cond > 1e4 else ""))
@@ -178,9 +194,25 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
     E_nn = molecule.nuclear_repulsion()
 
     # ---- initial density --------------------------------------------------
-    P = rescale_to_electron_count(atomic_superposition(molecule, basis), S, n_electrons)
+    from . import checkpoint as ckpt_mod
+
+    system_fp = ckpt_mod.system_fingerprint(molecule, basis, config, unrestricted)
+    geometry_fp = ckpt_mod.geometry_fingerprint(molecule)
+    start_it = 0
+    if restart is not None:
+        initial, start_it = ckpt_mod.initial_density(
+            ckpt_mod.read(restart), system_fp, geometry_fp, n_basis, path=restart,
+            verbose=verbose)
+    if initial is not None and initial.get("P") is not None:
+        P = rescale_to_electron_count(np.array(initial["P"], dtype=float), S, n_electrons)
+    else:
+        P = rescale_to_electron_count(atomic_superposition(molecule, basis), S, n_electrons)
     if unrestricted:
-        P_a, P_b = spin_split(P, molecule, basis, n_alpha, n_beta)
+        if initial is not None and all(initial.get(k) is not None for k in ("P_a", "P_b")):
+            P_a = rescale_to_electron_count(np.array(initial["P_a"], dtype=float), S, n_alpha)
+            P_b = rescale_to_electron_count(np.array(initial["P_b"], dtype=float), S, n_beta)
+        else:
+            P_a, P_b = spin_split(P, molecule, basis, n_alpha, n_beta)
         P = P_a + P_b
         accel = {
             "diis_a": PulayDIIS(), "diis_b": PulayDIIS(),
@@ -207,7 +239,8 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
     if verbose:
         _print_table_header(unrestricted)
 
-    for it in range(1, scf_cfg.max_iter + 1):
+    every = int(scf_cfg.checkpoint_every)
+    for it in range(start_it + 1, scf_cfg.max_iter + 1):
         with timer("scf.iteration"):
             # --- density on the grid, from the current P -------------------
             with timer("scf.density"):
@@ -255,8 +288,18 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
                 eps_a, C_a, eps_b, C_b = _diagonalise_uks(Fa_use, Fb_use, S, n_basis)
                 occ_a = fermi_occupations(eps_a, n_alpha, scf_cfg.smearing, 1.0)
                 occ_b = fermi_occupations(eps_b, n_beta, scf_cfg.smearing, 1.0)
+                if holes is not None:
+                    if ts_cfg.spin == "alpha":
+                        occ_a = holes.apply(eps_a, occ_a, C_a)
+                    else:
+                        occ_b = holes.apply(eps_b, occ_b, C_b)
                 Pa_new = density_matrix(C_a, occ_a)
                 Pb_new = density_matrix(C_b, occ_b)
+                if holes is not None and holes.correction is not None:
+                    if ts_cfg.spin == "alpha":
+                        Pa_new = Pa_new - holes.correction
+                    else:
+                        Pb_new = Pb_new - holes.correction
                 d_rms = float(np.sqrt(np.mean((Pa_new + Pb_new - P) ** 2)))
                 P_a = mix * Pa_new + (1.0 - mix) * P_a
                 P_b = mix * Pb_new + (1.0 - mix) * P_b
@@ -288,9 +331,14 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
             if verbose:
                 _print_row(it, energies["E_total"], dE, err, d_rms, extra, method)
 
-            if it > 2 and dE < scf_cfg.e_tol and d_rms < scf_cfg.d_tol:
+            if it > start_it + 2 and dE < scf_cfg.e_tol and d_rms < scf_cfg.d_tol:
                 converged = True
                 break
+            if checkpoint_path is not None and every > 0 and it % every == 0:
+                ckpt_mod.write(checkpoint_path, P=P, P_a=P_a, P_b=P_b, C=C, eps=eps,
+                               occ=occ, iteration=it, system=system_fp,
+                               geometry=geometry_fp, energy=energies["E_total"],
+                               converged=False)
 
     # ---- final quantities from the converged density ----------------------
     if unrestricted:
@@ -315,10 +363,16 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
         energies["E_free"] = energies["E_total"] - ts
 
     energies["n_electrons_integrated"] = allreduce_scalar(float(np.dot(weights, rho)))
+    n_expected = n_electrons - (holes.electrons if holes is not None and holes.mode == "remove"
+                                else 0.0)
+    if checkpoint_path is not None:
+        ckpt_mod.write(checkpoint_path, P=P, P_a=P_a, P_b=P_b, C=C, eps=eps, occ=occ,
+                       iteration=start_it + len(history), system=system_fp,
+                       geometry=geometry_fp, energy=energies["E_total"], converged=converged)
     energies["trace_PS"] = float(np.einsum("mn,nm->", P, S))
 
     if verbose:
-        _print_footer(converged, len(history), energies, n_electrons)
+        _print_footer(converged, len(history), energies, n_expected)
         if not converged:
             for line in diagnose_non_convergence(history, eps, occ, scf_cfg):
                 mpi_print(f"  {line}")
@@ -330,6 +384,9 @@ def run_scf(molecule, basis, config, verbose: int = 1) -> SCFResult:
         unrestricted=unrestricted, n_alpha=n_alpha, n_beta=n_beta,
         eps_a=eps_a, eps_b=eps_b, C_a=C_a, C_b=C_b, P_a=P_a, P_b=P_b,
         occ_a=occ_a, occ_b=occ_b, history=history,
+        transition_state=None if holes is None else dict(holes.last, mode=holes.mode,
+                                                         spin=ts_cfg.spin,
+                                                         electrons=holes.electrons),
     )
 
 

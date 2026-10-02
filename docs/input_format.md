@@ -90,6 +90,12 @@ properties:
   dos: {sigma: 0.3, n_points: 600}
   bde: {enabled: false}
   esp: {enabled: false, n_pts: 20, margin: 3.0}
+  overlap_population:              # bond overlap population (ADR 0005)
+    pairs: []                      # [[0, 1], ...] 0-based; empty: Mayer B.O. >= min_bond_order
+    min_bond_order: 0.2
+    heatmap: false                 # atom-pair matrix figure; small systems only
+    sigma: 0.3                     # broadening of the COOP and PDOS curves (eV)
+  terminator_weight_max: 0.5       # Loewdin weight above which an orbital is a terminator state
 
 output:
   dir:    "."
@@ -155,3 +161,47 @@ pyxany run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp -o /scr
 | `<prefix>_timing.json` | per-section wall times |
 | `<prefix>_scan.csv` | `pyxany scan` output |
 | `<prefix>_matrices.npz` | P, C, S, T, eigenvalues (`output.npz: true`) |
+
+## Bonding figures
+
+With `output.figure: true` (and matplotlib installed) `pyxany run` writes, next
+to the summary PNG, three figures as both PDF and PNG:
+
+| file | content |
+|---|---|
+| `<prefix>_coop.*` | MO overlap population vs orbital energy, one panel per element-pair type (bars per orbital, broadened curve; > 0 bonding, < 0 antibonding). The axis is scaled to the occupied orbitals; empty-orbital bars beyond it are clipped and marked, because Mulliken overlap populations of diffuse empty orbitals can exceed 1 by far (H2O/DZ: -7 for the O-H sigma*). |
+| `<prefix>_levels_op.*` | orbital levels coloured by the overlap population of the dominant pair type (solid occupied, dashed empty). |
+| `<prefix>_pdos.*` | Loewdin partial DOS by element and by (element, l); species in order of nuclear charge. Beta drawn negative for open shells. |
+| `<prefix>_op_heatmap.*` | atom-pair overlap population matrix, if `overlap_population.heatmap: true`. |
+
+The energy window is HOMO - 20 eV to HOMO + 10 eV. The same numbers are in the
+text report (strongest pairs) and in the JSON output under `bonding`.
+
+## Slater transition state
+
+```yaml
+transition_state:
+  remove: homo                  # valence ionisation: 'homo', or an MO number (1-based)
+  # remove: {atom: 3, shell: 1s}  # core ionisation of atom 3 (1-based, as in the .xyz)
+  # excite: {from: homo, to: lumo}
+  spin: alpha                   # channel the half electron leaves
+  electrons: 0.5
+```
+
+Half an electron is removed (or moved) every SCF iteration; the run is
+unrestricted automatically and `scf.smearing` must be 0. The report gives
+`-eps(TS)` (ionisation) or `eps_to - eps_from` (excitation), which by Janak's
+theorem equal the Delta-SCF energy to third order (H2O HOMO: 11.16 eV against
+Delta-SCF 11.12 eV).
+
+**Indices here are 1-based**, as you read the .xyz file; the `--coord` option
+of `pyxany scan` is 0-based.
+
+A core hole needs a basis with principal quantum numbers (STO sets such as
+`dz`, or `nao`). With several equivalent atoms the hole is localised on the
+one named: the run starts by removing the combination of their core orbitals
+with the largest weight on that atom, and switches to the orbital itself once
+an eigenvector is localised (N2: 0.998 on the named atom). Keep
+`poisson_l_max` at its default (`auto`); a low value spoils the energy/orbital
+consistency the method relies on (Janak residual 5.8e-3 Ha at l_max = 2,
+1.4e-5 at 13).

@@ -80,10 +80,30 @@ Two things that matter at scale:
 
 ## Checkpointing
 
-**Not implemented.** There is no SCF restart: a job killed at a wall-clock limit
-loses all of its work. `scf.checkpoint_every` is rejected by the input validator
-rather than accepted as a no-op, so an input file cannot quietly claim
-protection it does not have.
+`run`, `opt`, `forces` and `scan` write the SCF state to
+`<output.dir>/<prefix>_scf.npz` at the end of every SCF, and every
+`scf.checkpoint_every` iterations if that is > 0:
 
-Until it exists, size the wall-clock request from a `--dry-run` estimate plus a
-margin, and prefer several smaller jobs over one long one.
+```yaml
+scf:
+  checkpoint_every: 10
+```
+
+A job killed at the wall-clock limit is resumed with
+
+```bash
+pyxany run cluster.yaml --restart results/cluster_scf.npz
+```
+
+The file holds the density matrix (both spins for UKS), the orbitals and the
+iteration count, plus fingerprints of the system and of the geometry. Same
+system and geometry: the run resumes where it stopped. Same system, other
+geometry: the stored density is only the initial guess (a warning says so).
+Anything else -- other atoms, charge, multiplicity, basis or alpha -- is
+refused. DIIS history is not stored (it would multiply the file size by ~10
+and is rebuilt within a few iterations), so the first iterations after a
+restart converge a little more slowly than an uninterrupted run would.
+
+Files are written by rank 0 to a temporary name and renamed into place, so a
+kill during the write leaves the previous checkpoint intact. `opt` and `scan`
+also start every SCF from the previous point's density.

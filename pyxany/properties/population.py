@@ -92,3 +92,117 @@ def basis_function_weights(C: np.ndarray, occ: np.ndarray, S: np.ndarray,
     total = contrib.sum(axis=0)
     with np.errstate(divide="ignore", invalid="ignore"):
         return np.where(np.abs(total) > 1e-12, contrib[mask].sum(axis=0) / total, 0.0)
+
+
+def _sqrt_overlap(S: np.ndarray) -> np.ndarray:
+    w, U = np.linalg.eigh(S)
+    return (U * np.sqrt(np.maximum(w, 0.0))) @ U.T
+
+
+def loewdin(P: np.ndarray, S: np.ndarray, basis, molecule) -> dict:
+    """Loewdin gross populations and charges: ``diag(S^1/2 P S^1/2)`` summed per atom.
+
+    Unlike Mulliken, each orbital's share stays within [0, 1]: Mulliken gave a
+    pseudo-hydrogen-terminated MgO6 cluster's LUMO a terminator weight of 1.55,
+    Loewdin 0.72.
+    """
+    Sh = _sqrt_overlap(S)
+    atom_of = np.array([f.atom_idx for f in basis])
+    gross = np.zeros(len(molecule))
+    np.add.at(gross, atom_of, np.diag(Sh @ P @ Sh))
+    return {"gross": gross, "charges": molecule.charges - gross, "atom_of_basis": atom_of}
+
+
+def loewdin_orbital_weights(C: np.ndarray, S: np.ndarray, selector) -> np.ndarray:
+    """Fraction of each MO on the basis functions ``selector`` picks, in [0, 1].
+
+    ``sum_{mu selected} (S^1/2 C)_{mu i}^2`` -- the orbital expressed in the
+    symmetrically orthogonalised basis, so the weights of all functions add up
+    to the orbital's norm, 1, and none can be negative.
+    """
+    mask = np.asarray(selector, dtype=bool)
+    LC = _sqrt_overlap(S) @ C
+    return np.sum(LC[mask] ** 2, axis=0)
+
+
+def core_gap(eps: np.ndarray, occ: np.ndarray, weights: np.ndarray,
+             max_weight: float = 0.5) -> dict:
+    """Gap between the frontier orbitals that are *not* terminator states.
+
+    ``weights`` is each orbital's terminator fraction (Loewdin). The core HOMO
+    (LUMO) is the highest occupied (lowest empty) orbital with weight below
+    ``max_weight``. In small passivated clusters a terminator-dominated empty
+    state can sit below the cluster's own conduction states, so the plain
+    HOMO-LUMO gap is not the gap of the cluster interior.
+    """
+    finite = np.isfinite(eps)
+    occupied = finite & (occ > 1e-8)
+    empty = finite & ~occupied
+    core = weights < max_weight
+    homo_i = np.where(occupied)[0][np.argmax(eps[occupied])] if occupied.any() else None
+    lumo_i = np.where(empty)[0][np.argmin(eps[empty])] if empty.any() else None
+    core_occ = np.where(occupied & core)[0]
+    core_emp = np.where(empty & core)[0]
+    c_homo = core_occ[np.argmax(eps[core_occ])] if len(core_occ) else None
+    c_lumo = core_emp[np.argmin(eps[core_emp])] if len(core_emp) else None
+    return {
+        "homo": homo_i, "lumo": lumo_i, "core_homo": c_homo, "core_lumo": c_lumo,
+        "gap": (eps[lumo_i] - eps[homo_i]) if homo_i is not None and lumo_i is not None else np.nan,
+        "core_gap": (eps[c_lumo] - eps[c_homo]) if c_homo is not None and c_lumo is not None
+        else np.nan,
+        "n_terminator_states_below_core_lumo": int(np.sum(empty & ~core & (eps < eps[c_lumo])))
+        if c_lumo is not None else 0,
+    }
+
+
+def overlap_population(P: np.ndarray, S: np.ndarray, basis, molecule) -> np.ndarray:
+    """Mulliken bond overlap population ``n_AB = sum_{mu in A, nu in B} 2 P_mu,nu S_mu,nu``.
+
+    Symmetric ``(n_atoms, n_atoms)``; the diagonal holds the net population
+    ``sum_{mu, nu in A} P S`` so that ``trace + sum_{A<B} n_AB`` is the electron
+    count -- the sum rule the tests check. Positive off-diagonal entries are
+    bonding, negative antibonding.
+    """
+    atom_of = np.array([f.atom_idx for f in basis])
+    M = P * S
+    out = np.zeros((len(molecule), len(molecule)))
+    np.add.at(out, (atom_of[:, None], atom_of[None, :]), M)
+    off = ~np.eye(len(molecule), dtype=bool)
+    out[off] *= 2.0
+    return out
+
+
+def mo_overlap_population(C: np.ndarray, S: np.ndarray, basis, pairs) -> np.ndarray:
+    """Overlap population of each MO for each atom pair, per electron: ``(n_mo, n_pairs)``.
+
+    ``OP_i(A, B) = 2 sum_{mu in A, nu in B} C_mu,i C_nu,i S_mu,nu``. Weighted by
+    the occupations and summed over orbitals it reproduces
+    :func:`overlap_population` -- the input for COOP-type plots.
+    """
+    atom_of = np.array([f.atom_idx for f in basis])
+    SC = S @ C
+    out = np.zeros((C.shape[1], len(pairs)))
+    for k, (a, b) in enumerate(pairs):
+        ma, mb = atom_of == a, atom_of == b
+        # sum_{mu in A, nu in B} C_mu S_mu,nu C_nu  ==  sum_{mu in A} C_mu (S_{:,B} C_B)_mu
+        out[:, k] = 2.0 * np.einsum("mi,mi->i", C[ma], S[np.ix_(ma, mb)] @ C[mb])
+    return out
+
+
+def bonded_pairs(bond_orders: np.ndarray, min_bond_order: float = 0.2) -> list[tuple[int, int]]:
+    """Atom pairs ``(A, B)``, ``A < B``, whose (Mayer) bond order reaches the threshold."""
+    n = len(bond_orders)
+    return [(a, b) for a in range(n) for b in range(a + 1, n)
+            if bond_orders[a, b] >= min_bond_order]
+
+
+def loewdin_orbital_groups(C: np.ndarray, S: np.ndarray, labels) -> dict:
+    """Loewdin weight of every MO on each group of basis functions: ``{label: (n_mo,)}``.
+
+    ``labels`` gives one group label per basis function (e.g. ``"Ga d"``); the
+    returned weights of all groups add up to 1 for every orbital.
+    """
+    LC = _sqrt_overlap(S) @ C
+    sq = LC**2
+    labels = np.asarray(labels)
+    return {lab: sq[labels == lab].sum(axis=0) for lab in dict.fromkeys(labels)}

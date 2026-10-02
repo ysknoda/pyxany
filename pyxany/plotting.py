@@ -204,3 +204,181 @@ def _style(ax) -> None:
     ax.xaxis.label.set_color(_DIM)
     ax.yaxis.label.set_color(_DIM)
     ax.title.set_color(_FG)
+
+
+# --------------------------------------------------------------------------
+# bonding figures (ADR 0005): white background, written as PDF and PNG
+# --------------------------------------------------------------------------
+_WINDOW_BELOW_HOMO_EV = 20.0
+_WINDOW_ABOVE_HOMO_EV = 10.0
+
+
+def _broaden(x, e, w, sigma):
+    z = (x[:, None] - e[None, :]) / sigma
+    return (np.exp(-0.5 * z * z) * w[None, :]).sum(axis=1) / (sigma * np.sqrt(2.0 * np.pi))
+
+
+def _window(analysis):
+    lo = analysis.homo_ev - _WINDOW_BELOW_HOMO_EV
+    hi = analysis.homo_ev + _WINDOW_ABOVE_HOMO_EV
+    return lo, hi
+
+
+def _occupied_limit(analysis, pair_type, cap, lo, hi, x=None, sigma=None) -> float:
+    """Largest |overlap population| of the occupied orbitals in the window (>= 0.05).
+
+    With ``x`` and ``sigma`` the broadened occupied curve counts too, so that
+    degenerate levels -- whose broadened sum exceeds any single bar -- are not
+    clipped.
+    """
+    best = 0.05
+    for ch in analysis.channels:
+        sel = np.isfinite(ch.eps) & (ch.eps >= lo) & (ch.eps <= hi) & (ch.occ > 1e-8)
+        op = cap * ch.mo_op_by_type[pair_type][sel]
+        if op.size:
+            best = max(best, float(np.abs(op).max()))
+            if x is not None:
+                curve = _broaden(x, ch.eps[sel], op, sigma) * sigma * np.sqrt(2.0 * np.pi)
+                best = max(best, float(np.abs(curve).max()))
+    return best
+
+
+def _save(fig, stem, suffix):
+    paths = []
+    for ext in ("pdf", "png"):
+        path = f"{stem}_{suffix}.{ext}"
+        fig.savefig(path, dpi=200 if ext == "png" else None, bbox_inches="tight")
+        paths.append(path)
+    return paths
+
+
+def bonding_figures(analysis, result, config, stem) -> list[str]:
+    """COOP-type plot, OP-coloured level diagram, partial DOS (+ optional heatmap)."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import TwoSlopeNorm
+
+    mol = result.molecule
+    sigma = float(config.properties.overlap_population.get("sigma", 0.3))
+    lo, hi = _window(analysis)
+    x = np.linspace(lo, hi, 1200)
+    cap = 1.0 if result.unrestricted else 2.0
+    written: list[str] = []
+    styles = {"": "-", "alpha": "-", "beta": "--"}
+
+    # -- 1. COOP-type: overlap population per pair type vs energy -----------
+    # Empty orbitals of a non-orthogonal basis can carry Mulliken overlap
+    # populations far beyond 1 (H2O/DZ: -7 for the O-H sigma*), which would
+    # flatten every occupied feature; the axis is therefore scaled to the
+    # occupied orbitals and larger empty-orbital bars are clipped and marked.
+    types = list(dict.fromkeys(analysis.pair_types))
+    if types:
+        fig, axes = plt.subplots(len(types), 1, figsize=(6.5, 1.9 * len(types) + 0.8),
+                                 sharex=True, squeeze=False)
+        any_clipped = False
+        for ax, t in zip(axes[:, 0], types, strict=True):
+            lim = _occupied_limit(analysis, t, cap, lo, hi, x, sigma)
+            for ch in analysis.channels:
+                inside = np.isfinite(ch.eps) & (ch.eps >= lo) & (ch.eps <= hi)
+                op = cap * ch.mo_op_by_type[t][inside]
+                e = ch.eps[inside]
+                shown = np.clip(op, -lim, lim)
+                clipped = np.abs(op) > lim
+                any_clipped |= bool(clipped.any())
+                ax.vlines(e, 0.0, shown, colors=np.where(op >= 0, "#1f6fb4", "#c0392b"),
+                          linewidth=1.0, alpha=0.7)
+                ax.plot(e[clipped], shown[clipped], marker="v", linestyle="none",
+                        color="#c0392b", markersize=4)
+                # normalised so an isolated level's peak equals its bar
+                curve = _broaden(x, e, op, sigma) * sigma * np.sqrt(2.0 * np.pi)
+                ax.plot(x, np.clip(curve, -lim, lim), styles[ch.name], color="k",
+                        linewidth=1.0, label=ch.name or None)
+            ax.set_ylim(-1.15 * lim, 1.15 * lim)
+            ax.axhline(0.0, color="0.5", linewidth=0.6)
+            ax.axvline(analysis.homo_ev, color="0.3", linestyle=":", linewidth=1.0)
+            ax.axvspan(lo, analysis.homo_ev, color="0.92", zorder=0)
+            ax.set_ylabel(f"{t}\nOP / orbital")
+        axes[0, 0].set_title(f"{mol.name}: MO overlap population (> 0 bonding, < 0 antibonding)",
+                             fontsize=10)
+        if result.unrestricted:
+            axes[0, 0].legend(fontsize=8, frameon=False)
+        note = "; triangles: clipped" if any_clipped else ""
+        axes[-1, 0].set_xlabel(f"orbital energy (eV)   [dotted: HOMO; shaded: occupied{note}]")
+        axes[-1, 0].set_xlim(lo, hi)
+        written += _save(fig, stem, "coop")
+        plt.close(fig)
+
+    # -- 2. level diagram coloured by the overlap population ---------------
+    if types:
+        totals = {t: abs(sum(analysis.op[p] for p, tt in zip(analysis.pairs,
+                                                             analysis.pair_types, strict=True)
+                             if tt == t))
+                  for t in types}
+        t_main = max(totals, key=totals.get)
+        fig, ax = plt.subplots(figsize=(3.6 + 1.4 * (len(analysis.channels) - 1), 6.0))
+        # colour scale from the occupied orbitals (see the COOP note); empty
+        # orbitals beyond it saturate
+        lim = _occupied_limit(analysis, t_main, cap, lo, hi)
+        norm = TwoSlopeNorm(vmin=-lim, vcenter=0.0, vmax=lim)
+        cmap = plt.get_cmap("RdBu")
+        for k, ch in enumerate(analysis.channels):
+            for e, o, v in zip(ch.eps, ch.occ, cap * ch.mo_op_by_type[t_main], strict=True):
+                if not (np.isfinite(e) and lo <= e <= hi):
+                    continue
+                style = "-" if o > 1e-8 else (0, (2, 1.5))
+                # grey underlay keeps near-zero (white) levels visible
+                ax.hlines(e, k + 0.1, k + 0.9, color="0.75", linewidth=3.4, linestyle=style)
+                ax.hlines(e, k + 0.1, k + 0.9, color=cmap(norm(v)), linewidth=2.2,
+                          linestyle=style)
+        ax.set_xlim(0, len(analysis.channels))
+        ax.set_xticks([k + 0.5 for k in range(len(analysis.channels))])
+        ax.set_xticklabels([ch.name or "levels" for ch in analysis.channels])
+        ax.set_ylim(lo, hi)
+        ax.set_ylabel("orbital energy (eV)   [solid: occupied, dashed: empty]")
+        sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        fig.colorbar(sm, ax=ax, extend="both",
+                     label=f"{t_main} overlap population per orbital")
+        ax.set_title(f"{mol.name}: levels coloured by {t_main} bonding", fontsize=10)
+        written += _save(fig, stem, "levels_op")
+        plt.close(fig)
+
+    # -- 3. partial DOS by element and by (element, l) ----------------------
+    fig, (ax_e, ax_l) = plt.subplots(2, 1, figsize=(6.5, 6.0), sharex=True)
+    colours = plt.cm.tab10(np.arange(10))
+    for ax, key in ((ax_e, "pdos_element"), (ax_l, "pdos_element_l")):
+        for ch in analysis.channels:
+            groups = getattr(ch, key)
+            inside = np.isfinite(ch.eps) & (ch.eps >= lo - 5 * sigma) & (ch.eps <= hi + 5 * sigma)
+            sign = -1.0 if ch.name == "beta" else 1.0
+            for i, (lab, w) in enumerate(groups.items()):
+                ax.plot(x, sign * _broaden(x, ch.eps[inside], w[inside], sigma),
+                        styles[ch.name], color=colours[i % 10], linewidth=1.1,
+                        label=str(lab) if ch.name != "beta" else None)
+        ax.axvline(analysis.homo_ev, color="0.3", linestyle=":", linewidth=1.0)
+        ax.set_ylabel("PDOS (orbitals/eV)")
+        ax.legend(fontsize=7, frameon=False, ncol=3)
+    ax_e.set_title(f"{mol.name}: Loewdin partial DOS (sigma = {sigma:g} eV"
+                   + ("; beta drawn negative" if result.unrestricted else "") + ")", fontsize=10)
+    ax_l.set_xlabel("orbital energy (eV)   [dotted: HOMO]")
+    ax_l.set_xlim(lo, hi)
+    written += _save(fig, stem, "pdos")
+    plt.close(fig)
+
+    # -- 4. optional atom-pair heatmap (small systems only) -----------------
+    if config.properties.overlap_population.get("heatmap", False):
+        n = len(mol)
+        fig, ax = plt.subplots(figsize=(1.2 + 0.32 * n, 1.0 + 0.32 * n))
+        M = analysis.op.copy()
+        np.fill_diagonal(M, np.nan)
+        lim = max(1e-6, float(np.nanmax(np.abs(M))))
+        im = ax.imshow(M, cmap="RdBu", vmin=-lim, vmax=lim)
+        labels = [f"{a.symbol}{i + 1}" for i, a in enumerate(mol)]
+        ax.set_xticks(range(n), labels, rotation=90, fontsize=7)
+        ax.set_yticks(range(n), labels, fontsize=7)
+        fig.colorbar(im, ax=ax, label="bond overlap population")
+        ax.set_title(f"{mol.name}: atom-pair overlap population", fontsize=10)
+        written += _save(fig, stem, "op_heatmap")
+        plt.close(fig)
+    return written

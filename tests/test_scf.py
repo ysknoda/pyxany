@@ -219,3 +219,73 @@ def test_restricted_frontier_is_unchanged(h2o):
     occ, eps = result.occupations, result.eps
     assert homo == pytest.approx(float(eps[occ > 1e-8].max()))
     assert list(result.homo_lumo_by_spin()) == ["restricted"]
+
+
+def test_loewdin_weights_are_bounded_and_complete(h2o):
+    """Loewdin orbital weights lie in [0, 1] and sum to 1; charges sum to the net charge."""
+    from pyxany.properties import loewdin, loewdin_orbital_weights
+
+    cfg = make_config(basis={"set": "dz"})
+    basis = build_basis(h2o, cfg)
+    res = run_scf(h2o, basis, cfg, verbose=0)
+    atom_of = np.array([f.atom_idx for f in basis])
+    per_atom = np.array([loewdin_orbital_weights(res.C, res.S, atom_of == a)
+                         for a in range(len(h2o))])
+    assert per_atom.min() >= -1e-12 and per_atom.max() <= 1 + 1e-12
+    assert np.allclose(per_atom.sum(axis=0), 1.0, atol=1e-10)
+    assert loewdin(res.P, res.S, basis, h2o)["charges"].sum() == pytest.approx(0.0, abs=1e-8)
+
+
+def test_loewdin_equals_mulliken_in_an_orthonormal_basis():
+    from types import SimpleNamespace
+
+    from pyxany.properties import loewdin, mulliken
+
+    rng = np.random.default_rng(0)
+    P = rng.normal(size=(4, 4))
+    P = P @ P.T
+    basis = [SimpleNamespace(atom_idx=i // 2) for i in range(4)]
+    mol = type("M", (), {"charges": np.array([1.0, 1.0]), "__len__": lambda self: 2})()
+    a = loewdin(P, np.eye(4), basis, mol)["charges"]
+    b = mulliken(P, np.eye(4), basis, mol)["charges"]
+    assert np.allclose(a, b)
+
+
+def test_core_gap_skips_terminator_states():
+    from pyxany.properties import core_gap
+
+    eps = np.array([-0.30, -0.20, -0.05, 0.02, 0.10])
+    occ = np.array([2.0, 2.0, 0.0, 0.0, 0.0])
+    weights = np.array([0.1, 0.2, 0.8, 0.3, 0.1])   # LUMO is a terminator state
+    g = core_gap(eps, occ, weights, max_weight=0.5)
+    assert g["gap"] == pytest.approx(0.15)
+    assert g["core_gap"] == pytest.approx(0.22)
+    assert g["n_terminator_states_below_core_lumo"] == 1
+
+
+def test_overlap_population_sum_rule_and_mo_decomposition(h2o):
+    """Net + bond overlap populations add to N; the MO decomposition sums back."""
+    from pyxany.properties import mo_overlap_population, overlap_population
+
+    cfg = make_config(basis={"set": "dz"})
+    basis = build_basis(h2o, cfg)
+    res = run_scf(h2o, basis, cfg, verbose=0)
+    op = overlap_population(res.P, res.S, basis, h2o)
+    assert np.allclose(op, op.T)
+    assert np.trace(op) + op[np.triu_indices(3, 1)].sum() == pytest.approx(10.0, abs=1e-8)
+    assert op[0, 1] > 0.0, "O-H must be bonding"
+    pairs = [(0, 1), (0, 2), (1, 2)]
+    per_mo = mo_overlap_population(res.C, res.S, basis, pairs)
+    assert np.allclose(per_mo.T @ res.occupations, [op[a, b] for a, b in pairs], atol=1e-10)
+
+
+def test_loewdin_orbital_groups_partition_every_orbital(h2o):
+    from pyxany.properties import loewdin_orbital_groups
+
+    cfg = make_config(basis={"set": "dzp"})
+    basis = build_basis(h2o, cfg)
+    res = run_scf(h2o, basis, cfg, verbose=0)
+    labels = [f"{h2o[f.atom_idx].element} {'spdf'[f.l]}" for f in basis]
+    groups = loewdin_orbital_groups(res.C, res.S, labels)
+    assert set(groups) == set(labels) and "O d" in groups
+    assert np.allclose(sum(groups.values()), 1.0, atol=1e-10)

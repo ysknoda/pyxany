@@ -124,3 +124,44 @@ the comparison the reference paper is about: real-hydrogen passivation can raise
 or lower the gap depending on the ionicity of the compound, and the difference
 from pseudo-hydrogen shrinks as the material becomes more covalent. Run the same
 cluster both ways to see it.
+
+## Checking that the terminators stay out of the gap
+
+`pyxany run` prints a **passivation check** for any structure with
+pseudo-hydrogens: the Loewdin weight of the HOMO and LUMO on the terminators,
+the plain gap, and the **core gap** -- between the highest occupied and lowest
+empty orbitals whose terminator weight is below
+`properties.terminator_weight_max` (default 0.5, a heuristic). The JSON output
+carries the per-orbital weights.
+
+Loewdin weights are used rather than Mulliken: with the diffuse functions of
+fractional terminators Mulliken weights leave [0, 1] (1.55 on the MgO6 LUMO)
+and overstate the terminator share about twofold. A real-space check
+(integrating |psi|^2 over the terminators' Becke cells) agrees with Loewdin
+except for alpha = 1/3 terminators, whose large Becke cells bias it upward.
+
+What the examples show (2026-10-01, DZ basis, unrelaxed X-H* distances):
+
+| cluster | HOMO weight | LUMO weight | gap (eV) | core gap (eV) |
+|---|---|---|---|---|
+| GaAs4 | 0.18 | 0.52 | 5.31 | 5.81 (1 terminator state below) |
+| Cd4Se4 | 0.04 | 0.64 | 2.54 | 4.98 (6 terminator states below) |
+| MgO6 | 0.10 | 0.72 | 5.87 | 10.76 (18 below -- not meaningful, see below) |
+
+The occupied edge is the cluster interior in every case, but in these very
+small clusters (5-7 core atoms, 12-30 terminators) empty states with
+substantial terminator character sit at or below the interior's conduction
+states. A single-1s terminator basis hid them (CdSe terminator band at
++2.2 eV instead of +0.3 eV).
+
+Relaxing the terminators does not remove them: GaAs4 after
+`opt --freeze-core` (X-H* 1.524 -> 1.546 A) has LUMO weight 0.54 and gap
+5.21 eV against 0.52 and 5.31 eV unrelaxed. The effect belongs to clusters
+this small, not to an unrelaxed geometry.
+
+The core gap is only a guide. Its threshold is a heuristic, and when most
+atoms are terminators (MgO6: 30 of 37) even delocalised empty states carry
+more than half their weight on them, so the core gap runs off to the first
+state that happens to avoid them (10.8 eV). For a gap that represents the
+material, enlarge the cluster until the terminators are a minority and the
+frontier weights fall well below 0.5.

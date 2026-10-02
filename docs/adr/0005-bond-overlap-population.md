@@ -29,6 +29,18 @@ populations.
 - A transition-state annotation figure is decided with ADR 0006's
   implementation.
 
+## Implementation notes (2026-10-02)
+
+- The COOP axis and the level colour scale are set from the occupied orbitals:
+  Mulliken overlap populations of diffuse empty orbitals reach -7 per orbital
+  (H2O/DZ O-H sigma*) and would otherwise flatten every occupied feature.
+  Clipped bars are marked.
+- Partial DOS uses Loewdin weights (bounded, sum to 1 per orbital), not
+  Mulliken; species are ordered by nuclear charge.
+- `--set` cannot reach nested keys, so `overlap_population.*` is set in YAML.
+- Possible follow-up: choose the pair type that colours the level diagram
+  (today: the type with the largest total overlap population).
+
 ## Consequences
 
 The MO-resolved data scales as n_MO x n_pairs; output is restricted to

@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from ..constants import HARTREE_TO_EV
-from ..properties import mulliken, wiberg_bond_orders
+from ..properties import core_gap, loewdin, loewdin_orbital_weights, mulliken, wiberg_bond_orders
 from ..timing import REGISTRY
 
 
@@ -34,8 +34,13 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
             "converged": bool(result.converged),
             "n_iterations": int(result.n_iterations),
             "unrestricted": bool(result.unrestricted),
-            "history": [{k: (float(v) if isinstance(v, (int, float, np.floating)) else v)
-                         for k, v in h.items()} for h in result.history],
+            "history": [
+                {
+                    k: (float(v) if isinstance(v, (int, float, np.floating)) else v)
+                    for k, v in h.items()
+                }
+                for h in result.history
+            ],
         },
         "energies_hartree": {k: float(v) for k, v in result.energies.items()},
         "orbitals": {
@@ -44,26 +49,73 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
             "spin_channel": "alpha" if result.unrestricted else "restricted",
             "eigenvalues_hartree": _finite_list(result.eps),
             "occupations": [float(o) for o in result.occupations],
-            "eigenvalues_beta_hartree": (_finite_list(result.eps_b)
-                                         if result.unrestricted else None),
-            "occupations_beta": ([float(o) for o in result.occ_b]
-                                 if result.unrestricted else None),
+            "eigenvalues_beta_hartree": (
+                _finite_list(result.eps_b) if result.unrestricted else None
+            ),
+            "occupations_beta": ([float(o) for o in result.occ_b] if result.unrestricted else None),
             "homo_hartree": float(homo) if np.isfinite(homo) else None,
             "lumo_hartree": float(lumo) if np.isfinite(lumo) else None,
             "gap_ev": float(result.gap_ev()) if np.isfinite(result.gap_ev()) else None,
-            "by_spin": {k: {"homo_hartree": None if not np.isfinite(v[0]) else float(v[0]),
-                            "lumo_hartree": None if not np.isfinite(v[1]) else float(v[1])}
-                        for k, v in result.homo_lumo_by_spin().items()},
+            "by_spin": {
+                k: {
+                    "homo_hartree": None if not np.isfinite(v[0]) else float(v[0]),
+                    "lumo_hartree": None if not np.isfinite(v[1]) else float(v[1]),
+                }
+                for k, v in result.homo_lumo_by_spin().items()
+            },
         },
         "population": {
             "mulliken_gross": [float(x) for x in pop["gross"]],
             "mulliken_charges": [float(x) for x in pop["charges"]],
+            "loewdin_charges": [
+                float(x) for x in loewdin(result.P, result.S, basis, mol)["charges"]
+            ],
             "wiberg_bond_orders": [[float(x) for x in row] for row in bo],
         },
-        "units": {"energy": "hartree", "length": "angstrom",
-                  "force": "hartree/bohr", "dipole": "debye",
-                  "hartree_to_ev": HARTREE_TO_EV},
+        "units": {
+            "energy": "hartree",
+            "length": "angstrom",
+            "force": "hartree/bohr",
+            "dipole": "debye",
+            "hartree_to_ev": HARTREE_TO_EV,
+        },
     }
+    if getattr(result, "transition_state", None):
+        t = dict(result.transition_state)
+        t["orbital"] = int(t.pop("source")) + 1
+        if "dest" in t:
+            t["orbital_to"] = int(t.pop("dest")) + 1
+        t["estimate_ev"] = float(
+            (t["eps_dest"] - t["eps_source"]) * HARTREE_TO_EV
+            if t["mode"] == "excite"
+            else -t["eps_source"] * HARTREE_TO_EV
+        )
+        out["transition_state"] = t
+    if config.properties.population:
+        from ..properties import bonding
+
+        out["bonding"] = bonding.to_dict(bonding.analyse(result, config), mol)
+    pseudo = [i for i, a in enumerate(mol) if a.is_pseudo]
+    if pseudo:
+        mask = np.array([f.atom_idx in set(pseudo) for f in basis], dtype=bool)
+        C, eps, occ = (
+            (result.C_a, result.eps_a, result.occ_a)
+            if result.unrestricted
+            else (result.C, result.eps, result.occupations)
+        )
+        weights = loewdin_orbital_weights(C, result.S, mask)
+        g = core_gap(eps, occ, weights, config.properties.terminator_weight_max)
+        out["passivation"] = {
+            "spin_channel": "alpha" if result.unrestricted else "restricted",
+            "terminator_weight_loewdin": [float(x) for x in weights],
+            "terminator_weight_max": float(config.properties.terminator_weight_max),
+            "core_homo_index": None if g["core_homo"] is None else int(g["core_homo"]),
+            "core_lumo_index": None if g["core_lumo"] is None else int(g["core_lumo"]),
+            "core_gap_ev": float(g["core_gap"] * HARTREE_TO_EV)
+            if np.isfinite(g["core_gap"])
+            else None,
+            "terminator_states_below_core_lumo": g["n_terminator_states_below_core_lumo"],
+        }
     if result.unrestricted:
         out["orbitals"]["eigenvalues_alpha_hartree"] = _finite_list(result.eps_a)
         out["orbitals"]["eigenvalues_beta_hartree"] = _finite_list(result.eps_b)
@@ -74,6 +126,7 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
         out["max_force"] = float(np.abs(forces).max())
         out["force_translation_residual"] = float(np.linalg.norm(forces.sum(axis=0)))
         from ..forces.analytic import compute_forces as _compute_forces
+
         raw = getattr(_compute_forces, "last_translation_residual", None)
         # The projected residual is ~0 by construction; this is the informative one.
         out["force_translation_residual_raw"] = None if raw is None else float(raw)
@@ -107,9 +160,24 @@ def write_text(path, text: str) -> None:
 
 def write_npz(path, result) -> None:
     """Save the raw matrices for post-processing."""
-    data = {"P": result.P, "C": result.C, "eps": result.eps, "S": result.S,
-            "T": result.T, "V_nuc": result.V_nuc, "occupations": result.occupations}
+    data = {
+        "P": result.P,
+        "C": result.C,
+        "eps": result.eps,
+        "S": result.S,
+        "T": result.T,
+        "V_nuc": result.V_nuc,
+        "occupations": result.occupations,
+    }
     if result.unrestricted:
-        data.update({"P_a": result.P_a, "P_b": result.P_b, "C_a": result.C_a,
-                     "C_b": result.C_b, "eps_a": result.eps_a, "eps_b": result.eps_b})
+        data.update(
+            {
+                "P_a": result.P_a,
+                "P_b": result.P_b,
+                "C_a": result.C_a,
+                "C_b": result.C_b,
+                "eps_a": result.eps_a,
+                "eps_b": result.eps_b,
+            }
+        )
     np.savez_compressed(path, **data)

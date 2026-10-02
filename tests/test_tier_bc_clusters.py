@@ -9,9 +9,12 @@ Tier B (physics, X-alpha-robust):
 * Pseudo-hydrogen passivation removes gap states. With ordinary hydrogen a
   III-V cluster violates electron counting and has a partly filled frontier
   orbital on the terminators; with fractional-charge terminators the gap opens.
-  Measured on GaAs4: gap 0.07 eV with H (frontier weight on terminators 0.31 /
-  0.54) against 5.31 eV with pseudo-H -- the effect reported by Deng et al.,
-  Phys. Rev. B 85, 195328 (2012).
+  Measured on GaAs4: gap 0.07 eV with H against 5.31 eV with pseudo-H -- the
+  effect reported by Deng et al., Phys. Rev. B 85, 195328 (2012). The pseudo-H
+  HOMO is the cluster interior (Loewdin terminator weight 0.18); its LUMO is
+  about half on the terminators (0.52), so the plain gap is quoted with that
+  caveat -- see the core gap in the passivation report and
+  docs/passivation.md.
 
 Deliberately *not* tested: the HOMO-LUMO gap ordering of the cluster series
 against bulk band gaps. These 5-7 heavy-atom clusters are dominated by quantum
@@ -94,19 +97,26 @@ def test_ionicity_follows_electronegativity_difference():
     assert q_o < q_se < q_as < 0
 
 
+def _terminator_weights(mol, basis, C, S):
+    from pyxany.properties import loewdin_orbital_weights
+
+    mask = np.array([mol[f.atom_idx].is_pseudo or mol[f.atom_idx].element == "H"
+                     for f in basis], dtype=bool)
+    return loewdin_orbital_weights(C, S, mask)
+
+
 def test_pseudo_hydrogen_opens_the_gap_that_plain_hydrogen_closes():
-    _, _, pseudo = _run("ga4ash", "pseudo")
+    mol_p, basis_p, pseudo = _run("ga4ash", "pseudo")
     mol_h, basis_h, plain = _run("ga4ash", "hydrogen")
     assert pseudo.converged and plain.converged
     assert _gap_ev(pseudo) > 3.0
     assert _gap_ev(plain) < 0.5
-    # ... and with plain H the frontier orbital sits largely on the terminators
+    # With plain H the frontier is largely on the terminators (Loewdin weights);
+    # with pseudo-H the occupied edge is the cluster interior.
     _, homo, C = _frontier(plain)
-    term = np.array([basis_h[m].atom_idx for m in range(len(basis_h))])
-    on_term = np.isin(term, [i for i, a in enumerate(mol_h) if a.element == "H"])
-    SC = plain.S @ C
-    weight = float(np.sum((C[:, homo + 1] * SC[:, homo + 1])[on_term]))
-    assert weight > 0.3
+    assert _terminator_weights(mol_h, basis_h, C, plain.S)[homo + 1] > 0.3
+    _, homo_p, C_p = _frontier(pseudo)
+    assert _terminator_weights(mol_p, basis_p, C_p, pseudo.S)[homo_p] < 0.5
 
 
 @pytest.mark.parametrize("name", list(PINNED))
