@@ -127,8 +127,31 @@
 - `dvxa gridcheck` and `dvxa passivate` had no execution-time measurement;
   `passivate` also wrote output from every MPI rank via bare `print()`.
 
+### Performance
+
+All of the following reproduce the previous numbers (numba vs numpy to
+1e-12, chunked vs single-pass forces to 1e-12, analytic vs finite-difference
+grad V_H to < 1e-8 Ha/Bohr in the forces); each has a test.
+
+- **Compiled kernels** (numba, threaded) for the Becke cell weights, their
+  gradient, the Hartree multipole summation and its exact gradient, and the
+  basis-function gradients. On a 107-atom Si47H60 cluster (1.07 M points):
+  grid build 540 s -> 9 s, one Hartree evaluation 366 s -> 21 s, one S/T pair
+  52 ms -> 25 ms. The force term grad V_H is now one gradient evaluation
+  instead of six Hartree evaluations by finite differences.
+- **Forces walk the grid in chunks** within `grid.memory_budget_mb`; the
+  107-atom cluster no longer needs 24 GB for the basis gradients.
+- **Superposition-of-atomic-densities initial guess.** The previous guess
+  started Si47H60 2700 Ha above its energy and diverged; it now converges in
+  18 iterations. First-iteration error: H2O 20 -> 0.19 Ha, Si5H12 264 -> 3.9
+  Ha. Converged energies are unchanged.
+
 ### Changed
 
+- **A negative Mulliken overlap population on a bonded pair now carries a
+  note.** The Si-Si total is +0.51 (SZ) and -0.08 (DZ) in Si5H12 at the same
+  geometry and -0.88 in Si47H60 (DZ), with Mayer bond orders of 0.8-0.9: a
+  basis-set artefact, not antibonding (ADR 0005).
 - **Radial grid size depends on the element.** `grid.n_r` now means the
   second-row size; each atom gets `ceil(n_r × ratio)`, the ratio measured for
   all 86 elements by `tools/radial_grid_sizes.py` so that every element
@@ -138,8 +161,8 @@
 - **`grid.poisson_l_max` defaults to `auto` = n_a - 1** (11 on the default
   grid; was 6) and may not exceed n_a - 1. The force error is set by this
   truncation (CO: 1.6e-2 Ha/Bohr at 6, 1.3e-3 at 12). The Hartree step costs
-  ~(l+1)^2, so an SCF iteration is ~2.5x slower on GaAs4 until adaptive
-  multipole orders land (ADR 0008).
+  ~(l+1)^2; the compiled summation (see Performance) more than recovers the
+  cost (one GaAs4 evaluation 26 s -> 2.4 s).
 
 - **Renamed from `dvxa` to `pyxany`** (distribution, import name, CLI command,
   `python -m` entry and the `PYXANY_DISABLE_NUMBA` environment variable) and

@@ -8,7 +8,6 @@ Not in the current scope; recorded so the decision to defer is explicit.
 | item | why deferred / prerequisite |
 |---|---|
 | **Cluster-size convergence of the example gaps** | The example clusters (5-7 core atoms) have terminator-dominated LUMOs (Loewdin 0.52-0.72) that relaxing the terminators does not remove. A size series (e.g. Si/GaAs/CdSe with 17, 29, 47, 87 core atoms) is needed before their gaps can stand for the material; cost is set by step 8 (performance). |
-| Adaptive multipole order in the Hartree evaluation | The default l_max = n_a - 1 costs ~2.5x per SCF iteration on GaAs4; far atoms only need low l (tails decay as r^-(l+1)). Planned for step 8 (performance). |
 | **Element-specific X-alpha alpha** (e.g. Schwarz alpha_HF) | Needs an inter-atomic mixing rule and the full Schwarz table from the source paper; breaks Tier A PySCF comparison (ADR 0002). |
 | Multiple initial spin guesses, tried automatically | Next stage after the current scope. |
 | Point-charge (Madelung) embedding for ionic clusters | Next stage; relevant to MgO-type clusters. |
@@ -38,3 +37,8 @@ Not in the current scope; recorded so the decision to defer is explicit.
   core-dominated and cancels in energy differences). Ratios to the second row:
   ~1.2 (row 3), ~1.5 (row 4), ~1.9 (row 5), ~2.2 (row 6), against PySCF's
   per-period defaults 1.07 / 1.20 / 1.27 / 1.33 with its own mapping.
+- **Adaptive multipole order in the Hartree evaluation** -- tried in step 8
+  and removed: once the summation was compiled, cutting l for far atoms gave
+  no measurable gain.
+- **Large-cluster SCF divergence** -- caused by the initial guess; replaced by
+  a superposition of atomic densities (ADR 0007, step 8 outcome).

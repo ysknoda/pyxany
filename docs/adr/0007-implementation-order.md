@@ -24,6 +24,25 @@ pushed to GitHub.
    - chunking the chi-gradient in the force evaluation (current memory
      high-water mark).
 
+## Outcome of step 8 (2026-10-03)
+
+Profiling the 107-atom Si47H60 cluster (1.07 M grid points, 966 basis
+functions) rather than the candidate list decided the order. Done, all
+without changing results (Q26 options A and B):
+
+| hot spot | before | after | how |
+|---|---|---|---|
+| grid build (Becke weights) | 540 s | 9 s | compiled own-cell kernel |
+| Hartree evaluation | 366 s | 21 s | compiled multipole summation |
+| force grad V_H | 6 Hartree evaluations | 1 gradient evaluation | exact derivative kernel |
+| S/T, per pair | 52 ms | 25 ms | compiled basis gradients |
+| force memory | 24 GB | memory budget | chunked over points |
+| SCF start | diverged | 18 iterations | SAD initial guess |
+
+Not done: an adaptive multipole order (tried, no measurable gain once the
+summation was compiled); chi sparsity and angular pruning (they change the
+quadrature, so they are option C and need a separate decision).
+
 ## Rationale
 
 Tests come before features so that a feature that breaks a physical quantity
