@@ -19,7 +19,7 @@ import numpy as np
 from ..parallel import allreduce_array, round_robin
 from ..timing import timer
 from .onecentre import kinetic_1c, overlap_1c
-from .twocentre import overlap_kinetic_2c, pair_is_negligible
+from .twocentre import overlap_kinetic_2c, overlap_kinetic_2c_gradient, pair_is_negligible
 
 DEFAULT_SCREENING_TOL = 1e-10
 
@@ -105,10 +105,11 @@ def overlap_kinetic_gradient(molecule, basis, P: np.ndarray, W: np.ndarray,
     cancel (measured on CO/DZ at n_r = 40: 1.3e-3 and 1.7e-3 Ha/Bohr).
 
     One-centre blocks do not depend on the geometry. A two-centre block
-    depends only on ``R_B - R_A``, so ``d/dR_A = -d/dR_B`` and one central
-    difference per Cartesian direction of ``R_B`` suffices (6 block
-    evaluations per surviving pair; the pair grid moves rigidly with its
-    atoms, so the result is smooth in ``step``). Returns ``(n_atoms, 3)``;
+    depends only on ``R_B - R_A``, so ``d/dR_A = -d/dR_B``. With the compiled
+    kernels the derivative is exact (:func:`overlap_kinetic_2c_gradient`,
+    one pass with basis Hessians and Becke-weight derivatives); otherwise one
+    central difference per Cartesian direction of ``R_B`` (6 block
+    evaluations per pair). The two agree to ~1e-9. Returns ``(n_atoms, 3)``;
     rank-local pairs are summed with one Allreduce.
     """
     with timer("forces.S_T_gradient"):
@@ -124,6 +125,12 @@ def overlap_kinetic_gradient(molecule, basis, P: np.ndarray, W: np.ndarray,
             ix = np.ix_(mu_idx, nu_idx)
             # factor 2: the (B, A) block is the transpose and contributes equally
             Pb, Wb = 2.0 * P[ix], 2.0 * W[ix]
+            exact = overlap_kinetic_2c_gradient(fa, fb, molecule[ai].pos, molecule[aj].pos,
+                                                radii[ai], radii[aj], Pb, Wb, n_r=n_r, n_a=n_a)
+            if exact is not None:
+                grad[aj] += exact
+                grad[ai] -= exact
+                continue
             for x in range(3):
                 e = np.zeros(3)
                 e[x] = step

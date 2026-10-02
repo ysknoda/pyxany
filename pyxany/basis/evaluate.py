@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..kernels import chi_block_kernel, chi_grad_block_kernel
+from ..kernels import chi_block_kernel, chi_grad_block_kernel, chi_hess_block_kernel
 from .harmonics import solid_harmonic, solid_harmonic_grad
 
 _SAFE_R = 1e-14
@@ -58,13 +58,15 @@ def chi_matrix(basis, positions, points, out: np.ndarray | None = None) -> np.nd
     return X
 
 
-def chi_grad_matrix(basis, positions, points) -> np.ndarray:
+def chi_grad_matrix(basis, positions, points, out: np.ndarray | None = None) -> np.ndarray:
     """(n_points, n_basis, 3) gradient of each basis function w.r.t. the electron.
 
-    ``grad chi = g'(r) rhat S_lm + g(r) grad S_lm``
+    ``grad chi = g'(r) rhat S_lm + g(r) grad S_lm``. ``out`` may be a strided
+    view, e.g. ``np.empty((3, n, nb)).transpose(1, 2, 0)`` to make each
+    Cartesian component contiguous.
     """
     pts = np.ascontiguousarray(points, dtype=float)
-    G = np.empty((len(pts), len(basis), 3), dtype=float)
+    G = np.empty((len(pts), len(basis), 3), dtype=float) if out is None else out
 
     fast = chi_grad_block_kernel()
     for ai, idx in _atom_groups(basis).items():
@@ -91,6 +93,31 @@ def chi_grad_matrix(basis, positions, points) -> np.ndarray:
             for ax in range(3):
                 G[:, mu, ax] = dg * rhat[:, ax] * S + gr * gS[ax]
     return G
+
+
+def chi_hess_matrix(basis, positions, points) -> np.ndarray | None:
+    """(n_points, n_basis, 3, 3) Hessian of each basis function w.r.t. the electron.
+
+    Compiled STO path only; returns None when numba is unavailable or the
+    basis contains other function types, so callers keep a fallback.
+    """
+    fast = chi_hess_block_kernel()
+    if fast is None or any(f.kind != "sto" for f in basis):
+        return None
+    pts = np.ascontiguousarray(points, dtype=float)
+    H = np.empty((len(pts), len(basis), 3, 3), dtype=float)
+    for ai, idx in _atom_groups(basis).items():
+        d = pts - np.asarray(positions[ai], dtype=float)
+        r = np.sqrt(np.einsum("ij,ij->i", d, d))
+        fast(
+            np.array([basis[mu].norm for mu in idx]),
+            np.array([basis[mu].zeta for mu in idx]),
+            np.array([basis[mu].n - 1 - basis[mu].l for mu in idx], np.int64),
+            np.array([basis[mu].l for mu in idx], np.int64),
+            np.array([basis[mu].m for mu in idx], np.int64),
+            d, r, H, np.array(idx, np.int64),
+        )
+    return H
 
 
 def density_on_grid(chi: np.ndarray, P: np.ndarray, floor: float = 0.0) -> np.ndarray:

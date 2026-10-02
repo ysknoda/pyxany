@@ -35,6 +35,18 @@ def chi_block_kernel():
     return mod.chi_block if mod is not None else None
 
 
+def chi_hess_block_kernel():
+    """Fast STO Hessian evaluator, or None (no numpy counterpart; callers fall back)."""
+    mod = _numba()
+    return mod.chi_hess_block if mod is not None else None
+
+
+def pair_gradient_terms_kernel():
+    """Compiled per-point S/T gradient contraction, or None."""
+    mod = _numba()
+    return mod.pair_gradient_terms if mod is not None else None
+
+
 def chi_grad_block_kernel():
     """Fast STO gradient evaluator, or None to use the generic numpy path."""
     mod = _numba()
@@ -78,7 +90,7 @@ def numerov_inward(g, h, r, kappa, m, out):
     return numpy_impl.numerov_inward(g, h, r, kappa, m, out)
 
 
-__all__ = ["backend_name", "chi_block_kernel", "chi_grad_block_kernel", "poisson_radial", "density_from_chi",
+__all__ = ["backend_name", "chi_block_kernel", "chi_grad_block_kernel", "chi_hess_block_kernel", "poisson_radial", "density_from_chi",
            "numerov_outward", "numerov_inward"]
 
 

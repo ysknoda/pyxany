@@ -196,3 +196,47 @@ def test_analytic_hartree_gradient_leaves_forces_unchanged(h2o, monkeypatch):
     monkeypatch.setattr(fa, "hartree_potential", no_gradient)
     F_fd = fa.compute_forces(res, cfg, project=False)
     assert np.abs(F_exact - F_fd).max() < 1e-7
+
+
+def test_compiled_basis_hessian_matches_finite_differences(h2o):
+    _numba_or_skip()
+    from pyxany.basis.evaluate import chi_grad_matrix, chi_hess_matrix
+
+    basis = build_basis(h2o, make_config(basis={"set": "dzp"}))
+    rng = np.random.default_rng(3)
+    pts = rng.normal(scale=1.5, size=(400, 3))
+    H = chi_hess_matrix(basis, h2o.positions, pts)
+    h = 1e-5
+    fd = np.empty_like(H)
+    for x in range(3):
+        e = np.zeros(3)
+        e[x] = h
+        fd[..., x] = (chi_grad_matrix(basis, h2o.positions, pts + e)
+                      - chi_grad_matrix(basis, h2o.positions, pts - e)) / (2 * h)
+    assert np.abs(H - fd).max() < 1e-6 * np.abs(fd).max()
+    assert np.abs(H - H.transpose(0, 1, 3, 2)).max() < 1e-10 * np.abs(H).max()
+
+
+def test_exact_two_centre_gradient_matches_finite_differences(h2o):
+    """Basis Hessians, moving sub-grid and Becke-weight terms together."""
+    _numba_or_skip()
+    from pyxany.integrals.twocentre import overlap_kinetic_2c, overlap_kinetic_2c_gradient
+
+    basis = build_basis(h2o, make_config(basis={"set": "dzp"}))
+    fa = [f for f in basis if f.atom_idx == 0]
+    fb = [f for f in basis if f.atom_idx == 1]
+    A, B = h2o.positions[0], h2o.positions[1]
+    rA, rB = h2o[0].grid_radius(), h2o[1].grid_radius()
+    rng = np.random.default_rng(4)
+    Pb = rng.normal(size=(len(fa), len(fb)))
+    Wb = rng.normal(size=(len(fa), len(fb)))
+    exact = overlap_kinetic_2c_gradient(fa, fb, A, B, rA, rB, Pb, Wb)
+    fd = np.empty(3)
+    h = 1e-4
+    for x in range(3):
+        e = np.zeros(3)
+        e[x] = h
+        Sp, Tp = overlap_kinetic_2c(fa, fb, A, B + e, rA, rB)
+        Sm, Tm = overlap_kinetic_2c(fa, fb, A, B - e, rA, rB)
+        fd[x] = (np.sum(Pb * (Tp - Tm)) - np.sum(Wb * (Sp - Sm))) / (2 * h)
+    assert np.abs(exact - fd).max() < 1e-7 * max(1.0, np.abs(fd).max())

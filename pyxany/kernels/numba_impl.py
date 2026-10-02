@@ -133,6 +133,137 @@ def _chi_grad_block(norms, zetas, powers_n, lm_index, d, r, out, cols,
             out[k, col, 2] = radial * dz + g * sz
 
 
+@nb.njit(cache=True, parallel=True, fastmath=True)
+def _chi_hess_block(norms, zetas, powers_n, lm_index, d, r, out, cols,
+                    offsets, counts, coeffs, powers):
+    """Fill ``out[:, cols, i, j]`` with the STO Hessian w.r.t. the electron.
+
+    With ``chi = g(r) S(x)`` and ``h = g'/r``:
+    ``H_ij = (h'/r) x_i x_j S + h (delta_ij S + x_i d_j S + x_j d_i S) + g d_ij S``,
+    ``h'/r = (g'' - g'/r) / r^2``. Undefined on the nucleus itself (cusp);
+    points there are guarded but should not occur on a pair grid.
+    """
+    n_pts = d.shape[0]
+    n_f = norms.shape[0]
+    for k in nb.prange(n_pts):
+        xs = np.empty(3)
+        xs[0] = d[k, 0]
+        xs[1] = d[k, 1]
+        xs[2] = d[k, 2]
+        rk = r[k]
+        rs = rk if rk > 1e-14 else 1e-14
+        dS = np.empty(3)
+        d2S = np.empty((3, 3))
+        for j in range(n_f):
+            e = norms[j] * np.exp(-zetas[j] * rk)
+            p = powers_n[j]
+            z = zetas[j]
+            g = e * _ipow(rk, p)
+            # g' and g'' of r^p e^(-z r)
+            dg = e * ((p * _ipow(rk, p - 1) if p > 0 else 0.0) - z * _ipow(rk, p))
+            d2g = e * (z * z * _ipow(rk, p)
+                       - (2.0 * z * p * _ipow(rk, p - 1) if p > 0 else 0.0)
+                       + (p * (p - 1) * _ipow(rk, p - 2) if p > 1 else 0.0))
+            h = dg / rs
+            hp = (d2g - h) / (rs * rs)
+            idx = lm_index[j]
+            o = offsets[idx]
+            s = 0.0
+            for a in range(3):
+                dS[a] = 0.0
+                for b in range(3):
+                    d2S[a, b] = 0.0
+            for t in range(counts[idx]):
+                c = coeffs[o + t]
+                pw0 = powers[o + t, 0]
+                pw1 = powers[o + t, 1]
+                pw2 = powers[o + t, 2]
+                m0 = _ipow(xs[0], pw0)
+                m1 = _ipow(xs[1], pw1)
+                m2 = _ipow(xs[2], pw2)
+                s += c * m0 * m1 * m2
+                # first derivatives
+                f0 = pw0 * _ipow(xs[0], pw0 - 1) if pw0 > 0 else 0.0
+                f1 = pw1 * _ipow(xs[1], pw1 - 1) if pw1 > 0 else 0.0
+                f2 = pw2 * _ipow(xs[2], pw2 - 1) if pw2 > 0 else 0.0
+                s0 = pw0 * (pw0 - 1) * _ipow(xs[0], pw0 - 2) if pw0 > 1 else 0.0
+                s1 = pw1 * (pw1 - 1) * _ipow(xs[1], pw1 - 2) if pw1 > 1 else 0.0
+                s2 = pw2 * (pw2 - 1) * _ipow(xs[2], pw2 - 2) if pw2 > 1 else 0.0
+                dS[0] += c * f0 * m1 * m2
+                dS[1] += c * m0 * f1 * m2
+                dS[2] += c * m0 * m1 * f2
+                d2S[0, 0] += c * s0 * m1 * m2
+                d2S[1, 1] += c * m0 * s1 * m2
+                d2S[2, 2] += c * m0 * m1 * s2
+                d2S[0, 1] += c * f0 * f1 * m2
+                d2S[0, 2] += c * f0 * m1 * f2
+                d2S[1, 2] += c * m0 * f1 * f2
+            d2S[1, 0] = d2S[0, 1]
+            d2S[2, 0] = d2S[0, 2]
+            d2S[2, 1] = d2S[1, 2]
+            col = cols[j]
+            for a in range(3):
+                for b in range(3):
+                    v = hp * xs[a] * xs[b] * s + h * (xs[a] * dS[b] + xs[b] * dS[a]) \
+                        + g * d2S[a, b]
+                    if a == b:
+                        v += h * s
+                    out[k, col, a, b] = v
+
+
+@nb.njit(cache=True, parallel=True, fastmath=True)
+def pair_gradient_terms(fixed_v, fixed_g, mov_v, mov_g, mov_h, C, D, sign, F, dF):
+    """Per-point integrand and its derivative for the two-centre S/T gradient.
+
+    ``fixed_*`` are the functions that do not move relative to the point,
+    ``mov_*`` (value, gradient, Hessian) those that do; ``C`` and ``D``
+    are the T and S coefficient matrices oriented (fixed, moving).
+    ``F = 1/2 C : (grad f . grad m) - D : (f m)`` and
+    ``dF = sign * (1/2 C : (grad f . H_m) - D : (f grad m))``.
+    """
+    n_pts = fixed_v.shape[0]
+    nf = fixed_v.shape[1]
+    nm = mov_v.shape[1]
+    for k in nb.prange(n_pts):
+        f_val = 0.0
+        d0 = 0.0
+        d1 = 0.0
+        d2 = 0.0
+        for i in range(nf):
+            fv = fixed_v[k, i]
+            fx = fixed_g[k, i, 0]
+            fy = fixed_g[k, i, 1]
+            fz = fixed_g[k, i, 2]
+            for j in range(nm):
+                c = 0.5 * C[i, j]
+                dd = D[i, j]
+                f_val += c * (fx * mov_g[k, j, 0] + fy * mov_g[k, j, 1] + fz * mov_g[k, j, 2]) \
+                    - dd * fv * mov_v[k, j]
+                d0 += c * (fx * mov_h[k, j, 0, 0] + fy * mov_h[k, j, 1, 0]
+                           + fz * mov_h[k, j, 2, 0]) - dd * fv * mov_g[k, j, 0]
+                d1 += c * (fx * mov_h[k, j, 0, 1] + fy * mov_h[k, j, 1, 1]
+                           + fz * mov_h[k, j, 2, 1]) - dd * fv * mov_g[k, j, 1]
+                d2 += c * (fx * mov_h[k, j, 0, 2] + fy * mov_h[k, j, 1, 2]
+                           + fz * mov_h[k, j, 2, 2]) - dd * fv * mov_g[k, j, 2]
+        F[k] = f_val
+        dF[k, 0] = sign * d0
+        dF[k, 1] = sign * d1
+        dF[k, 2] = sign * d2
+
+
+def chi_hess_block(norms, zetas, powers_n, l_arr, m_arr, d, r, out, cols):
+    """Hessian counterpart of :func:`chi_block` (``out`` is (n_pts, nb, 3, 3))."""
+    lm_index = np.array([index_of(int(l), int(m)) for l, m in zip(l_arr, m_arr)], np.int64)
+    _chi_hess_block(np.ascontiguousarray(norms, np.float64),
+                    np.ascontiguousarray(zetas, np.float64),
+                    np.ascontiguousarray(powers_n, np.int64),
+                    lm_index,
+                    np.ascontiguousarray(d, np.float64),
+                    np.ascontiguousarray(r, np.float64),
+                    out, np.ascontiguousarray(cols, np.int64),
+                    _OFFSETS, _COUNTS, _COEFFS, _POWERS)
+
+
 def chi_grad_block(norms, zetas, powers_n, l_arr, m_arr, d, r, out, cols):
     """Gradient counterpart of :func:`chi_block` (``out`` is (n_pts, nb, 3))."""
     lm_index = np.array([index_of(int(l), int(m)) for l, m in zip(l_arr, m_arr)], np.int64)
