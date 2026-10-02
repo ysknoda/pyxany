@@ -71,8 +71,11 @@ def resource_estimate(cfg, molecule, basis) -> str:
     from ..grid.molecular import radial_sizes
 
     n_ang = cfg.grid.n_a * 2 * cfg.grid.n_a
-    n_r_atom = (radial_sizes(molecule, cfg.grid.n_r) if cfg.grid.radial_by_element
-                else [cfg.grid.n_r] * len(molecule))
+    n_r_atom = (
+        radial_sizes(molecule, cfg.grid.n_r)
+        if cfg.grid.radial_by_element
+        else [cfg.grid.n_r] * len(molecule)
+    )
     n_pts = int(sum(n_r_atom)) * n_ang
     nb = len(basis)
     chi_mb = n_pts * nb * 8 / 1024**2
@@ -96,26 +99,35 @@ def resource_estimate(cfg, molecule, basis) -> str:
     from ..grid import build_molecular_grid
     from ..scf.grid_terms import choose_strategy
 
-    grid = build_molecular_grid(molecule, cfg.grid.n_r, cfg.grid.n_a,
-                                partition=cfg.grid.partition,
-                                radial_by_element=cfg.grid.radial_by_element)
+    grid = build_molecular_grid(
+        molecule,
+        cfg.grid.n_r,
+        cfg.grid.n_a,
+        partition=cfg.grid.partition,
+        radial_by_element=cfg.grid.radial_by_element,
+    )
     chunk = choose_strategy(grid, nb, cfg.grid.chunk_size, cfg.grid.memory_budget_mb)
     budget = cfg.grid.memory_budget_mb
     if chunk is None:
-        lines.append(f"  -> chi ({grid.chi_memory_mb(nb):.1f} MB/rank) fits the "
-                     f"{budget:.0f} MB budget and will be cached")
+        lines.append(
+            f"  -> chi ({grid.chi_memory_mb(nb):.1f} MB/rank) fits the "
+            f"{budget:.0f} MB budget and will be cached"
+        )
     else:
-        lines.append(f"  -> chi exceeds the {budget:.0f} MB budget; the grid will be "
-                     f"walked in chunks of {chunk:,} points "
-                     f"({grid.chi_memory_mb(nb, chunk):.1f} MB/rank), at the cost of "
-                     f"one extra chi evaluation per SCF iteration")
-        lines.append("     (the force evaluation still builds chi and its gradient "
-                     "explicitly and is the memory high-water mark)")
+        lines.append(
+            f"  -> chi exceeds the {budget:.0f} MB budget; the grid will be "
+            f"walked in chunks of {chunk:,} points "
+            f"({grid.chi_memory_mb(nb, chunk):.1f} MB/rank), at the cost of "
+            f"one extra chi evaluation per SCF iteration"
+        )
+        lines.append("     (forces walk the grid in their own chunks within the same budget)")
     from ..parallel import SIZE
 
     if SIZE > 1:
-        lines.append(f"  -> running on {SIZE} ranks: the grid is split, so each rank "
-                     f"holds about 1/{SIZE} of the points above")
+        lines.append(
+            f"  -> running on {SIZE} ranks: the grid is split, so each rank "
+            f"holds about 1/{SIZE} of the points above"
+        )
     return "\n".join(lines)
 
 
@@ -143,12 +155,16 @@ def print_forces(molecule, forces) -> None:
     mpi_print(f"  {'atom':>8}  {'Fx':>13}  {'Fy':>13}  {'Fz':>13}  {'|F|':>11}")
     for i, atom in enumerate(molecule):
         fx, fy, fz = forces[i]
-        mpi_print(f"  {atom.symbol + str(i + 1):>8}  {fx:>13.8f}  {fy:>13.8f}  "
-                  f"{fz:>13.8f}  {np.linalg.norm(forces[i]):>11.8f}")
-    mpi_print(f"  max |F| = {np.abs(forces).max():.8f} Ha/Bohr   "
-              f"|sum F| = {np.linalg.norm(forces.sum(axis=0)):.2e}")
+        mpi_print(
+            f"  {atom.symbol + str(i + 1):>8}  {fx:>13.8f}  {fy:>13.8f}  "
+            f"{fz:>13.8f}  {np.linalg.norm(forces[i]):>11.8f}"
+        )
+    mpi_print(
+        f"  max |F| = {np.abs(forces).max():.8f} Ha/Bohr   "
+        f"|sum F| = {np.linalg.norm(forces.sum(axis=0)):.2e}"
+    )
     from ..forces.analytic import compute_forces
+
     raw = getattr(compute_forces, "last_translation_residual", None)
     if raw is not None:
-        mpi_print(f"  raw |sum F| before projection = {raw:.2e} Ha/Bohr "
-                  f"(grid-derivative error)")
+        mpi_print(f"  raw |sum F| before projection = {raw:.2e} Ha/Bohr (grid-derivative error)")

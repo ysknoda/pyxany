@@ -289,3 +289,21 @@ def test_loewdin_orbital_groups_partition_every_orbital(h2o):
     groups = loewdin_orbital_groups(res.C, res.S, labels)
     assert set(groups) == set(labels) and "O d" in groups
     assert np.allclose(sum(groups.values()), 1.0, atol=1e-10)
+
+
+def test_sad_guess_starts_close_to_the_converged_energy(h2o):
+    """The projected-atomic-density guess carries the core shape a diagonal guess loses.
+
+    Measured on H2O/DZ: first-iteration energy 0.19 Ha above the converged one
+    (the earlier diagonal occupation guess: 20 Ha above; for Si47H60 2700 Ha,
+    from which DIIS never recovered).
+    """
+    from pyxany.scf.guess import sad_density
+
+    cfg = make_config(basis={"set": "dz"}, scf={"max_iter": 80})
+    basis = build_basis(h2o, cfg)
+    P0 = sad_density(h2o, basis)
+    assert np.allclose(P0, P0.T)
+    res = run_scf(h2o, basis, cfg, verbose=0)
+    assert np.einsum("mn,nm->", P0, res.S) == pytest.approx(10.0, abs=0.05)
+    assert abs(res.history[0]["E"] - res.total_energy) < 1.0

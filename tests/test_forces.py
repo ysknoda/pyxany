@@ -336,3 +336,23 @@ def test_optimiser_accepts_a_force_converged_point_despite_grid_inconsistency(
     res = optimise_geometry(_h2(1.70), cfg, verbose=0)
     assert res.converged
     assert np.abs(res.forces).max() < 3e-4
+
+
+def test_chunked_force_evaluation_matches_a_single_chunk():
+    """Forces are built chunk by chunk to bound memory; the split must not matter."""
+    import pyxany.forces.analytic as analytic
+
+    molecule = make_molecule("h2o_c1", ASYMMETRIC_WATER)
+    cfg = make_config(basis={"set": "dz"}, scf={"max_iter": 80, "e_tol": 1e-9, "d_tol": 1e-8},
+                      forces={"enabled": True})
+    result = run_scf(molecule, build_basis(molecule, cfg), cfg, verbose=0)
+    whole = compute_forces(result, cfg, project=False)
+    n_points = len(result.grid.local_points)
+    saved = analytic._force_chunk
+    try:
+        analytic._force_chunk = lambda *a, **k: 997           # many uneven chunks
+        split = compute_forces(result, cfg, project=False)
+    finally:
+        analytic._force_chunk = saved
+    assert n_points > 5 * 997
+    assert np.abs(split - whole).max() < 1e-12

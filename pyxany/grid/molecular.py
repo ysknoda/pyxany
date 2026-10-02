@@ -182,8 +182,14 @@ def build_molecular_grid(
         if partition == "becke" and len(molecule) > 1:
             with timer("grid.becke"):
                 radii = np.array([a.grid_radius() for a in molecule])
-                w_cell = becke_weights(points, molecule.positions, radii, stiffness)
-                cell = w_cell[np.arange(len(points)), owner]
+                from ..kernels import becke_own_cell
+                from .becke import size_adjustment
+
+                cell = becke_own_cell(points, owner, molecule.positions,
+                                      size_adjustment(radii), stiffness)
+                if cell is None:  # numpy reference
+                    w_cell = becke_weights(points, molecule.positions, radii, stiffness)
+                    cell = w_cell[np.arange(len(points)), owner]
         else:
             cell = np.ones(len(points))
 

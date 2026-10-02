@@ -7,29 +7,51 @@ from collections import Counter
 import numpy as np
 
 from ..data import elements as elem
-from ..data.elements import _subshell_l
 
 
 def atomic_superposition(molecule, basis) -> np.ndarray:
-    """Diagonal P whose atomic blocks carry the free-atom electron counts.
+    """Diagonal P whose atomic blocks carry the free-atom shell occupations.
 
-    Occupations of a given angular momentum on an atom are shared equally among
-    all basis functions of that (atom, l), so a double-zeta pair each get half.
-    A pseudo-hydrogen carries its fractional charge in its single 1s function.
+    Each subshell's electrons go to the basis functions of that shell (n, l),
+    shared equally (a double-zeta pair each get half), when the functions carry
+    a principal quantum number (STO). Sharing an atom's electrons over *every*
+    function of the same l instead -- what the guess used to do, and still does
+    for Gaussian sets, which have no n -- puts half of Si's 1s electrons into
+    the diffuse 3s functions: 2700 Ha too high for Si47H60, from which the SCF
+    never recovered. Electrons of a shell the basis lacks fall back to the
+    functions of the same l. A pseudo-hydrogen spreads its fractional charge
+    over its functions.
     """
     n = len(basis)
     P = np.zeros((n, n))
-    share = Counter((f.atom_idx, f.l) for f in basis)
-
+    by_atom: dict[int, list[int]] = {}
     for mu, f in enumerate(basis):
-        atom = molecule[f.atom_idx]
+        by_atom.setdefault(f.atom_idx, []).append(mu)
+
+    for ai, idx in by_atom.items():
+        atom = molecule[ai]
         if atom.is_pseudo:
-            P[mu, mu] = atom.Z / share[(f.atom_idx, f.l)]
+            for mu in idx:
+                P[mu, mu] = atom.Z / len(idx)
             continue
-        occ = elem.occupations(atom.element)
-        total = sum(v for k, v in occ.items() if _subshell_l(k) == f.l)
-        count = share[(f.atom_idx, f.l)]
-        P[mu, mu] = total / count if count else 0.0
+        totals = elem._subshell_totals(atom.element)
+        shells = {}
+        has_n = all(getattr(basis[mu], "n", None) is not None for mu in idx)
+        if has_n:
+            for mu in idx:
+                shells.setdefault((basis[mu].n, basis[mu].l), []).append(mu)
+        leftover: Counter = Counter()
+        for (nn, l), ne in totals.items():
+            members = shells.get((nn, l))
+            if members:
+                for mu in members:
+                    P[mu, mu] += ne / len(members)
+            else:
+                leftover[l] += ne
+        for l, ne in leftover.items():
+            same_l = [mu for mu in idx if basis[mu].l == l]
+            for mu in same_l:
+                P[mu, mu] += ne / len(same_l)
     return P
 
 
@@ -65,3 +87,68 @@ def spin_split(P: np.ndarray, molecule, basis, n_alpha: float, n_beta: float):
         for mu in valence:
             P_a[mu, mu] += per
     return P_a, P_b
+
+
+def sad_density(molecule, basis, xc_alpha: float = 0.7) -> np.ndarray:
+    """Superposition of atomic densities, each projected onto the molecular basis.
+
+    For every species the spherical X-alpha atom is solved on its logarithmic
+    grid (pseudo-hydrogens with their fractional charge), each occupied atomic
+    orbital ``R_nl Y_lm`` is projected onto that atom's basis functions,
+    ``c = S_AA^-1 <chi|phi>``, and the block ``sum occ/(2l+1) c c^T`` (a
+    spherical average over m) is placed on every atom of the species. Unlike a
+    diagonal occupation guess this carries the cross terms of contracted and
+    multiple-zeta functions: the first SCF energy of H2O/DZ is within a few
+    hartree of the converged one instead of 20 Ha above it. The overlaps are
+    quadratures on a fine one-atom DV grid, so no normalisation convention of
+    the basis or the harmonics enters.
+    """
+    import copy
+
+    from scipy.interpolate import splev
+
+    from ..basis.evaluate import chi_matrix
+    from ..basis.nao import _atom_solution
+    from ..basis.pseudo_h import pseudo_hydrogen_solution
+    from ..basis.solid_harmonics import real_spherical_harmonics
+    from ..grid import build_molecular_grid
+    from ..molecule import Molecule
+
+    n = len(basis)
+    P = np.zeros((n, n))
+    by_atom: dict[int, list[int]] = {}
+    for mu, f in enumerate(basis):
+        by_atom.setdefault(f.atom_idx, []).append(mu)
+    blocks: dict[str, np.ndarray] = {}
+
+    for ai, idx in by_atom.items():
+        atom = molecule[ai]
+        if atom.symbol not in blocks:
+            local = []
+            for mu in idx:
+                g = copy.copy(basis[mu])
+                g.atom_idx = 0
+                local.append(g)
+            lone = copy.copy(atom)
+            lone.pos = np.zeros(3)
+            grid = build_molecular_grid(Molecule([lone], name=atom.symbol), 80, 14,
+                                        radial_by_element=False)
+            chi = chi_matrix(local, np.zeros((1, 3)), grid.points)
+            wchi = chi * grid.weights[:, None]
+            S_loc = chi.T @ wchi
+            r = np.linalg.norm(grid.points, axis=1)
+            sol = (pseudo_hydrogen_solution(round(float(atom.Z), 8), xc_alpha) if atom.is_pseudo
+                   else _atom_solution(atom.element, 2000, xc_alpha))
+            Pa = np.zeros((len(idx), len(idx)))
+            for (_, l), orb in sol.orbitals.items():
+                if orb.occupation <= 0 or orb.spline is None:
+                    continue
+                R = np.where(r <= orb.r[-1], splev(np.maximum(r, orb.r[0]), orb.spline), 0.0)
+                Y = real_spherical_harmonics(l, grid.points[:, 0], grid.points[:, 1],
+                                             grid.points[:, 2], r)[:, l * l:(l + 1) ** 2]
+                b = wchi.T @ (R[:, None] * Y)                     # (n_A, 2l+1)
+                c = np.linalg.lstsq(S_loc, b, rcond=1e-10)[0]
+                Pa += orb.occupation / (2 * l + 1) * (c @ c.T)
+            blocks[atom.symbol] = Pa
+        P[np.ix_(idx, idx)] = blocks[atom.symbol]
+    return P

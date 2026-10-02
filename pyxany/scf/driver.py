@@ -21,7 +21,7 @@ from ..parallel import allreduce_array, allreduce_scalar, bcast_array, mpi_print
 from ..timing import timer
 from .diis import EDIIS, PulayDIIS
 from .grid_terms import GridTerms, choose_strategy
-from .guess import atomic_superposition, rescale_to_electron_count, spin_split
+from .guess import rescale_to_electron_count, sad_density, spin_split
 from .linalg import solve_generalised
 from .occupations import (
     density_matrix,
@@ -206,7 +206,8 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
     if initial is not None and initial.get("P") is not None:
         P = rescale_to_electron_count(np.array(initial["P"], dtype=float), S, n_electrons)
     else:
-        P = rescale_to_electron_count(atomic_superposition(molecule, basis), S, n_electrons)
+        P = rescale_to_electron_count(sad_density(molecule, basis, scf_cfg.alpha), S,
+                                      n_electrons)
     if unrestricted:
         if initial is not None and all(initial.get(k) is not None for k in ("P_a", "P_b")):
             P_a = rescale_to_electron_count(np.array(initial["P_a"], dtype=float), S, n_alpha)

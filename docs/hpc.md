@@ -69,10 +69,17 @@ Two things that matter at scale:
   results (`tests/test_chunking.py` asserts agreement to 1e-9 on energies and
   forces). `--dry-run` reports which will happen and at what size.
 
-  The **force evaluation** builds chi and its gradient explicitly — the gradient
-  block is three times the size of chi — so it, not the SCF, is a run's memory
-  high-water mark. Set `forces.enabled: false` for a single-point energy on a
-  system where that is tight.
+  The **force evaluation** walks the grid in chunks within the same
+  `memory_budget_mb` (chi, its gradient and v*chi: five doubles per point and
+  basis function), so a 107-atom cluster whose full chi would take 8 GB and
+  whose gradient 24 GB computes forces in the same budget as its SCF; the split
+  changes the forces by < 1e-12 (`tests/test_forces.py`).
+
+  With numba installed, the Becke cell weights, their gradient and the Hartree
+  multipole summation run as compiled, threaded kernels (identical to the numpy
+  reference to 1e-12, `tests/test_backends.py`). On a 107-atom Si cluster
+  (1.07 M points) they took the grid build from 540 s to 9 s and one Hartree
+  evaluation from 366 s to 21 s; for one GaAs4 evaluation 26 s -> 2.4 s.
 - **`screening_tol`** skips atom pairs whose basis functions cannot overlap.
   For an extended structure this turns the `O(N²)` pair loop over `S` and `T`
   into a linear one; for a compact cluster where every atom is close to every

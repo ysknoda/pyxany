@@ -105,41 +105,16 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
         pts = grid.local_points
         wts = grid.local_weights
         alpha = config.scf.alpha
-        # The gradient block D is (n_points, n_basis, 3) -- three times the size
-        # of chi -- so the force evaluation always builds chi explicitly here
-        # rather than reusing a cached one, and is the memory high-water mark of
-        # a run.  See docs/hpc.md.
-        chi = result.chi if result.chi is not None else chi_matrix(basis, positions, pts)
+        n_basis = len(basis)
 
-        # -- effective potential on the grid, from the converged density ----
+        # -- point-sized quantities on the whole rank-local grid -------------
+        # Only chi and its gradient D (n_points x n_basis, and x3) are large;
+        # they are built chunk by chunk below, so a 100-atom cluster (chi 8 GB,
+        # D 24 GB) fits the same memory budget as its SCF.
         if result.unrestricted:
-            rho_a = np.einsum("km,mn,kn->k", chi, result.P_a, chi, optimize=True)
-            rho_b = np.einsum("km,mn,kn->k", chi, result.P_b, chi, optimize=True)
+            rho_a = result.terms.density(result.P_a)
+            rho_b = result.terms.density(result.P_b)
             rho = rho_a + rho_b
-        else:
-            rho_a = rho_b = None
-            rho = np.einsum("km,mn,kn->k", chi, result.P, chi, optimize=True)
-
-        rho_full = _full_density(grid, rho)
-        V_H = hartree_potential(
-            grid, rho_full, positions, l_max=config.grid.l_max, eval_points=pts
-        )
-        v_nuc = nuclear_potential(pts, positions, molecule.charges)
-
-        with timer("forces.gradients"):
-            D = chi_grad_matrix(basis, positions, pts)  # (npts, nb, 3)
-
-        grad = np.zeros((len(molecule), 3))
-
-        # -- Hellmann-Feynman + nuclear repulsion ---------------------------
-        grad += hellmann_feynman_gradient(molecule, pts, wts, rho)
-
-        # -- Pulay: h_eff acting on chi_nu ----------------------------------
-        by_atom: dict[int, list[int]] = {}
-        for mu, f in enumerate(basis):
-            by_atom.setdefault(f.atom_idx, []).append(mu)
-
-        if result.unrestricted:
             spins = (
                 (
                     result.P_a,
@@ -157,28 +132,50 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
                 ),
             )
         else:
+            rho_a = rho_b = None
+            rho = result.terms.density(result.P)
             spins = (
                 (result.P, xc.potential(rho, alpha), result.eps, result.C, result.occupations),
             )
 
-        W_total = np.zeros_like(result.P)
-        for P_s, v_xc_s, eps_s, C_s, occ_s in spins:
-            v_eff = v_nuc + V_H + v_xc_s
-            # Only the potential matrices are built on the DV grid, so only they
-            # are differentiated on it; T and S come from their own builders and
-            # are differentiated by overlap_kinetic_gradient below.
-            v_chi = v_eff[:, None] * chi  # (npts, nb)
-            W_total += energy_weighted_density(C_s, eps_s, occ_s)
-            for ai, idx in by_atom.items():
-                Pblk = P_s[np.ix_(idx, range(len(basis)))]  # (n_A, nb)
-                Dw = D[:, idx, :] * wts[:, None, None]  # (npts, n_A, 3)
-                M_v = np.einsum("kax,kn->anx", Dw, v_chi, optimize=True)
-                grad[ai] -= 2.0 * np.einsum("an,anx->x", Pblk, M_v, optimize=True)
+        rho_full = _full_density(grid, rho)
+        V_H = hartree_potential(grid, rho_full, positions, l_max=config.grid.l_max, eval_points=pts)
+        v_nuc = nuclear_potential(pts, positions, molecule.charges)
 
+        grad = np.zeros((len(molecule), 3))
+        grad += hellmann_feynman_gradient(molecule, pts, wts, rho)
+
+        by_atom: dict[int, list[int]] = {}
+        for mu, f in enumerate(basis):
+            by_atom.setdefault(f.atom_idx, []).append(mu)
+        W_total = np.zeros_like(result.P)
+        for _, _, eps_s, C_s, occ_s in spins:
+            W_total += energy_weighted_density(C_s, eps_s, occ_s)
+
+        # grad rho per spin channel, filled chunk by chunk for the grid term
+        grad_rho_s = [np.zeros((len(pts), 3)) for _ in spins]
+        chunk = _force_chunk(n_basis, config.grid.memory_budget_mb, len(pts))
+        for start in range(0, len(pts), chunk):
+            c = slice(start, min(start + chunk, len(pts)))
+            with timer("forces.gradients"):
+                chi_c = chi_matrix(basis, positions, pts[c])  # (nc, nb)
+                D_c = chi_grad_matrix(basis, positions, pts[c])  # (nc, nb, 3)
+            w_c = wts[c]
+            for s_i, (P_s, v_xc_s, _, _, _) in enumerate(spins):
+                # -- Pulay: potential matrices are built on the DV grid, so
+                # only they are differentiated here; T and S below.
+                v_chi = (v_nuc[c] + V_H[c] + v_xc_s[c])[:, None] * chi_c
+                for ai, idx in by_atom.items():
+                    Dw = D_c[:, idx, :] * w_c[:, None, None]
+                    M_v = np.einsum("kax,kn->anx", Dw, v_chi, optimize=True)
+                    grad[ai] -= 2.0 * np.einsum("an,anx->x", P_s[idx], M_v, optimize=True)
+                grad_rho_s[s_i][c] = 2.0 * np.einsum(
+                    "kmx,mn,kn->kx", D_c, P_s, chi_c, optimize=True
+                )
 
         # -- grid motion: Becke weights and atom-centred points move with R --
         with timer("forces.grid"):
-            grad += _grid_motion_gradient(result, config, chi, D, rho, rho_a, rho_b, V_H, v_nuc)
+            grad += _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc)
 
         allreduce_array(grad)
         # -- Pulay terms of T and S, from the matrices the SCF used. Added after
@@ -205,7 +202,7 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
         return forces
 
 
-def _grid_motion_gradient(result, config, chi, D, rho, rho_a, rho_b, V_H, v_nuc):
+def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc):
     """Derivative of the quadrature itself: ``sum_k d(w_k G(r_k)) / d R_B``.
 
     The grid-sampled energy is ``sum_k w_k G(r_k)`` with
@@ -235,26 +232,24 @@ def _grid_motion_gradient(result, config, chi, D, rho, rho_a, rho_b, V_H, v_nuc)
     pts, wts = grid.local_points, grid.local_weights
     owner = grid.owner[sl]
 
-    # energy density and its gradient on the grid
+    # energy density and its gradient on the grid (grad rho per spin from the caller)
     if result.unrestricted:
         e_xc = 2.0 * rho_a * xc.energy_density(
             2.0 * rho_a, alpha
         ) + 2.0 * rho_b * xc.energy_density(2.0 * rho_b, alpha)
-        grad_rho_a = 2.0 * np.einsum("kmx,mn,kn->kx", D, result.P_a, chi, optimize=True)
-        grad_rho_b = 2.0 * np.einsum("kmx,mn,kn->kx", D, result.P_b, chi, optimize=True)
-        grad_rho = grad_rho_a + grad_rho_b
+        grad_rho = grad_rho_s[0] + grad_rho_s[1]
         xc_part = (
-            xc.potential_spin(rho_a, alpha)[:, None] * grad_rho_a
-            + xc.potential_spin(rho_b, alpha)[:, None] * grad_rho_b
+            xc.potential_spin(rho_a, alpha)[:, None] * grad_rho_s[0]
+            + xc.potential_spin(rho_b, alpha)[:, None] * grad_rho_s[1]
         )
     else:
         e_xc = rho * xc.energy_density(rho, alpha)
-        grad_rho = 2.0 * np.einsum("kmx,mn,kn->kx", D, result.P, chi, optimize=True)
+        grad_rho = grad_rho_s[0]
         xc_part = xc.potential(rho, alpha)[:, None] * grad_rho
     G = rho * (v_nuc + V_H) + e_xc
 
     grad_v_nuc = np.zeros_like(pts)
-    for pos, Z in zip(molecule.positions, molecule.charges):
+    for pos, Z in zip(molecule.positions, molecule.charges, strict=True):
         d = pts - pos
         r = np.maximum(np.linalg.norm(d, axis=1), 1e-12)
         grad_v_nuc += Z * d / r[:, None] ** 3
@@ -287,6 +282,12 @@ def _grid_motion_gradient(result, config, chi, D, rho, rho_a, rho_b, V_H, v_nuc)
                 grad[B] += M[A, B]
                 grad[A] -= M[A, B]
     return grad
+
+
+def _force_chunk(n_basis: int, budget_mb: float, n_points: int) -> int:
+    """Points per force chunk: chi, its gradient D and v*chi (5 x n_basis doubles)."""
+    per_point = 5 * n_basis * 8
+    return int(min(n_points, max(1000, budget_mb * 1024**2 // per_point)))
 
 
 def _full_density(grid, rho_local):

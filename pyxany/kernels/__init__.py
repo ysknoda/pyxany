@@ -74,3 +74,70 @@ def numerov_inward(g, h, r, kappa, m, out):
 
 __all__ = ["backend_name", "chi_block_kernel", "poisson_radial", "density_from_chi",
            "numerov_outward", "numerov_inward"]
+
+
+def becke_own_cell(points, owner, centres, a, stiffness):
+    """Own-cell Becke weights; compiled when numba is available."""
+    import numpy as np
+
+    mod = _numba()
+    if mod is None:
+        return None
+    R = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2)
+    np.fill_diagonal(R, 1.0)
+    out = np.empty(len(points))
+    mod.becke_own_cell(np.ascontiguousarray(points, dtype=float), np.asarray(owner, np.int64),
+                       np.ascontiguousarray(centres, dtype=float), np.ascontiguousarray(a),
+                       1.0 / R, int(stiffness), out)
+    return out
+
+
+def hartree_evaluate(points, centres, radii, v_radial, l_max):
+    """Compiled multipole summation, or None to use the numpy path."""
+    import numpy as np
+    from scipy.interpolate import CubicSpline
+
+    from ..basis.solid_harmonics import normalisation_factors
+
+    mod = _numba()
+    if mod is None:
+        return None
+    n_at = len(radii)
+    n_lm = (l_max + 1) ** 2
+    nmax = max(len(r) for r in radii)
+    knots = np.zeros((n_at, nmax))
+    n_knots = np.zeros(n_at, dtype=np.int64)
+    coefs = np.zeros((n_at, 4, nmax - 1, n_lm))
+    v_first = np.zeros((n_at, n_lm))
+    v_last = np.zeros((n_at, n_lm))
+    for A, (r, v) in enumerate(zip(radii, v_radial, strict=True)):
+        cs = CubicSpline(r, v, axis=0, extrapolate=False)
+        knots[A, :len(r)] = r
+        n_knots[A] = len(r)
+        coefs[A, :, :len(r) - 1] = cs.c
+        v_first[A] = v[0]
+        v_last[A] = v[-1]
+    out = np.empty(len(points))
+    mod.hartree_evaluate(np.ascontiguousarray(points, dtype=float),
+                         np.ascontiguousarray(centres, dtype=float), knots, n_knots, coefs,
+                         v_first, v_last, int(l_max), normalisation_factors(l_max), out)
+    return out
+
+
+def own_cell_weight_gradient(points, owner, coeff, centres, a, stiffness):
+    """Compiled Becke-weight gradient contraction, or None for the numpy path."""
+    import numpy as np
+
+    mod = _numba()
+    if mod is None:
+        return None
+    owner = np.asarray(owner, np.int64)
+    n_at = len(centres)
+    order = np.argsort(owner, kind="stable").astype(np.int64)
+    starts = np.searchsorted(owner[order], np.arange(n_at + 1)).astype(np.int64)
+    out = np.zeros((n_at, n_at, 3))
+    mod.own_cell_weight_gradient(np.ascontiguousarray(points, dtype=float), order, starts,
+                                 np.ascontiguousarray(coeff, dtype=float),
+                                 np.ascontiguousarray(centres, dtype=float),
+                                 np.ascontiguousarray(a), int(stiffness), out)
+    return out

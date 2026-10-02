@@ -83,3 +83,62 @@ def test_chi_matrix_is_backend_independent(h2o):
         r = np.linalg.norm(d, axis=1)
         slow[:, mu] = f.g(r) * solid_harmonic(f.l, f.m, d[:, 0], d[:, 1], d[:, 2])
     assert np.abs(fast - slow).max() < 1e-13
+
+
+def _numba_or_skip():
+    from pyxany import kernels
+
+    if kernels._numba() is None:
+        pytest.skip("numba not installed")
+    return kernels
+
+
+def test_compiled_becke_weights_match_numpy():
+    kernels = _numba_or_skip()
+    from pyxany.grid.becke import becke_weights, size_adjustment
+
+    rng = np.random.default_rng(1)
+    C = rng.normal(size=(6, 3)) * 2.0
+    radii = rng.uniform(0.5, 2.0, size=6)
+    pts = C[rng.integers(0, 6, 3000)] + rng.normal(size=(3000, 3))
+    owner = rng.integers(0, 6, 3000)
+    ref = becke_weights(pts, C, radii)[np.arange(3000), owner]
+    got = kernels.becke_own_cell(pts, owner, C, size_adjustment(radii), 3)
+    assert np.abs(got - ref).max() < 1e-13
+
+
+def test_compiled_becke_gradient_matches_numpy():
+    kernels = _numba_or_skip()
+    import pyxany.grid.becke as becke
+
+    rng = np.random.default_rng(2)
+    C = rng.normal(size=(5, 3)) * 2.0
+    radii = rng.uniform(0.5, 2.0, size=5)
+    pts = C[rng.integers(0, 5, 2000)] + rng.normal(size=(2000, 3))
+    owner = np.argmin(np.linalg.norm(pts[:, None] - C[None], axis=2), axis=1)
+    coeff = rng.normal(size=2000)
+    got = kernels.own_cell_weight_gradient(pts, owner, coeff, C, becke.size_adjustment(radii), 3)
+    saved = kernels.own_cell_weight_gradient
+    try:
+        kernels.own_cell_weight_gradient = lambda *a, **k: None   # force the numpy path
+        ref = becke.own_cell_weight_gradient(pts, owner, coeff, C, radii)
+    finally:
+        kernels.own_cell_weight_gradient = saved
+    assert np.abs(got - ref).max() < 1e-11 * max(1.0, np.abs(ref).max())
+
+
+def test_compiled_hartree_summation_matches_numpy(h2o):
+    kernels = _numba_or_skip()
+    from pyxany.grid import build_molecular_grid
+    from pyxany.integrals import coulomb
+
+    grid = build_molecular_grid(h2o, 25, 10)
+    rho = sum(float(a.Z) * np.exp(-np.sum((grid.points - a.pos) ** 2, axis=1)) for a in h2o)
+    fast = coulomb.hartree_potential(grid, rho, h2o.positions, l_max=9)
+    saved = kernels.hartree_evaluate
+    try:
+        kernels.hartree_evaluate = lambda *a, **k: None
+        ref = coulomb.hartree_potential(grid, rho, h2o.positions, l_max=9)
+    finally:
+        kernels.hartree_evaluate = saved
+    assert np.abs(fast - ref).max() < 1e-12 * np.abs(ref).max()

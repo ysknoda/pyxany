@@ -163,6 +163,11 @@ def own_cell_weight_gradient(
     out = np.zeros((n_atoms, n_atoms, 3))
     if n_atoms == 1:
         return out
+    from ..kernels import own_cell_weight_gradient as compiled
+
+    fast = compiled(pts, owner, coeff, C, size_adjustment(radii), stiffness)
+    if fast is not None:
+        return fast
 
     a = size_adjustment(radii)
     diff = pts[:, None, :] - C[None, :, :]                       # r - R_C

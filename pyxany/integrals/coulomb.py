@@ -36,7 +36,7 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.special import sph_harm_y
 
-from ..basis.solid_harmonics import real_spherical_harmonics
+from ..basis.solid_harmonics import real_spherical_harmonics, real_spherical_harmonics_T
 from ..parallel import allreduce_array, round_robin
 from ..timing import timer
 
@@ -196,14 +196,24 @@ def hartree_potential(grid, rho: np.ndarray, positions: np.ndarray,
 
         # -- step 4: sum every atom's potential onto the evaluation points ---
         pts = grid.points if eval_points is None else np.asarray(eval_points, float)
-        V = np.zeros(len(pts))
-        for ai in range(n_atoms):
-            d = pts - positions[ai]
-            rr = np.sqrt(np.einsum("ij,ij->i", d, d))
-            Y = real_spherical_harmonics(l_max, d[:, 0], d[:, 1], d[:, 2], rr)
-            v_at_r = _evaluate_multipoles(grid.radii[ai], v_radial[ai], l_of, rr)
-            V += np.einsum("kj,kj->k", v_at_r, Y, optimize=True)
+        from ..kernels import hartree_evaluate
+
+        V = hartree_evaluate(pts, positions, grid.radii, v_radial, l_max)
+        if V is None:
+            V = _sum_multipoles(pts, positions, grid.radii, v_radial, l_of, l_max)
         return V
+
+
+def _sum_multipoles(pts, positions, radii, v_radial, l_of, l_max) -> np.ndarray:
+    """numpy reference for the multipole summation (kernels.hartree_evaluate)."""
+    V = np.zeros(len(pts))
+    for ai in range(len(radii)):
+        d = pts - positions[ai]
+        rr = np.sqrt(np.einsum("ij,ij->i", d, d))
+        Yt = real_spherical_harmonics_T(l_max, d[:, 0], d[:, 1], d[:, 2], rr)
+        v_at_r = _evaluate_multipoles(radii[ai], v_radial[ai], l_of, rr)
+        V += np.einsum("kj,jk->k", v_at_r, Yt, optimize=True)
+    return V
 
 
 def _evaluate_multipoles(r_nodes: np.ndarray, v_nodes: np.ndarray,
