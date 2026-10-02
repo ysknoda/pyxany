@@ -307,3 +307,20 @@ def test_sad_guess_starts_close_to_the_converged_energy(h2o):
     res = run_scf(h2o, basis, cfg, verbose=0)
     assert np.einsum("mn,nm->", P0, res.S) == pytest.approx(10.0, abs=0.05)
     assert abs(res.history[0]["E"] - res.total_energy) < 1.0
+
+
+def test_negative_overlap_population_on_a_real_bond_gets_a_note():
+    from types import SimpleNamespace
+
+    from pyxany.properties.bonding import BondingAnalysis, report_lines
+
+    mol = [SimpleNamespace(symbol="Si"), SimpleNamespace(symbol="Si")]
+
+    def lines(op_value):
+        op = np.array([[0.0, op_value], [op_value, 0.0]])
+        bo = np.array([[0.0, 0.85], [0.85, 0.0]])
+        a = BondingAnalysis(op, bo, [(0, 1)], ["Si-Si"], [], 0.0)
+        return "\n".join(report_lines(a, mol))
+
+    assert "[note]" in lines(-0.88)
+    assert "[note]" not in lines(+0.51)

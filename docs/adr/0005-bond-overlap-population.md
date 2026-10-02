@@ -45,3 +45,23 @@ populations.
 
 The MO-resolved data scales as n_MO x n_pairs; output is restricted to
 user-selected pairs or pairs above a bond-order threshold for large clusters.
+
+## Addendum (2026-10-02): negative totals on real bonds
+
+The atom-pair Mulliken overlap population depends on the basis set strongly
+enough to change sign. Measured at fixed geometry:
+
+| system | basis | mean Si-Si overlap pop. | Mayer B.O. |
+|---|---|---|---|
+| Si5H12 | SZ | +0.51 | ~0.9 |
+| Si5H12 | DZ | -0.08 | ~0.9 |
+| Si47H60 (107 atoms) | DZ | -0.88 (min -1.69) | 0.78-0.86 |
+
+The Mayer bond order is stable throughout, so the bonds are not
+antibonding; the equal Mulliken split of overlap terms between diffuse
+functions on closely packed atoms is the cause. A Loewdin analogue is no
+remedy (the pair overlap population vanishes in an orthogonalised basis).
+
+Decision: keep the quantity (it is what COOP plots integrate), and print a
+note whenever a pair with Mayer bond order >= 0.5 has a negative total.
+Interpret the MO-resolved curve and bond orders, not the sign of the total.

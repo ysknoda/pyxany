@@ -130,6 +130,19 @@ def report_lines(analysis: BondingAnalysis, molecule, max_rows: int = 12) -> lis
     out.append(
         "  per type: " + "   ".join(f"{t} {np.mean(v):+.4f} (x{len(v)})" for t, v in totals.items())
     )
+    # Mulliken splits each overlap term equally between the two atoms, so with
+    # diffuse functions on closely packed atoms the pair term goes negative
+    # without the bond being antibonding: Si-Si in Si5H12 is +0.51 in SZ and
+    # -0.08 in DZ at the same geometry, and -0.88 in Si47H60 (DZ), while the
+    # Mayer bond order stays 0.8-0.9 throughout (ADR 0005).
+    if any(analysis.op[p] < 0 and analysis.bond_orders[p] >= 0.5 for p in analysis.pairs):
+        out.append(
+            "  [note] a pair with Mayer bond order >= 0.5 has a negative overlap population:"
+        )
+        out.append(
+            "  a basis-set artefact of the Mulliken split, not antibonding -- compare MO-resolved"
+        )
+        out.append("  values or bond orders, not the sign of the total.")
     out.append("")
     return out
 
