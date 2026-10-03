@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..constants import HARTREE_TO_EV
+from ..constants import ANG_TO_BOHR, HARTREE_TO_EV
 from ..grid.molecular import grid_from_config
 from ..integrals import xc
 from ..integrals.coulomb import hartree_potential, nuclear_potential
@@ -205,6 +205,22 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
         V_nuc = terms.potential_matrix(v_nuc)
     E_nn = molecule.nuclear_repulsion()
 
+    # ---- point-charge embedding: a fixed one-electron potential (ADR 0010) --
+    from .. import embedding as emb_mod
+
+    ext = emb_mod.from_config(config)
+    V_ext = None
+    E_ext_nuc = 0.0
+    if ext is not None:
+        with timer("scf.embedding"):
+            V_ext = terms.potential_matrix(ext.potential(grid.local_points))
+            E_ext_nuc = ext.nuclear_energy(molecule)
+        V_nuc = V_nuc + V_ext
+        E_nn = E_nn + E_ext_nuc
+        if verbose:
+            mpi_print(f"  embedding          : {len(ext)} point charges, total "
+                      f"{ext.total_charge:+.4f}, sigma {ext.sigma:g} Bohr")
+
     # ---- initial density --------------------------------------------------
     from . import checkpoint as ckpt_mod
 
@@ -376,6 +392,13 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
         energies["E_free"] = energies["E_total"] - ts
 
     energies["n_electrons_integrated"] = allreduce_scalar(float(np.dot(weights, rho)))
+    if ext is not None:
+        # already inside E_nuclear_attraction / E_nn; reported separately
+        energies["E_embedding_electrons"] = float(np.einsum("mn,nm->", P, V_ext))
+        energies["E_embedding_nuclei"] = E_ext_nuc
+        radius = config.embedding.spill_radius * ANG_TO_BOHR
+        energies["embedding_spill_electrons"] = allreduce_scalar(
+            ext.electrons_near(grid.local_points, weights, rho, radius))
     n_expected = n_electrons - (holes.electrons if holes is not None and holes.mode == "remove"
                                 else 0.0)
     if checkpoint_path is not None:

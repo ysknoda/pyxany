@@ -47,6 +47,22 @@ def pair_gradient_terms_kernel():
     return mod.pair_gradient_terms if mod is not None else None
 
 
+def point_charge_field(points, centres, charges, sigma, gradient=False):
+    """Compiled Gaussian point-charge potential (and gradient), or None."""
+    import numpy as np
+
+    mod = _numba()
+    if mod is None:
+        return None
+    pts = np.ascontiguousarray(points, dtype=float)
+    v = np.empty(len(pts))
+    g = np.empty((len(pts), 3)) if gradient else np.empty((0, 3))
+    mod.point_charge_field(pts, np.ascontiguousarray(centres, dtype=float),
+                           np.ascontiguousarray(charges, dtype=float), float(sigma),
+                           bool(gradient), v, g)
+    return (v, g) if gradient else v
+
+
 def chi_all_kernel():
     """Single-call STO evaluator for functions on many atoms, or None."""
     mod = _numba()

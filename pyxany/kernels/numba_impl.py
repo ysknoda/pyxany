@@ -11,6 +11,8 @@ Compilation is lazy (``cache=True``, no import-time warm-up) so that importing
 
 from __future__ import annotations
 
+import math
+
 import numba as nb
 import numpy as np
 
@@ -670,6 +672,43 @@ def hartree_evaluate_grad(points, centres, knots, n_knots, coefs, v_first, v_las
         out[k, 0] = gx
         out[k, 1] = gy
         out[k, 2] = gz
+
+
+@nb.njit(parallel=True, cache=True)
+def point_charge_field(points, centres, charges, sigma, want_grad, v_out, g_out):
+    """Electron potential energy of Gaussian point charges and its gradient.
+
+    ``v = -sum_i q_i erf(d_i / sigma) / d_i``; see pyxany/embedding.py.
+    """
+    n_pts = points.shape[0]
+    n_q = centres.shape[0]
+    c = 2.0 / np.sqrt(np.pi) / sigma
+    for k in nb.prange(n_pts):
+        v = 0.0
+        gx = 0.0
+        gy = 0.0
+        gz = 0.0
+        for i in range(n_q):
+            dx = points[k, 0] - centres[i, 0]
+            dy = points[k, 1] - centres[i, 1]
+            dz = points[k, 2] - centres[i, 2]
+            d = np.sqrt(dx * dx + dy * dy + dz * dz)
+            if d < 1e-8 * sigma:
+                v -= charges[i] * c
+                continue
+            e = math.erf(d / sigma) / d
+            v -= charges[i] * e
+            if want_grad:
+                de = (c * np.exp(-(d / sigma) ** 2) - e) / d
+                f = -charges[i] * de / d
+                gx += f * dx
+                gy += f * dy
+                gz += f * dz
+        v_out[k] = v
+        if want_grad:
+            g_out[k, 0] = gx
+            g_out[k, 1] = gy
+            g_out[k, 2] = gz
 
 
 @nb.njit(cache=True)

@@ -10,7 +10,7 @@ Not in the current scope; recorded so the decision to defer is explicit.
 | **Cluster-size convergence of the example gaps** | The example clusters (5-7 core atoms) have terminator-dominated LUMOs (Loewdin 0.52-0.72) that relaxing the terminators does not remove. A size series (e.g. Si/GaAs/CdSe with 17, 29, 47, 87 core atoms) is needed before their gaps can stand for the material; cost is set by step 8 (performance). |
 | **Element-specific X-alpha alpha** (e.g. Schwarz alpha_HF) | Needs an inter-atomic mixing rule and the full Schwarz table from the source paper; breaks Tier A PySCF comparison (ADR 0002). |
 | Multiple initial spin guesses, tried automatically | Next stage after the current scope. |
-| Point-charge (Madelung) embedding for ionic clusters | Next stage; relevant to MgO-type clusters. |
+| Effective core potentials on boundary cations of embedded clusters | Would allow anion-terminated embedded clusters (MgO6 rather than Mg19O6); needs semi-local ECP projectors on one-centre grids at each boundary site and an ECP parameter source (ADR 0010). |
 | XANES / XES spectra from transition-state dipole intensities | Builds on ADR 0006 (c). |
 | Correlation functional (e.g. VWN5) | Changes the code's identity as an X-alpha code; separate decision. |
 | Point-group symmetry | Large effort; performance and labelling benefit only. |
@@ -43,3 +43,4 @@ Not in the current scope; recorded so the decision to defer is explicit.
 - **Large-cluster SCF divergence** -- caused by the initial guess; replaced by
   a superposition of atomic densities (ADR 0007, step 8 outcome).
 - **Lebedev angular grids** -- available as `grid.angular: lebedev` (ADR 0009).
+- **Point-charge (Madelung) embedding** -- `embedding:` and `pyxany embed` (ADR 0010).

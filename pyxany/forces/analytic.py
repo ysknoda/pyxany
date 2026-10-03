@@ -141,6 +141,13 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
         rho_full = _full_density(grid, rho)
         V_H = hartree_potential(grid, rho_full, positions, l_max=config.grid.l_max, eval_points=pts)
         v_nuc = nuclear_potential(pts, positions, molecule.charges)
+        # embedding charges: a fixed potential, so they enter wherever v_nuc
+        # does on the grid but not in the Hellmann-Feynman term (ADR 0010)
+        from .. import embedding as emb_mod
+
+        ext = emb_mod.from_config(config)
+        if ext is not None:
+            v_nuc = v_nuc + ext.potential(pts)
 
         grad = np.zeros((len(molecule), 3))
         grad += hellmann_feynman_gradient(molecule, pts, wts, rho)
@@ -175,7 +182,10 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
 
         # -- grid motion: Becke weights and atom-centred points move with R --
         with timer("forces.grid"):
-            grad += _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc)
+            grad += _grid_motion_gradient(
+                result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc,
+                None if ext is None else ext.gradient(pts),
+            )
 
         allreduce_array(grad)
         # -- Pulay terms of T and S, from the matrices the SCF used. Added after
@@ -190,19 +200,28 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
             screening_tol=config.grid.screening_tol,
         )
         grad += nuclear_repulsion_gradient(molecule)
+        if ext is not None:
+            grad += ext.nuclear_gradient(molecule)
         forces = -grad
         # Keep the pre-projection residual: it is a direct measure of the
         # grid-derivative error, and therefore of whether a requested force
         # convergence threshold is resolvable at all.  After projection
         # |sum F| is ~1e-16 by construction and says nothing.
-        compute_forces.last_translation_residual = float(np.linalg.norm(forces.sum(axis=0)))
         wanted = getattr(config.forces, "project_translation", True) if project is None else project
+        if ext is not None:
+            # fixed external charges: the net force is physical, not grid error
+            wanted = False
+            compute_forces.last_translation_residual = None
+        else:
+            compute_forces.last_translation_residual = float(
+                np.linalg.norm(forces.sum(axis=0)))
         if wanted:
             forces = project_out_translation(forces)
         return forces
 
 
-def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc):
+def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc,
+                          grad_v_ext=None):
     """Derivative of the quadrature itself: ``sum_k d(w_k G(r_k)) / d R_B``.
 
     The grid-sampled energy is ``sum_k w_k G(r_k)`` with
@@ -217,7 +236,8 @@ def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_
     * point term   ``sum_{k owned by B} w_k grad G(r_k)``, where
       ``grad G = grad rho (v_nuc + V_H + v_xc) + rho (grad v_nuc + grad V_H)``.
 
-    Rank-local; the caller reduces.
+    ``v_nuc`` includes any embedding potential, whose gradient is
+    ``grad_v_ext``. Rank-local; the caller reduces.
     """
     from ..grid.becke import own_cell_weight_gradient
 
@@ -225,7 +245,7 @@ def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_
     alpha = config.scf.alpha
     n_atoms = len(molecule)
     grad = np.zeros((n_atoms, 3))
-    if n_atoms == 1 or grid.partition != "becke":
+    if (n_atoms == 1 and grad_v_ext is None) or grid.partition != "becke":
         return grad
 
     sl = grid.local_slice
@@ -280,10 +300,14 @@ def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_
             grad_V_H[:, x] = (vp - vm) / (2.0 * h)
 
     grad_G = grad_rho * (v_nuc + V_H)[:, None] + xc_part + rho[:, None] * (grad_v_nuc + grad_V_H)
+    if grad_v_ext is not None:
+        grad_G += rho[:, None] * grad_v_ext
     for A in range(n_atoms):
         sel = owner == A
         grad[A] += wts[sel] @ grad_G[sel]
 
+    if n_atoms == 1:
+        return grad
     radii = np.array([a.grid_radius() for a in molecule])
     M = own_cell_weight_gradient(pts, owner, grid.raw_weights[sl] * G, molecule.positions, radii)
     for A in range(n_atoms):

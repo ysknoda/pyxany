@@ -71,6 +71,13 @@ grid:
   memory_budget_mb: 4096
   radial_by_element: true   # false: every atom gets exactly n_r
 
+embedding:                  # optional point-charge (Madelung) embedding, ADR 0010
+  charges:          null    # file of 'x y z q' lines; 'pyxany embed' writes one
+  units:            angstrom
+  sigma:            0.5     # Gaussian width of every charge, Bohr
+  spill_radius:     1.0     # report electrons this close (A) to positive charges
+  spill_warn:       0.1     # and warn above this many
+
 scf:
   max_iter:         100
   e_tol:            1.0e-6  # total-energy convergence (Ha)

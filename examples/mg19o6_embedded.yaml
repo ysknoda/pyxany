@@ -1,0 +1,34 @@
+# MgO6 in rock-salt MgO, terminated by the 12 + 6 Mg ions bonded to its O
+# atoms and embedded in the Madelung field of the rest of the crystal (ADR 0010).
+#
+#   pyxany embed mgo_crystal.yaml -o mg19o6_charges.xyz
+#   pyxany run mg19o6_embedded.yaml
+#
+# Why Mg19O6 and not the bare MgO6(10-): a point-charge Mg2+ next to an O has
+# no Pauli repulsion, and diffuse (DZ) O functions pour 1.6 electrons into it
+# (the SCF does not converge, gap ~0). Making every cation bonded to the
+# quantum O atoms quantum too brings that to 0.03 e (gap 3.3 eV); see
+# docs/embedding.md.
+molecule:
+  name: mg19o6_embedded
+  structure: mg19o6.xyz
+  charge: 26               # formal charge of the lattice sites the cluster replaces
+  mult: 1
+  units: angstrom
+basis:
+  set: dz
+grid:
+  n_r: 30
+  n_a: 12
+scf:
+  max_iter: 150
+embedding:
+  charges: mg19o6_charges.xyz
+  units: angstrom
+  sigma: 0.5               # Bohr
+forces:
+  enabled: true
+output:
+  dir: ./results
+  prefix: mg19o6_embedded
+  figure: false

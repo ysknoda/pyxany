@@ -387,6 +387,33 @@ class RuntimeConfig:
 
 
 @dataclass
+class EmbeddingConfig:
+    """Point-charge embedding (ADR 0010)."""
+
+    #: File of point charges (``x y z q`` or ``label x y z q``), relative to the
+    #: input file; None: no embedding. ``pyxany embed`` writes one.
+    charges: Any = None
+    units: str = "angstrom"
+    #: Gaussian width of every charge, Bohr (always Bohr, whatever ``units``).
+    sigma: float = 0.5
+    #: Electrons within this distance (Angstrom) of a positive charge are
+    #: reported; above ``spill_warn`` electrons a warning is printed.
+    spill_radius: float = 1.0
+    spill_warn: float = 0.1
+
+    def validate(self, ctx: str) -> None:
+        if self.charges is not None and not isinstance(self.charges, str):
+            raise ConfigError(f"{ctx}: embedding.charges must be a file name")
+        if self.units not in ("angstrom", "bohr"):
+            raise ConfigError(f"{ctx}: embedding.units must be 'angstrom' or 'bohr'")
+        if not (isinstance(self.sigma, (int, float)) and self.sigma > 0):
+            raise ConfigError(f"{ctx}: embedding.sigma must be > 0 (Bohr)")
+        if not (self.spill_radius > 0 and self.spill_warn >= 0):
+            raise ConfigError(f"{ctx}: embedding.spill_radius must be > 0 and "
+                              f"spill_warn >= 0")
+
+
+@dataclass
 class TransitionStateConfig:
     """Slater transition state (ADR 0006). Set exactly one of ``remove``/``excite``.
 
@@ -443,6 +470,7 @@ _SECTIONS = {
     "output": OutputConfig,
     "runtime": RuntimeConfig,
     "transition_state": TransitionStateConfig,
+    "embedding": EmbeddingConfig,
 }
 
 
@@ -459,6 +487,7 @@ class Config:
     output: OutputConfig = field(default_factory=OutputConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
     transition_state: TransitionStateConfig = field(default_factory=TransitionStateConfig)
+    embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     #: Directory the YAML file lives in, used to resolve relative paths.
     source_dir: Path = field(default_factory=Path)
 

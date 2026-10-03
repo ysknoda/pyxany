@@ -7,6 +7,7 @@ opt         geometry optimisation
 forces      forces only, optionally comparing analytic against finite difference
 scan        scan a bond length or angle
 passivate   add pseudo-hydrogen (or real hydrogen) terminators to a cluster
+embed       point charges of the surrounding crystal (Evjen block)
 gridcheck   grid-quality diagnostic
 validate    parse and validate an input file without running anything
 init        write a template YAML + XYZ pair
@@ -119,6 +120,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_p.add_argument("--timing", dest="timing", action="store_true", default=None)
     p_p.add_argument("--no-timing", dest="timing", action="store_false")
 
+    p_e = sub.add_parser("embed", help="point charges of the surrounding crystal")
+    p_e.add_argument("input", help="crystal description YAML (lattice, sites, cells, cluster)")
+    p_e.add_argument("-o", "--output", default="charges.xyz", help="point-charge file to write")
+
     p_init = sub.add_parser("init", help="write a template input pair")
     p_init.add_argument("name")
     p_init.add_argument("--template", choices=["molecule", "cluster", "radical"],
@@ -147,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     from ..config import ConfigError
     from . import basis as basis_cmd
     from . import forces as forces_cmd
+    from . import embed as embed_cmd
     from . import gridcheck as gridcheck_cmd
     from . import info as info_cmd
     from . import init as init_cmd
@@ -160,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
         "run": run_cmd.execute, "opt": opt_cmd.execute, "forces": forces_cmd.execute,
         "scan": scan_cmd.execute, "gridcheck": gridcheck_cmd.execute,
         "validate": validate_cmd.execute, "passivate": passivate_cmd.execute,
-        "init": init_cmd.execute, "basis": basis_cmd.execute, "info": info_cmd.execute,
+        "embed": embed_cmd.execute, "init": init_cmd.execute, "basis": basis_cmd.execute, "info": info_cmd.execute,
     }
     tee = _Tee(getattr(args, "log", None))
     try:
@@ -221,7 +227,7 @@ class _Tee:
 
 
 def _completion_script(shell: str) -> str:
-    cmds = "run opt forces scan passivate gridcheck validate init basis info"
+    cmds = "run opt forces scan passivate embed gridcheck validate init basis info"
     if shell == "bash":
         return (
             "_pyxany_completion() {\n"

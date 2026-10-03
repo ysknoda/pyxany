@@ -50,9 +50,19 @@ def system_fingerprint(molecule, basis, config, unrestricted: bool) -> str:
     return _digest(
         np.asarray(molecule.charges),
         f"q={molecule.charge};m={molecule.multiplicity};u={unrestricted};"
-        f"a={config.scf.alpha!r};ts={_ts_key(config)};{labels}",
+        f"a={config.scf.alpha!r};ts={_ts_key(config)};emb={_embedding_key(config)};{labels}",
         exps,
     )
+
+
+def _embedding_key(config) -> str:
+    """Different point charges make a different system."""
+    from ..embedding import from_config
+
+    ext = from_config(config)
+    if ext is None:
+        return "none"
+    return _digest(np.round(ext.positions, 10), ext.charges, f"s={ext.sigma!r}")
 
 
 def _ts_key(config) -> str:

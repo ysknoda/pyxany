@@ -20,3 +20,4 @@ venv/
 # AI-assisted development tooling (local only)
 .claude/
 .code-check/
+examples/*_charges.xyz

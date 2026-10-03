@@ -4,6 +4,14 @@
 
 ### Added
 
+- **Point-charge (Madelung) embedding** (ADR 0010): `embedding.charges`
+  reads fixed Gaussian point charges; `pyxany embed` builds them from a
+  crystal as a neutral, dipole-free Evjen block (rock-salt Madelung constant
+  to 7e-6). Energies, forces (analytic = finite differences to the grid
+  error) and a warning for electrons leaking onto positive charges. Example
+  `examples/mg19o6_embedded.yaml`: the bare MgO6(10-) leaks 1.6 e with DZ and
+  does not converge, the cation-terminated Mg19O6 leaks 0.03 e (docs/embedding.md).
+
 - **Slater transition state** (ADR 0006): `transition_state:` removes half an
   electron from a chosen orbital (`homo`, an MO number, or a core shell
   `{atom, shell}`) or moves it between two, and reports the ionisation or

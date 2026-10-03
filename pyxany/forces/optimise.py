@@ -107,7 +107,9 @@ def optimise_geometry(molecule, config, verbose: int = 1, restart=None,
     # gradient that do not correspond.  Applying it to the finite-difference
     # branch as well keeps the two forces.method settings consistent.
     anything_frozen = bool(frozen.any())
-    project = (not anything_frozen) and getattr(
+    # fixed embedding charges break translation invariance the same way
+    embedded = bool(config.embedding.charges)
+    project = (not anything_frozen) and (not embedded) and getattr(
         config.forces, "project_translation", True)
 
     def energy_and_gradient(x: np.ndarray):

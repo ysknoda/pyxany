@@ -48,6 +48,8 @@ def format_results(result, config, forces=None, dipole=None) -> str:
             v = result.energies[key]
             w(f"  {key:<24s} {v:>18.9f}   ({v * HARTREE_TO_EV:>15.5f} eV)")
     w("")
+    if "E_embedding_electrons" in result.energies:
+        out.extend(_embedding_lines(result, config))
     w(
         f"  Grid check: int rho dV = {result.energies['n_electrons_integrated']:.8f}   "
         f"Tr(PS) = {result.energies['trace_PS']:.8f}   "
@@ -145,7 +147,8 @@ def format_results(result, config, forces=None, dipole=None) -> str:
         w(
             f"  max |F| = {np.abs(forces).max():.8f}   "
             f"|sum F| = {np.linalg.norm(forces.sum(axis=0)):.2e} "
-            f"(translational invariance)"
+            + ("(net force from the embedding charges)" if config.embedding.charges
+               else "(translational invariance)")
         )
         # The line above is ~1e-16 by construction once the net translation has
         # been projected out, so it validates nothing. The pre-projection
@@ -171,6 +174,28 @@ def format_results(result, config, forces=None, dipole=None) -> str:
     if passivation:
         out.extend(passivation)
     return "\n".join(out)
+
+
+def _embedding_lines(result, config) -> list[str]:
+    """Point-charge embedding: its energy and whether electrons leak into it."""
+    e = result.energies
+    emb = config.embedding
+    spill = e["embedding_spill_electrons"]
+    out = [
+        "  POINT-CHARGE EMBEDDING  (included in the totals above)",
+        "  " + "-" * 62,
+        f"  electrons - charges  {e['E_embedding_electrons']:>18.9f} Ha",
+        f"  nuclei - charges     {e['E_embedding_nuclei']:>18.9f} Ha",
+        f"  electrons within {emb.spill_radius:g} A of a positive charge: {spill:.4f}",
+    ]
+    if spill > emb.spill_warn:
+        out.append(
+            f"  [warning] more than {emb.spill_warn:g} electrons sit on positive point charges, "
+            "which have no Pauli repulsion: make the cations bonded to the cluster quantum "
+            "atoms (see docs/embedding.md)."
+        )
+    out.append("")
+    return out
 
 
 def _transition_state_lines(result) -> list[str]:

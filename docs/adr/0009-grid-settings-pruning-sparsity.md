@@ -115,8 +115,8 @@ Measured against product n_a = 20 unpruned, pruning on (|dE| Ha / max|dF| Ha/Boh
 At the same degree Lebedev saves a third of the points but is not uniformly
 as accurate (better on CO, worse on the heavier clusters); at a near-equal
 point count it gives equal or smaller force errors in all four, with the
-GaAs4 energy slightly worse. The default stays `product` (Q38 measured, see
-the decision recorded with the user); Lebedev is an option.
+GaAs4 energy slightly worse. Decision (Q38, after these measurements): the
+default stays `product`; Lebedev is an option.
 
 ## Consequences
 
