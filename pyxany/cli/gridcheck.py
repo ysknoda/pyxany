@@ -7,7 +7,7 @@ import time
 import numpy as np
 
 from ..basis.evaluate import chi_matrix
-from ..grid import build_molecular_grid
+from ..grid.molecular import grid_from_config
 from ..parallel import mpi_print
 from ..scf.guess import atomic_superposition, rescale_to_electron_count
 from ..integrals.overlap import build_overlap_kinetic
@@ -41,16 +41,16 @@ def _gridcheck(args):
 
     with timer("overlap"):
         S, _ = build_overlap_kinetic(molecule, basis,
-                                     screening_tol=cfg.grid.screening_tol)
+                                     n_r=cfg.grid.pair["n_r"], n_a=cfg.grid.pair["n_a"],
+                                     screening_tol=cfg.grid.screening_tol,
+                                     n_r_1c=cfg.grid.one_centre["n_r"])
     P = rescale_to_electron_count(atomic_superposition(molecule, basis), S,
                                   molecule.n_electrons)
     for n_r, n_a in levels:
         label = f"{n_r} x {n_a}"
         elapsed = time.perf_counter()
         with timer(f"grid {label}"):
-            grid = build_molecular_grid(molecule, n_r, n_a,
-                                        partition=cfg.grid.partition,
-                                        radial_by_element=cfg.grid.radial_by_element)
+            grid = grid_from_config(molecule, cfg.grid, n_r=n_r, n_a=n_a)
         with timer(f"chi {label}"):
             chi = chi_matrix(basis, molecule.positions, grid.local_points)
         with timer(f"density {label}"):

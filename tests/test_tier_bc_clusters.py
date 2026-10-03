@@ -23,7 +23,7 @@ GaAs 5.31 > CdSe 2.54 eV, nothing like the bulk order, and there is no
 physical reason they should be.
 
 Tier C (regression): total energy and gap of each pseudo-passivated example at
-its own input settings, pinned to the values measured on 2026-10-01. A change
+its own input settings, pinned to the values measured on 2026-10-03. A change
 here is not necessarily wrong, but it must be explained.
 """
 
@@ -46,12 +46,15 @@ pytestmark = pytest.mark.slow
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
-# (total energy / Ha, HOMO-LUMO gap / eV) at each example's own settings
+# (total energy / Ha, HOMO-LUMO gap / eV) at each example's own settings.
+# Re-pinned 2026-10-03 for angular pruning (ADR 0009); changes from the
+# 2026-10-01 values: si5h12 -1.1e-6, ga4ash -1.8e-5, cdse4h -3.3e-6,
+# mgo6h +9.1e-5 Ha; gaps within 1e-3 eV.
 PINNED = {
-    "si5h12": (-1443.3008570263, 5.7987),
-    "ga4ash": (-10853.6931107800, 5.3117),
-    "cdse4h": (-15045.8373677317, 2.5441),
-    "mgo6h": (-646.5986515276, 5.8668),
+    "si5h12": (-1443.3008581379, 5.7987),
+    "ga4ash": (-10853.6931292017, 5.3111),
+    "cdse4h": (-15045.8373710704, 2.5433),
+    "mgo6h": (-646.5985608779, 5.8669),
 }
 
 
@@ -73,6 +76,11 @@ def _run(name: str, termination: str = "pseudo"):
         atoms = [Atom.from_element("H", a.pos) if a.is_pseudo else a for a in mol]
         n_e = round(sum(a.Z for a in atoms) - mol.charge)
         mol = Molecule(atoms, charge=mol.charge, multiplicity=1 + n_e % 2, name=f"{name}_H")
+    if termination == "hydrogen":
+        # Plain H closes the gap (~0.07 eV): a nearly metallic SCF that needs
+        # 120-150 iterations, the exact count moving with rounding-level
+        # changes (grid pruning, block summation order) -- 150 was too tight.
+        cfg.scf.max_iter = 300
     basis = build_basis(mol, cfg)
     res = run_scf(mol, basis, cfg, verbose=0)
     return mol, basis, res

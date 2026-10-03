@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..constants import HARTREE_TO_EV
-from ..grid import build_molecular_grid
+from ..grid.molecular import grid_from_config
 from ..integrals import xc
 from ..integrals.coulomb import hartree_potential, nuclear_potential
 from ..integrals.overlap import build_overlap_kinetic, condition_number
@@ -161,8 +161,9 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
 
     # ---- one-time matrices ------------------------------------------------
     S, T = build_overlap_kinetic(molecule, basis,
-                                 n_r=grid_cfg.pair_n_r, n_a=grid_cfg.pair_n_a,
-                                 screening_tol=grid_cfg.screening_tol)
+                                 n_r=grid_cfg.pair["n_r"], n_a=grid_cfg.pair["n_a"],
+                                 screening_tol=grid_cfg.screening_tol,
+                                 n_r_1c=grid_cfg.one_centre["n_r"])
     cond = condition_number(S)
     holes = None
     if ts_cfg.enabled:
@@ -173,20 +174,30 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
         mpi_print(f"  S condition number : {cond:.4g}"
                   + ("   [WARNING: near-linear dependence]" if cond > 1e4 else ""))
 
-    grid = build_molecular_grid(molecule, grid_cfg.n_r, grid_cfg.n_a,
-                                partition=grid_cfg.partition,
-                                radial_by_element=grid_cfg.radial_by_element)
+    grid = grid_from_config(molecule, grid_cfg)
     chunk = choose_strategy(grid, n_basis, grid_cfg.chunk_size,
                             grid_cfg.memory_budget_mb)
-    terms = GridTerms(basis, molecule, grid, chunk_size=chunk)
+    terms = GridTerms(basis, molecule, grid, chunk_size=chunk,
+                      cutoff=grid_cfg.basis_cutoff, budget_mb=grid_cfg.memory_budget_mb)
     chi = terms.chi
     weights = grid.local_weights
     if verbose:
-        how = ("cached" if terms.cached
-               else f"chunked, {chunk:,} points at a time")
+        sp = terms.sparsity
+        if sp is not None:
+            how = (f"block-sparse, {sp['kept_fraction']:.0%} kept, "
+                   + ("cached" if sp["cached"] else "rebuilt per pass"))
+        else:
+            how = ("cached" if terms.cached
+                   else f"chunked, {chunk:,} points at a time")
         mpi_print(f"  DV grid            : {len(grid)} points "
                   f"({_radial_summary(grid)}r x {grid.n_a}th x {2 * grid.n_a}ph per atom), "
-                  f"chi {grid.chi_memory_mb(n_basis, chunk):.1f} MB/rank ({how})")
+                  f"chi {sp['chi_mb'] if sp else grid.chi_memory_mb(n_basis, chunk):.1f} "
+                  f"MB/rank ({how})")
+        if verbose > 1:
+            from ..grid.summary import grid_summary, summary_lines
+
+            for line in summary_lines(grid_summary(config, grid, molecule, terms)):
+                mpi_print(line)
 
     with timer("scf.v_nuc"):
         v_nuc = nuclear_potential(grid.local_points, molecule.positions, molecule.charges)
@@ -206,8 +217,10 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
     if initial is not None and initial.get("P") is not None:
         P = rescale_to_electron_count(np.array(initial["P"], dtype=float), S, n_electrons)
     else:
-        P = rescale_to_electron_count(sad_density(molecule, basis, scf_cfg.alpha), S,
-                                      n_electrons)
+        P = rescale_to_electron_count(
+            sad_density(molecule, basis, scf_cfg.alpha, grid_cfg.atom["n_points"],
+                        (grid_cfg.guess["n_r"], grid_cfg.guess["n_a"])),
+            S, n_electrons)
     if unrestricted:
         if initial is not None and all(initial.get(k) is not None for k in ("P_a", "P_b")):
             P_a = rescale_to_electron_count(np.array(initial["P_a"], dtype=float), S, n_alpha)
@@ -259,20 +272,18 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                 V_H = hartree_potential(grid, rho_full, molecule.positions,
                                         l_max=l_max, eval_points=grid.local_points)
 
-            # --- Coulomb and exchange-correlation, in one pass over the grid --
+            # --- Coulomb plus exchange-correlation, in one pass over the grid.
+            # Only J + Vxc enters the Fock matrix (the energy is a grid
+            # integral), so each spin channel needs one matrix, not two.
             with timer("scf.xc"):
-                wanted = {"J": V_H}
                 if unrestricted:
-                    wanted["Vxc_a"] = xc.potential_spin(rho_a, alpha)
-                    wanted["Vxc_b"] = xc.potential_spin(rho_b, alpha)
+                    built = terms.potential_matrices({
+                        "a": V_H + xc.potential_spin(rho_a, alpha),
+                        "b": V_H + xc.potential_spin(rho_b, alpha),
+                    })
+                    JVxc_a, JVxc_b = built["a"], built["b"]
                 else:
-                    wanted["Vxc"] = xc.potential(rho, alpha)
-                built = terms.potential_matrices(wanted)
-                J = built["J"]
-                if unrestricted:
-                    Vxc_a, Vxc_b = built["Vxc_a"], built["Vxc_b"]
-                else:
-                    Vxc = built["Vxc"]
+                    JVxc = terms.potential_matrices({"v": V_H + xc.potential(rho, alpha)})["v"]
 
             energies = _total_energy(P, T, V_nuc, rho, V_H, weights, alpha, E_nn,
                                      rho_a, rho_b)
@@ -282,8 +293,8 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
 
             # --- Fock matrices and extrapolation ---------------------------
             if unrestricted:
-                F_a = T + V_nuc + J + Vxc_a
-                F_b = T + V_nuc + J + Vxc_b
+                F_a = T + V_nuc + JVxc_a
+                F_b = T + V_nuc + JVxc_b
                 Fa_use, Fb_use, method, err, mix = _accelerate_uks(
                     accel, F_a, F_b, P_a, P_b, S, energies["E_total"], it, scf_cfg, dE)
                 eps_a, C_a, eps_b, C_b = _diagonalise_uks(Fa_use, Fb_use, S, n_basis)
@@ -312,7 +323,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                 extra = (float(eps_a[np.argsort(eps_a)][max(int(round(n_alpha)) - 1, 0)]),
                          float(eps_b[np.argsort(eps_b)][max(int(round(n_beta)) - 1, 0)]))
             else:
-                F = T + V_nuc + J + Vxc
+                F = T + V_nuc + JVxc
                 F_use, method, err, mix = _accelerate_rks(
                     accel, F, P, S, energies["E_total"], it, scf_cfg, dE)
                 eps, C, _ = solve_generalised(F_use, S, scf_cfg.s_threshold)

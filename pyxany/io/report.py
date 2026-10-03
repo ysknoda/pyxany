@@ -28,6 +28,9 @@ def format_results(result, config, forces=None, dipole=None) -> str:
         f"{result.n_iterations} iterations"
     )
     w("")
+    from ..grid.summary import grid_summary, summary_lines
+
+    out.extend(summary_lines(grid_summary(config, result.grid, mol, result.terms)))
 
     w("  TOTAL ENERGY  [Hartree]")
     w("  " + "-" * 62)

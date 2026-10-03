@@ -131,6 +131,24 @@
 
 ### Performance
 
+- **Every grid is set in the input file** (ADR 0009): `grid.pair`,
+  `grid.atom`, `grid.guess`, `grid.one_centre` and `grid.n_r_by_element`
+  join `n_r` / `n_a`; omitted values keep the previous behaviour. The old
+  `grid.pair_n_r`, `grid.pair_n_a` and `basis.nao_n_r` are errors that name
+  their replacement. `--set grid.pair.n_r=60` reaches nested keys.
+  `--dry-run`, the report and the JSON (`"grids"`) list every grid.
+- **Angular pruning, on by default**: shells inside 0.25 / 0.5 of the Bragg
+  radius use n_a/3 and 2n_a/3; 67 % of the points, adding < 10 % to the
+  grid's own angular error on CO, H2O, Si5H12 and GaAs4. Tier C re-pinned
+  (changes 1e-6 to 9e-5 Ha).
+- **Block-sparse basis** (`grid.basis_cutoff`, default 1e-6): per block of
+  points only the atoms whose functions reach 1e-6 there; Si47H60 changes by
+  1.3e-6 Ha and 2e-7 Ha/Bohr. 0 restores the dense path.
+- **J and V_xc built as one matrix** per spin channel (only the sum enters
+  the Fock matrix), and a single-call kernel for all Slater functions (chi
+  evaluation 2x faster). Si47H60 SCF + forces: 1875 s -> 1246 s with pruning
+  and the fused matrix alone.
+
 All of the following reproduce the previous numbers (numba vs numpy to
 1e-12, chunked vs single-pass forces to 1e-12, analytic vs finite-difference
 grad V_H to < 1e-8 Ha/Bohr in the forces); each has a test.

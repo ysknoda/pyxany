@@ -18,7 +18,7 @@ import numpy as np
 
 from ..parallel import allreduce_array, round_robin
 from ..timing import timer
-from .onecentre import kinetic_1c, overlap_1c
+from .onecentre import RADIAL_POINTS, kinetic_1c, overlap_1c
 from .twocentre import overlap_kinetic_2c, overlap_kinetic_2c_gradient, pair_is_negligible
 
 DEFAULT_SCREENING_TOL = 1e-10
@@ -46,8 +46,14 @@ def _groups(molecule, basis) -> list[list[int]]:
 
 
 def build_overlap_kinetic(molecule, basis, n_r: int = 40, n_a: int = 14,
-                          screening_tol: float = DEFAULT_SCREENING_TOL):
-    """Return ``(S, T)`` for the whole molecule."""
+                          screening_tol: float = DEFAULT_SCREENING_TOL,
+                          n_r_1c: int = RADIAL_POINTS):
+    """Return ``(S, T)`` for the whole molecule.
+
+    ``n_r`` / ``n_a`` size the two-centre grids (``grid.pair``); ``n_r_1c`` is
+    the radial quadrature of one-centre integrals of non-Slater functions
+    (``grid.one_centre``; Slater pairs use the closed form).
+    """
     with timer("integrals.S_T"):
         n = len(basis)
         S = np.zeros((n, n))
@@ -78,8 +84,8 @@ def build_overlap_kinetic(molecule, basis, n_r: int = 40, n_a: int = 14,
         for idx in groups:
             for a, mu in enumerate(idx):
                 for nu in idx[a:]:
-                    s = overlap_1c(basis[mu], basis[nu])
-                    t = kinetic_1c(basis[mu], basis[nu])
+                    s = overlap_1c(basis[mu], basis[nu], n_r_1c)
+                    t = kinetic_1c(basis[mu], basis[nu], n_r_1c)
                     S[mu, nu] = S[nu, mu] = s
                     T[mu, nu] = T[nu, mu] = t
         # T from the gradient form is symmetric by construction; symmetrise the

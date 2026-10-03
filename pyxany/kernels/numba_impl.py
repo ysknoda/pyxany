@@ -60,6 +60,41 @@ def _chi_block(norms, zetas, powers_n, lm_index, d, r, out, cols,
             out[k, cols[j]] = rad * ang
 
 
+@nb.njit(cache=True, parallel=True, fastmath=True)
+def _chi_all(centres, norms, zetas, powers_n, lm_index, points, out,
+             offsets, counts, coeffs, powers):
+    """``out[k, j]`` = STO ``j`` (centred at ``centres[j]``) at ``points[k]``.
+
+    One call for functions on any number of atoms: the per-atom calls of
+    :func:`_chi_block` cost a thread launch each, which dominates on small
+    point blocks.
+    """
+    n_pts = points.shape[0]
+    n_f = norms.shape[0]
+    for k in nb.prange(n_pts):
+        for j in range(n_f):
+            dx = points[k, 0] - centres[j, 0]
+            dy = points[k, 1] - centres[j, 1]
+            dz = points[k, 2] - centres[j, 2]
+            rk = np.sqrt(dx * dx + dy * dy + dz * dz)
+            rad = norms[j] * np.exp(-zetas[j] * rk)
+            for _ in range(powers_n[j]):
+                rad *= rk
+            out[k, j] = rad * _solid_harmonic_terms(lm_index[j], dx, dy, dz,
+                                                    offsets, counts, coeffs, powers)
+
+
+def chi_all(centres, norms, zetas, powers_n, l_arr, m_arr, points, out):
+    """Wrapper for :func:`_chi_all` translating (l, m) into table indices."""
+    lm_index = np.array([index_of(int(l), int(m)) for l, m in zip(l_arr, m_arr)], np.int64)
+    _chi_all(np.ascontiguousarray(centres, np.float64),
+             np.ascontiguousarray(norms, np.float64),
+             np.ascontiguousarray(zetas, np.float64),
+             np.ascontiguousarray(powers_n, np.int64),
+             lm_index, np.ascontiguousarray(points, np.float64), out,
+             _OFFSETS, _COUNTS, _COEFFS, _POWERS)
+
+
 def chi_block(norms, zetas, powers_n, l_arr, m_arr, d, r, out, cols):
     """Wrapper translating (l, m) pairs into flat-table indices."""
     lm_index = np.array([index_of(int(l), int(m)) for l, m in zip(l_arr, m_arr)], np.int64)

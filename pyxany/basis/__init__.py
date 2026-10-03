@@ -25,7 +25,8 @@ def build_basis(molecule, config, pseudo_zeta=None) -> BasisSet:
     if pseudo_zeta is None and any(atom.is_pseudo for atom in molecule):
         from .pseudo_h import derive_exponents
 
-        pseudo_zeta = derive_exponents(molecule)
+        pseudo_zeta = derive_exponents(molecule, config.scf.alpha,
+                                       config.grid.atom["n_points"])
     if key in STO_KEYS:
         functions = build_sto_basis(molecule, key, pseudo_zeta)
     elif key in GTO_KEYS:

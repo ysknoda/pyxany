@@ -173,22 +173,34 @@ def hartree_potential(grid, rho: np.ndarray, positions: np.ndarray,
     """
     with timer("coulomb.hartree"):
         n_atoms = grid.n_atoms
-        n_ang = grid.n_angular
         lm = lm_index_pairs(l_max)
-
-        # Angular harmonics on the (shared) direction set of every sub-grid
-        d0 = grid.directions
-        Y_ang = real_spherical_harmonics(l_max, d0[:, 0], d0[:, 1], d0[:, 2],
-                                         np.ones(len(d0)))     # (n_ang, n_lm)
-        wY = grid.angular_weights[:, None] * Y_ang             # projection kernel
         l_of = np.array([l for l, _ in lm])
+
+        # Projection kernels w_ang * Y_lm, one per angular grid in use. A pruned
+        # shell (n_a' < n_a) resolves only l <= n_a' - 1; its higher multipoles
+        # are left at zero (ADR 0009) -- the inner shells it applies to see an
+        # almost spherical density.
+        kernels: dict[int, np.ndarray] = {}
+
+        def kernel(na: int) -> np.ndarray:
+            if na not in kernels:
+                from ..grid.angular import spherical_product
+
+                d0, w0 = spherical_product(na)
+                n_lm = (min(l_max, na - 1) + 1) ** 2
+                Y = real_spherical_harmonics(min(l_max, na - 1), d0[:, 0], d0[:, 1],
+                                             d0[:, 2], np.ones(len(d0)))
+                kernels[na] = w0[:, None] * Y[:, :n_lm]
+            return kernels[na]
 
         # -- steps 1-3: one set of radial multipole potentials per atom -----
         v_radial = [np.zeros((int(grid.n_r_atom[ai]), len(lm))) for ai in range(n_atoms)]
         rho_cell = grid.cell_weights * rho
         for ai in round_robin(range(n_atoms)):
-            rho_a = grid.as_radial_angular(rho_cell, ai)                   # (n_r, n_ang)
-            rho_lm = rho_a @ wY                                            # (n_r, n_lm)
+            rho_lm = np.zeros((int(grid.n_r_atom[ai]), len(lm)))          # (n_r, n_lm)
+            for lo, hi, na, rows in grid.shell_blocks(ai):
+                wY = kernel(na)
+                rho_lm[lo:hi, :wY.shape[1]] = rho_cell[rows].reshape(hi - lo, -1) @ wY
             r = grid.radii[ai]
             v_radial[ai] = _radial_poisson_multipoles(r, rho_lm, l_of)
         # atoms may carry different radial sizes: reduce one flat buffer

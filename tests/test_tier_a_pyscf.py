@@ -46,7 +46,7 @@ pytestmark = pytest.mark.slow
 ALPHA = 0.7
 _L = {"s": 0, "p": 1, "d": 2}
 
-TEST_GRID = {"n_r": 50, "n_a": 18, "poisson_l_max": 8, "pair_n_r": 60, "pair_n_a": 20}
+TEST_GRID = {"n_r": 50, "n_a": 18, "poisson_l_max": 8, "pair": {"n_r": 60, "n_a": 20}}
 TOL_ENERGY_HA = 2e-3
 TOL_EPS_MAE_HA = 5e-4
 TOL_CHARGE_E = 2e-3
@@ -212,8 +212,8 @@ def test_energy_converges_to_pyscf(name):
     ref = _run_pyscf(geom, key, mult)["E"]
     grids = [
         TEST_GRID,
-        {"n_r": 70, "n_a": 24, "poisson_l_max": 10, "pair_n_r": 80, "pair_n_a": 26},
-        {"n_r": 90, "n_a": 30, "poisson_l_max": 10, "pair_n_r": 100, "pair_n_a": 30},
+        {"n_r": 70, "n_a": 24, "poisson_l_max": 10, "pair": {"n_r": 80, "n_a": 26}},
+        {"n_r": 90, "n_a": 30, "poisson_l_max": 10, "pair": {"n_r": 100, "n_a": 30}},
     ]
     gaps = [abs(_run_pyxany(name, geom, key, mult, g)["E"] - ref) for g in grids]
     assert gaps[2] < 5e-4

@@ -30,6 +30,7 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
             "n_electrons": float(mol.n_electrons),
         },
         "settings": config.to_dict(),
+        "grids": _grids(result, config),
         "scf": {
             "converged": bool(result.converged),
             "n_iterations": int(result.n_iterations),
@@ -138,6 +139,12 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
     if extra:
         out.update(extra)
     return out
+
+
+def _grids(result, config) -> dict:
+    from ..grid.summary import grid_summary
+
+    return grid_summary(config, result.grid, result.molecule, result.terms)
 
 
 def _finite_list(arr):

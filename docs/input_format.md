@@ -44,7 +44,6 @@ passivation:                # only for structures containing terminators
 
 basis:
   set:     dz               # sz szp dz dzp tz tzp tzpp | sto3g 631g 631gd | nao
-  nao_n_r: 2000             # radial points for the atomic solve behind 'nao'
 
 grid:
   n_r:              30      # radial points for second-row atoms (scaled per element)
@@ -52,8 +51,21 @@ grid:
   partition:        becke   # Becke fuzzy cells; 'none' is rejected, see below
   poisson_l_max:    auto    # multipole cut-off of the Hartree expansion (n_a - 1)
   screening_tol:    1.0e-10 # skip atom pairs that cannot overlap this much
-  pair_n_r:         40      # radial points of the two-centre S/T grids
-  pair_n_a:         14
+  n_r_by_element:   {}      # e.g. {Si: 40, Cd: 80}: overrides the per-element table
+  pruning:                  # fewer angular points on inner shells (ADR 0009)
+    enabled:        true
+    regions:        auto    # or [[r/R_Bragg bound, n_a], ...]; auto = [[0.25, n_a/3], [0.5, 2n_a/3]]
+  basis_cutoff:     1.0e-6  # drop basis functions below this on a block of points; 0 = dense
+  pair:                     # two-centre grids of the S and T matrices
+    n_r:            40
+    n_a:            14
+  atom:                     # log grid of the spherical atom solver (NAO basis,
+    n_points:       2000    #   SAD guess, pseudo-hydrogen exponents)
+  guess:                    # one-atom grid the SAD guess is projected on
+    n_r:            80
+    n_a:            14
+  one_centre:               # radial quadrature of one-centre non-Slater integrals
+    n_r:            400
   chunk_size:       auto    # points per chi block; auto uses memory_budget_mb
   memory_budget_mb: 4096
   radial_by_element: true   # false: every atom gets exactly n_r

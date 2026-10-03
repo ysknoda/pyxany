@@ -19,7 +19,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..kernels import chi_block_kernel, chi_grad_block_kernel, chi_hess_block_kernel
+from ..kernels import (
+    chi_all_kernel,
+    chi_block_kernel,
+    chi_grad_block_kernel,
+    chi_hess_block_kernel,
+)
 from .harmonics import solid_harmonic, solid_harmonic_grad
 
 _SAFE_R = 1e-14
@@ -37,6 +42,16 @@ def chi_matrix(basis, positions, points, out: np.ndarray | None = None) -> np.nd
     pts = np.ascontiguousarray(points, dtype=float)
     n_pts, n_bas = len(pts), len(basis)
     X = np.empty((n_pts, n_bas), dtype=float) if out is None else out
+
+    every = chi_all_kernel()
+    if every is not None and n_bas and all(f.kind == "sto" for f in basis):
+        pos = np.asarray(positions, dtype=float)
+        every(pos[[f.atom_idx for f in basis]],
+              np.array([f.norm for f in basis]), np.array([f.zeta for f in basis]),
+              np.array([f.n - 1 - f.l for f in basis], np.int64),
+              np.array([f.l for f in basis], np.int64),
+              np.array([f.m for f in basis], np.int64), pts, X)
+        return X
 
     fast = chi_block_kernel()
     for ai, idx in _atom_groups(basis).items():

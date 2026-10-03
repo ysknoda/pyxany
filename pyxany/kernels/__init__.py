@@ -47,6 +47,12 @@ def pair_gradient_terms_kernel():
     return mod.pair_gradient_terms if mod is not None else None
 
 
+def chi_all_kernel():
+    """Single-call STO evaluator for functions on many atoms, or None."""
+    mod = _numba()
+    return mod.chi_all if mod is not None else None
+
+
 def chi_grad_block_kernel():
     """Fast STO gradient evaluator, or None to use the generic numpy path."""
     mod = _numba()

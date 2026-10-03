@@ -14,6 +14,15 @@ _ANGSTROM = ("angstrom", "ang", "a")
 _BOHR = ("bohr", "au", "a.u.")
 
 
+def DEFAULT_PRUNING(n_a: int) -> list:
+    """Angular sizes of the inner regions for ``grid.pruning.regions: auto``.
+
+    Region bounds are fractions of the Bragg-Slater radius; see ADR 0009 for the
+    measurements behind them.
+    """
+    return [[0.25, max(4, n_a // 3)], [0.5, max(4, (2 * n_a) // 3)]]
+
+
 class ConfigError(ValueError):
     """Raised for anything wrong with an input file."""
 
@@ -62,7 +71,6 @@ class PassivationConfig:
 @dataclass
 class BasisConfig:
     set: str = "dz"
-    nao_n_r: int = 2000
 
     def validate(self, ctx: str) -> None:
         from .basis.gto import GTO_KEYS
@@ -86,8 +94,23 @@ class GridConfig:
     #: resolve; anything lower leaves a force error set by the truncation.
     poisson_l_max: Any = "auto"
     screening_tol: float = 1e-10
-    pair_n_r: int = 40
-    pair_n_a: int = 14
+    #: Radial points per element, overriding the ratio table (e.g. {Si: 40}).
+    n_r_by_element: dict = field(default_factory=dict)
+    #: Two-centre grids for the S and T matrices and their gradient.
+    pair: dict = field(default_factory=lambda: {"n_r": 40, "n_a": 14})
+    #: Logarithmic radial grid of the spherical atom solver (NAO basis, SAD
+    #: initial guess, pseudo-hydrogen exponents).
+    atom: dict = field(default_factory=lambda: {"n_points": 2000})
+    #: One-atom DV grid on which the SAD guess is projected onto the basis.
+    guess: dict = field(default_factory=lambda: {"n_r": 80, "n_a": 14})
+    #: Radial quadrature for one-centre integrals of non-Slater functions.
+    one_centre: dict = field(default_factory=lambda: {"n_r": 400})
+    #: Fewer angular points on the inner shells of the molecular grid (ADR 0009).
+    pruning: dict = field(default_factory=lambda: {"enabled": True, "regions": "auto"})
+    #: Basis functions below this magnitude on a block of grid points are
+    #: dropped from that block's matrix products; 0 disables (ADR 0009).
+    #: 1e-6 changes Si47H60 by 1.3e-6 Ha and 2e-7 Ha/Bohr (Q35).
+    basis_cutoff: float = 1e-6
     chunk_size: Any = "auto"
     memory_budget_mb: float = 4096.0
     #: Scale n_r per element (n_r is then the second-row size); see
@@ -128,6 +151,87 @@ class GridConfig:
             )
         if isinstance(self.chunk_size, str) and self.chunk_size != "auto":
             raise ConfigError(f"{ctx}: grid.chunk_size must be an integer or 'auto'")
+        self._validate_sub_grids(ctx)
+
+    #: defaults and lower bounds of the nested grid blocks
+    _SUBGRIDS = {
+        "pair": ({"n_r": 40, "n_a": 14}, {"n_r": 5, "n_a": 4}),
+        "atom": ({"n_points": 2000}, {"n_points": 500}),
+        "guess": ({"n_r": 80, "n_a": 14}, {"n_r": 5, "n_a": 4}),
+        "one_centre": ({"n_r": 400}, {"n_r": 50}),
+    }
+
+    def _validate_sub_grids(self, ctx: str) -> None:
+        from .data import elements as elem
+
+        for name, (defaults, minima) in self._SUBGRIDS.items():
+            block = getattr(self, name)
+            if not isinstance(block, dict):
+                raise ConfigError(f"{ctx}: grid.{name} must be a mapping")
+            unknown = set(block) - set(defaults)
+            if unknown:
+                raise ConfigError(f"{ctx}: grid.{name} has unknown key(s) {sorted(unknown)}. "
+                                  f"Valid keys: {sorted(defaults)}")
+            merged = {**defaults, **block}
+            for key, low in minima.items():
+                value = merged[key]
+                if isinstance(value, bool) or not isinstance(value, int) or value < low:
+                    raise ConfigError(f"{ctx}: grid.{name}.{key} must be an integer >= {low}; "
+                                      f"got {value!r}")
+            setattr(self, name, merged)
+
+        if not isinstance(self.n_r_by_element, dict):
+            raise ConfigError(f"{ctx}: grid.n_r_by_element must be a mapping like {{Si: 40}}")
+        for symbol, value in self.n_r_by_element.items():
+            try:
+                elem.atomic_number(str(symbol))
+            except (KeyError, ValueError):
+                raise ConfigError(f"{ctx}: grid.n_r_by_element: unknown element {symbol!r}")
+            if isinstance(value, bool) or not isinstance(value, int) or value < 5:
+                raise ConfigError(f"{ctx}: grid.n_r_by_element.{symbol} must be an integer "
+                                  f">= 5; got {value!r}")
+
+        if not isinstance(self.pruning, dict):
+            raise ConfigError(f"{ctx}: grid.pruning must be a mapping")
+        unknown = set(self.pruning) - {"enabled", "regions"}
+        if unknown:
+            raise ConfigError(f"{ctx}: grid.pruning has unknown key(s) {sorted(unknown)}. "
+                              f"Valid keys: ['enabled', 'regions']")
+        self.pruning = {"enabled": True, "regions": "auto", **self.pruning}
+        if not isinstance(self.pruning["enabled"], bool):
+            raise ConfigError(f"{ctx}: grid.pruning.enabled must be true or false")
+        regions = self.pruning["regions"]
+        if regions != "auto":
+            ok = isinstance(regions, list) and all(
+                isinstance(r, (list, tuple)) and len(r) == 2 for r in regions)
+            if ok:
+                bounds = [float(r[0]) for r in regions]
+                sizes = [r[1] for r in regions]
+                ok = (all(b > 0 for b in bounds) and bounds == sorted(bounds)
+                      and len(set(bounds)) == len(bounds)
+                      and all(isinstance(n, int) and 4 <= n <= self.n_a for n in sizes))
+            if not ok:
+                raise ConfigError(
+                    f"{ctx}: grid.pruning.regions must be 'auto' or a list of "
+                    f"[r/R_Bragg upper bound, n_a] pairs with increasing bounds and "
+                    f"4 <= n_a <= grid.n_a = {self.n_a}; got {regions!r}")
+
+        if not (isinstance(self.basis_cutoff, (int, float)) and 0 <= self.basis_cutoff < 1e-3):
+            raise ConfigError(f"{ctx}: grid.basis_cutoff must be in [0, 1e-3) (0 disables); "
+                              f"got {self.basis_cutoff!r}")
+
+    def pruning_regions(self) -> list:
+        """``[(r/R upper bound, n_a), ...]`` actually used; [] when pruning is off."""
+        if not self.pruning.get("enabled", True):
+            return []
+        regions = self.pruning.get("regions", "auto")
+        if regions == "auto":
+            regions = DEFAULT_PRUNING(self.n_a)
+        return [(float(b), int(n)) for b, n in regions if int(n) < self.n_a]
+
+    def n_r_for(self, symbol: str, scaled: int) -> int:
+        """Radial points for one element: explicit override, else the table."""
+        return int(self.n_r_by_element.get(symbol, scaled))
 
 
 @dataclass
@@ -311,6 +415,13 @@ class TransitionStateConfig:
                 raise ConfigError(f"{ctx}: {exc}") from None
 
 
+#: keys that were renamed; using the old name is an error that says where it went
+_MOVED = {
+    ("grid", "pair_n_r"): "grid: {pair: {n_r: ...}}",
+    ("grid", "pair_n_a"): "grid: {pair: {n_a: ...}}",
+    ("basis", "nao_n_r"): "grid: {atom: {n_points: ...}}",
+}
+
 _SECTIONS = {
     "molecule": MoleculeConfig,
     "passivation": PassivationConfig,
@@ -357,6 +468,10 @@ class Config:
             section = raw.get(name) or {}
             if not isinstance(section, dict):
                 raise ConfigError(f"{ctx}: section '{name}' must be a mapping")
+            for key in section:
+                if (name, key) in _MOVED:
+                    raise ConfigError(f"{ctx}: '{name}.{key}' has moved: write "
+                                      f"{_MOVED[(name, key)]} instead")
             valid = {f.name for f in fields(klass)}
             bad = set(section) - valid
             if bad:
@@ -396,6 +511,12 @@ class Config:
                     f"one of {', '.join(sorted(_SECTIONS))}"
                 )
             obj = getattr(self, section)
+            key, _, sub = key.partition(".")
+            if sub and isinstance(getattr(obj, key, None), dict):
+                block = dict(getattr(obj, key))
+                block[sub] = _coerce(block.get(sub, value), value, dotted)
+                setattr(obj, key, block)
+                continue
             if not hasattr(obj, key):
                 valid = ", ".join(sorted(f.name for f in fields(obj)))
                 raise ConfigError(

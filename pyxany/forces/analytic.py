@@ -185,8 +185,8 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
             basis,
             result.P,
             W_total,
-            n_r=config.grid.pair_n_r,
-            n_a=config.grid.pair_n_a,
+            n_r=config.grid.pair["n_r"],
+            n_a=config.grid.pair["n_a"],
             screening_tol=config.grid.screening_tol,
         )
         grad += nuclear_repulsion_gradient(molecule)

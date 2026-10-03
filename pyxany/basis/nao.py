@@ -39,11 +39,11 @@ def build_nao_basis(molecule, config, pseudo_zeta=None) -> list:
     """One NAO per (n, l, m) of each atom's self-consistent atomic solution."""
     functions: list = []
     xc_alpha = config.scf.alpha
-    n_points = max(int(config.basis.nao_n_r), 500)
+    n_points = int(config.grid.atom["n_points"])
 
     for ai, atom in enumerate(molecule):
         if atom.is_pseudo:
-            sol = pseudo_hydrogen_solution(round(float(atom.Z), 8), xc_alpha)
+            sol = pseudo_hydrogen_solution(round(float(atom.Z), 8), xc_alpha, n_points)
         else:
             sol = _atom_solution(atom.element, n_points, xc_alpha)
             if config.runtime.verbosity > 1:

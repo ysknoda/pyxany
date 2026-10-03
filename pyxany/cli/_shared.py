@@ -42,7 +42,7 @@ def _apply_passivation_basis(cfg, molecule) -> None:
         return
     from ..basis.pseudo_h import derive_exponents
 
-    cfg._pseudo_zeta = derive_exponents(molecule)
+    cfg._pseudo_zeta = derive_exponents(molecule, cfg.scf.alpha, cfg.grid.atom["n_points"])
 
 
 def build_molecule_basis(cfg, molecule):
@@ -69,16 +69,13 @@ def out_path(cfg, suffix: str) -> Path:
 
 
 def resource_estimate(cfg, molecule, basis) -> str:
-    """What ``--dry-run`` prints: grid size, memory and a rough cost estimate."""
-    from ..grid.molecular import radial_sizes
+    """What ``--dry-run`` prints: every grid, memory and a rough cost estimate."""
+    from ..grid.molecular import grid_from_config
+    from ..grid.summary import grid_summary, summary_lines
+    from ..scf.grid_terms import SparseBlocks, choose_strategy
 
-    n_ang = cfg.grid.n_a * 2 * cfg.grid.n_a
-    n_r_atom = (
-        radial_sizes(molecule, cfg.grid.n_r)
-        if cfg.grid.radial_by_element
-        else [cfg.grid.n_r] * len(molecule)
-    )
-    n_pts = int(sum(n_r_atom)) * n_ang
+    grid = grid_from_config(molecule, cfg.grid)
+    n_pts = len(grid)
     nb = len(basis)
     chi_mb = n_pts * nb * 8 / 1024**2
     n_lm = (cfg.grid.l_max + 1) ** 2
@@ -89,40 +86,44 @@ def resource_estimate(cfg, molecule, basis) -> str:
         f"  atoms                {len(molecule)}",
         f"  basis functions      {nb}",
         f"  electrons            {molecule.n_electrons:g}",
-        f"  grid points          {n_pts:,}  ({min(n_r_atom)}-{max(n_r_atom)} radial x "
-        f"{n_ang} angular per atom)",
-        f"  chi matrix           {chi_mb:,.1f} MB  (full, one rank)",
+        f"  grid points          {n_pts:,}",
+        f"  chi matrix           {chi_mb:,.1f} MB  (dense, one rank)",
         f"  S/T pairs            {_n_pairs(molecule, basis, cfg)} of "
         f"{len(molecule) * (len(molecule) - 1) // 2} after screening",
         f"  Hartree work         {hartree_ops:,.0f} harmonic evaluations per iteration"
         f"  (l_max = {cfg.grid.l_max})",
         f"  nb x nb matrices     {nb * nb * 8 / 1024**2:.1f} MB each",
+        "",
     ]
-    from ..grid import build_molecular_grid
-    from ..scf.grid_terms import choose_strategy
-
-    grid = build_molecular_grid(
-        molecule,
-        cfg.grid.n_r,
-        cfg.grid.n_a,
-        partition=cfg.grid.partition,
-        radial_by_element=cfg.grid.radial_by_element,
-    )
-    chunk = choose_strategy(grid, nb, cfg.grid.chunk_size, cfg.grid.memory_budget_mb)
     budget = cfg.grid.memory_budget_mb
-    if chunk is None:
+    sparse = None
+    if cfg.grid.basis_cutoff > 0:
+        # layout only (budget 0 keeps it from evaluating chi)
+        sparse = SparseBlocks(basis, molecule, grid.local_points, cfg.grid.basis_cutoff, 0.0)
+        cached = sparse.size_mb <= budget / 4.0
         lines.append(
-            f"  -> chi ({grid.chi_memory_mb(nb):.1f} MB/rank) fits the "
-            f"{budget:.0f} MB budget and will be cached"
+            f"  -> block-sparse chi: {sparse.stats()['kept_fraction']:.1%} kept, "
+            f"{sparse.size_mb:,.1f} MB/rank; "
+            + ("cached" if cached else f"exceeds a quarter of the {budget:.0f} MB budget, "
+               "rebuilt on every pass (one extra chi evaluation per SCF iteration)")
         )
     else:
-        lines.append(
-            f"  -> chi exceeds the {budget:.0f} MB budget; the grid will be "
-            f"walked in chunks of {chunk:,} points "
-            f"({grid.chi_memory_mb(nb, chunk):.1f} MB/rank), at the cost of "
-            f"one extra chi evaluation per SCF iteration"
-        )
-        lines.append("     (forces walk the grid in their own chunks within the same budget)")
+        chunk = choose_strategy(grid, nb, cfg.grid.chunk_size, budget)
+        if chunk is None:
+            lines.append(
+                f"  -> chi ({grid.chi_memory_mb(nb):.1f} MB/rank) fits the "
+                f"{budget:.0f} MB budget and will be cached"
+            )
+        else:
+            lines.append(
+                f"  -> chi exceeds the {budget:.0f} MB budget; the grid will be "
+                f"walked in chunks of {chunk:,} points "
+                f"({grid.chi_memory_mb(nb, chunk):.1f} MB/rank), at the cost of "
+                f"one extra chi evaluation per SCF iteration"
+            )
+    lines.append("     (forces walk the grid in their own chunks within the same budget)")
+    lines.append("")
+    lines.extend(summary_lines(grid_summary(cfg, grid, molecule, _Stats(sparse))))
     from ..parallel import SIZE
 
     if SIZE > 1:
@@ -131,6 +132,13 @@ def resource_estimate(cfg, molecule, basis) -> str:
             f"holds about 1/{SIZE} of the points above"
         )
     return "\n".join(lines)
+
+
+class _Stats:
+    """Adapter so grid_summary can report a layout-only SparseBlocks."""
+
+    def __init__(self, sparse):
+        self.sparsity = None if sparse is None else sparse.stats()
 
 
 def _n_pairs(cfg_molecule, basis, cfg) -> int:

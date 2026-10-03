@@ -13,3 +13,4 @@ consequences. Status is one of `Proposed`, `Accepted`, `Superseded by NNNN`.
 | [0006](0006-slater-transition-state.md) | Slater transition-state method | Accepted |
 | [0007](0007-implementation-order.md) | Implementation order | Accepted |
 | [0008](0008-future-work.md) | Deferred work (backlog) | Accepted |
+| [0009](0009-grid-settings-pruning-sparsity.md) | All grids in the input; angular pruning; block-sparse basis | Accepted |

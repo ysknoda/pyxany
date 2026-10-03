@@ -34,17 +34,17 @@ def _I(k: int, s: float) -> float:
     return math.factorial(k) / s ** (k + 1) if k >= 0 else 0.0
 
 
-def overlap_1c(bf_i, bf_j) -> float:
+def overlap_1c(bf_i, bf_j, n_r: int = RADIAL_POINTS) -> float:
     """<chi_i | chi_j> for two functions on the same centre."""
     if not _same_angular(bf_i, bf_j):
         return 0.0
     if bf_i.kind == "sto" and bf_j.kind == "sto":
         return bf_i.norm * bf_j.norm * _I(bf_i.n + bf_j.n, bf_i.zeta + bf_j.zeta)
-    r, w = _radial_quadrature()
+    r, w = _radial_quadrature(n_r)
     return float(np.dot(w, bf_i.radial(r) * bf_j.radial(r) * r * r))
 
 
-def kinetic_1c(bf_i, bf_j) -> float:
+def kinetic_1c(bf_i, bf_j, n_r: int = RADIAL_POINTS) -> float:
     """<chi_i | -1/2 laplacian | chi_j> for two functions on the same centre.
 
     Closed form for Slater pairs, using the exact Laplacian of
@@ -66,7 +66,7 @@ def kinetic_1c(bf_i, bf_j) -> float:
             - 2.0 * nj * zj * _I(ni + nj - 1, s)
             + zj * zj * _I(ni + nj, s)
         )
-    r, w = _radial_quadrature()
+    r, w = _radial_quadrature(n_r)
     integrand = bf_i.radial(r) * bf_j.laplacian_radial(r) * r ** bf_j.l * r * r
     return -0.5 * float(np.dot(w, integrand))
 

@@ -89,7 +89,8 @@ def spin_split(P: np.ndarray, molecule, basis, n_alpha: float, n_beta: float):
     return P_a, P_b
 
 
-def sad_density(molecule, basis, xc_alpha: float = 0.7) -> np.ndarray:
+def sad_density(molecule, basis, xc_alpha: float = 0.7, n_points: int = 2000,
+                grid_size: tuple[int, int] = (80, 14)) -> np.ndarray:
     """Superposition of atomic densities, each projected onto the molecular basis.
 
     For every species the spherical X-alpha atom is solved on its logarithmic
@@ -100,8 +101,9 @@ def sad_density(molecule, basis, xc_alpha: float = 0.7) -> np.ndarray:
     diagonal occupation guess this carries the cross terms of contracted and
     multiple-zeta functions: the first SCF energy of H2O/DZ is within a few
     hartree of the converged one instead of 20 Ha above it. The overlaps are
-    quadratures on a fine one-atom DV grid, so no normalisation convention of
-    the basis or the harmonics enters.
+    quadratures on a fine one-atom DV grid (``grid_size`` = n_r, n_a; input
+    ``grid.guess``), so no normalisation convention of the basis or the
+    harmonics enters. ``n_points`` is the atom solver's grid (``grid.atom``).
     """
     import copy
 
@@ -131,14 +133,14 @@ def sad_density(molecule, basis, xc_alpha: float = 0.7) -> np.ndarray:
                 local.append(g)
             lone = copy.copy(atom)
             lone.pos = np.zeros(3)
-            grid = build_molecular_grid(Molecule([lone], name=atom.symbol), 80, 14,
+            grid = build_molecular_grid(Molecule([lone], name=atom.symbol), *grid_size,
                                         radial_by_element=False)
             chi = chi_matrix(local, np.zeros((1, 3)), grid.points)
             wchi = chi * grid.weights[:, None]
             S_loc = chi.T @ wchi
             r = np.linalg.norm(grid.points, axis=1)
-            sol = (pseudo_hydrogen_solution(round(float(atom.Z), 8), xc_alpha) if atom.is_pseudo
-                   else _atom_solution(atom.element, 2000, xc_alpha))
+            sol = (pseudo_hydrogen_solution(round(float(atom.Z), 8), xc_alpha, n_points)
+                   if atom.is_pseudo else _atom_solution(atom.element, n_points, xc_alpha))
             Pa = np.zeros((len(idx), len(idx)))
             for (_, l), orb in sol.orbitals.items():
                 if orb.occupation <= 0 or orb.spline is None:

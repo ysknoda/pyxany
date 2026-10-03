@@ -44,12 +44,16 @@ from .atomic_solver import solve_atom
 
 
 @lru_cache(maxsize=64)
-def pseudo_hydrogen_solution(alpha: float, xc_alpha: float = DEFAULT_ALPHA):
-    """Self-consistent spherical X-alpha solution for a fractional-charge H."""
+def pseudo_hydrogen_solution(alpha: float, xc_alpha: float = DEFAULT_ALPHA,
+                             n_points: int = 2000):
+    """Self-consistent spherical X-alpha solution for a fractional-charge H.
+
+    ``n_points`` is the logarithmic radial grid (``grid.atom.n_points``).
+    """
     if alpha <= 0:
         raise ValueError(f"pseudo-hydrogen charge must be positive, got {alpha}")
     return solve_atom(Z=float(alpha), occupations={(1, 0): float(alpha)},
-                      alpha=xc_alpha, n_points=2000,
+                      alpha=xc_alpha, n_points=n_points,
                       r_max=max(60.0, 60.0 / max(alpha, 0.2)))
 
 
@@ -62,26 +66,26 @@ def _hydrogen_reference_zeta() -> float:
 
 
 @lru_cache(maxsize=64)
-def _calibration(xc_alpha: float) -> float:
-    return _hydrogen_reference_zeta() / _raw_zeta(1.0, xc_alpha)
+def _calibration(xc_alpha: float, n_points: int = 2000) -> float:
+    return _hydrogen_reference_zeta() / _raw_zeta(1.0, xc_alpha, n_points)
 
 
 def pseudo_hydrogen_zeta(alpha: float, xc_alpha: float = DEFAULT_ALPHA,
-                         calibrate: bool = True) -> float:
+                         calibrate: bool = True, n_points: int = 2000) -> float:
     """1s Slater exponent for a pseudo-hydrogen of fractional charge ``alpha``."""
-    raw = _raw_zeta(float(alpha), xc_alpha)
-    return raw * _calibration(xc_alpha) if calibrate else raw
+    raw = _raw_zeta(float(alpha), xc_alpha, n_points)
+    return raw * _calibration(xc_alpha, n_points) if calibrate else raw
 
 
 @lru_cache(maxsize=64)
-def _raw_zeta(alpha: float, xc_alpha: float = DEFAULT_ALPHA) -> float:
+def _raw_zeta(alpha: float, xc_alpha: float = DEFAULT_ALPHA, n_points: int = 2000) -> float:
     """Exponent of the Slater 1s with maximum overlap on the atomic solution.
 
     For a nodeless function maximising the overlap is equivalent to a
     least-squares fit, and the overlap is unimodal in zeta, so golden-section
     search finds the optimum without derivatives.
     """
-    sol = pseudo_hydrogen_solution(alpha, xc_alpha)
+    sol = pseudo_hydrogen_solution(alpha, xc_alpha, n_points)
     orb = sol.orbitals.get((1, 0))
     if orb is None:  # pragma: no cover - would mean the atomic solve failed
         raise RuntimeError(f"could not solve the pseudo-hydrogen atom for alpha={alpha}")
@@ -107,12 +111,14 @@ def _raw_zeta(alpha: float, xc_alpha: float = DEFAULT_ALPHA) -> float:
     return 0.5 * (lo + hi)
 
 
-def derive_exponents(molecule, xc_alpha: float = DEFAULT_ALPHA) -> dict[str, float]:
+def derive_exponents(molecule, xc_alpha: float = DEFAULT_ALPHA,
+                     n_points: int = 2000) -> dict[str, float]:
     """``{species_label: zeta}`` for every pseudo-hydrogen species in ``molecule``."""
     out: dict[str, float] = {}
     for atom in molecule:
         if atom.is_pseudo and atom.symbol not in out:
-            out[atom.symbol] = pseudo_hydrogen_zeta(round(float(atom.Z), 8), xc_alpha)
+            out[atom.symbol] = pseudo_hydrogen_zeta(round(float(atom.Z), 8), xc_alpha,
+                                                    n_points=n_points)
     return out
 
 
