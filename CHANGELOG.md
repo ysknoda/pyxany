@@ -131,6 +131,11 @@
 
 ### Performance
 
+- **Lebedev angular grids** (`grid.angular: lebedev`): the Lebedev rule of
+  the same degree as the n_a x 2n_a product grid on every shell, ~2/3 of the
+  points. Not uniformly as accurate at equal degree (ADR 0009 table), so the
+  default stays `product`. Requires scipy >= 1.15 (`lebedev_rule`).
+
 - **Every grid is set in the input file** (ADR 0009): `grid.pair`,
   `grid.atom`, `grid.guess`, `grid.one_centre` and `grid.n_r_by_element`
   join `n_r` / `n_a`; omitted values keep the previous behaviour. The old

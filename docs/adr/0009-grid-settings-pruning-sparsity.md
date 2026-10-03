@@ -22,6 +22,7 @@ converged by a user.
 | `n_r_by_element` | per-element radial size, overrides the ratio table | `{}` |
 | `pruning` | inner-shell angular reduction (below) | on, `auto` |
 | `basis_cutoff` | block-sparse basis (below) | 1e-6 |
+| `angular` | angular rule: `product` or `lebedev` | product |
 | `pair: {n_r, n_a}` | two-centre S/T grids (was `pair_n_r`, `pair_n_a`) | 40, 14 |
 | `atom: {n_points}` | atom solver log grid: NAO basis, SAD, pseudo-H (was `basis.nao_n_r`) | 2000 |
 | `guess: {n_r, n_a}` | one-atom grid of the SAD projection | 80, 14 |
@@ -94,9 +95,28 @@ A single numba kernel now evaluates all Slater functions of a block in one
 call (per-atom calls cost one thread launch each); this also halves chi
 evaluation on the dense path.
 
-### Lebedev grids (Q34)
+### Lebedev grids (Q34, then Q36-Q38)
 
-Deferred to ADR 0008.
+`grid.angular: lebedev` replaces the n_a x 2n_a product rule on every shell
+(pruned ones included) by the Lebedev rule of the same polynomial degree,
+order >= 2 n_a - 1 (Lebedev & Laikov 1999, from `scipy.integrate.lebedev_rule`;
+scipy >= 1.15). It resolves the same multipoles (l <= n_a - 1), so pruning and
+`poisson_l_max` are unchanged. n_a <= 66.
+
+Measured against product n_a = 20 unpruned, pruning on (|dE| Ha / max|dF| Ha/Bohr):
+
+| system | product n_a=12 | Lebedev n_a=12 (67 % pts) | Lebedev n_a=14 (~92 % pts) |
+|---|---|---|---|
+| CO | 6.3e-4 / 6.9e-3 | 4.7e-5 / 1.1e-3 | 3.3e-4 / 2.3e-3 |
+| H2O | 1.0e-5 / 6.7e-5 | 7.3e-6 / 1.9e-4 | 8.9e-6 / 7.0e-5 |
+| Si5H12 | 1.2e-3 / 6.4e-4 | 1.7e-3 / 8.8e-4 | 4.6e-4 / 4.5e-4 |
+| GaAs4 | 8.2e-3 / 6.8e-3 | 1.7e-2 / 9.2e-3 | 9.8e-3 / 3.2e-3 |
+
+At the same degree Lebedev saves a third of the points but is not uniformly
+as accurate (better on CO, worse on the heavier clusters); at a near-equal
+point count it gives equal or smaller force errors in all four, with the
+GaAs4 energy slightly worse. The default stays `product` (Q38 measured, see
+the decision recorded with the user); Lebedev is an option.
 
 ## Consequences
 

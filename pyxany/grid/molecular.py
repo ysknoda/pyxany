@@ -14,7 +14,7 @@ import numpy as np
 
 from ..parallel import local_slice
 from ..timing import timer
-from .angular import spherical_product
+from .angular import angular_grid, spherical_product
 from .becke import DEFAULT_STIFFNESS, becke_weights
 from .radial import log_squared_map, treutler_ahlrichs_m4
 
@@ -56,6 +56,8 @@ class Grid:
     #: Angular pruning: per atom, ``[(shell_lo, shell_hi, n_a), ...]`` contiguous
     #: runs of radial shells sharing one angular grid (None: every shell uses n_a).
     segments: list = None
+    #: Angular rule: "product" (n_a x 2 n_a) or "lebedev" (same degree).
+    angular: str = "product"
     _slice: slice = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
@@ -68,8 +70,12 @@ class Grid:
             return
         if self.segments is None:
             self.segments = [[(0, int(n), self.n_a)] for n in self.n_r_atom]
-        sizes = [sum((hi - lo) * 2 * na * na for lo, hi, na in seg) for seg in self.segments]
+        sizes = [sum((hi - lo) * self.n_ang(na) for lo, hi, na in seg) for seg in self.segments]
         self._starts = np.concatenate([[0], np.cumsum(sizes)]).astype(int)
+
+    def n_ang(self, na: int) -> int:
+        """Angular points of a shell at accuracy level ``na``."""
+        return len(angular_grid(self.angular, na)[0])
 
     @property
     def pruned(self) -> bool:
@@ -79,11 +85,11 @@ class Grid:
         """Yield ``(shell_lo, shell_hi, n_a, rows)`` for atom ``ai``'s angular runs.
 
         ``rows`` is the slice of the full grid holding those shells, ordered
-        shell-major, so ``values[rows].reshape(shell_hi - shell_lo, 2 n_a^2)``.
+        shell-major, so ``values[rows].reshape(shell_hi - shell_lo, n_ang(n_a))``.
         """
         start = int(self._starts[ai])
         for lo, hi, na in self.segments[ai]:
-            n = (hi - lo) * 2 * na * na
+            n = (hi - lo) * self.n_ang(na)
             yield lo, hi, na, slice(start, start + n)
             start += n
 
@@ -168,6 +174,7 @@ def build_molecular_grid(
     radial_by_element: bool = True,
     n_r_by_element: dict | None = None,
     pruning: list | None = None,
+    angular: str = "product",
 ) -> Grid:
     """Superposition of atom-centred TA-radial x Gauss-Legendre-angular grids.
 
@@ -192,7 +199,7 @@ def build_molecular_grid(
     production calculations.
     """
     with timer("grid.build"):
-        dirs, w_ang = spherical_product(n_a)
+        dirs, w_ang = angular_grid(angular, n_a)
 
         n_r_atom = radial_sizes(molecule, n_r) if radial_by_element \
             else np.full(len(molecule), n_r, dtype=int)
@@ -200,7 +207,7 @@ def build_molecular_grid(
             n_r_atom = np.array([n_r_by_element.get(a.element, n) for a, n in
                                  zip(molecule, n_r_atom, strict=True)], dtype=int)
         regions = sorted(pruning or [])
-        angular = {n_a: (dirs, w_ang)}
+        angular_sets = {n_a: (dirs, w_ang)}
         all_pts, all_wts, all_owner, all_radii, segments = [], [], [], [], []
         for ai, atom in enumerate(molecule):
             r, w_r = treutler_ahlrichs_m4(int(n_r_atom[ai]), atom.grid_radius())
@@ -217,9 +224,9 @@ def build_molecular_grid(
                     seg.append([k, k + 1, int(shell_na[k])])
             segments.append([tuple(x) for x in seg])
             for lo, hi, na in seg:
-                if na not in angular:
-                    angular[na] = spherical_product(na)
-                d, wa = angular[na]
+                if na not in angular_sets:
+                    angular_sets[na] = angular_grid(angular, na)
+                d, wa = angular_sets[na]
                 rr, ww = r[lo:hi], w_r[lo:hi]
                 # outer product of radial and angular grids
                 all_pts.append((rr[:, None, None] * d[None, :, :]).reshape(-1, 3) + atom.pos)
@@ -252,7 +259,7 @@ def build_molecular_grid(
                     raw_weights=raw_weights, cell_weights=cell,
                     directions=dirs, angular_weights=w_ang,
                     radii=all_radii, n_atoms=len(molecule), n_r_atom=n_r_atom,
-                    segments=segments)
+                    segments=segments, angular=angular)
 
 
 def grid_from_config(molecule, grid_cfg, n_r: int | None = None, n_a: int | None = None):
@@ -273,7 +280,7 @@ def grid_from_config(molecule, grid_cfg, n_r: int | None = None, n_a: int | None
     return build_molecular_grid(molecule, n_r, n_a, partition=grid_cfg.partition,
                                 radial_by_element=grid_cfg.radial_by_element,
                                 n_r_by_element=grid_cfg.n_r_by_element or None,
-                                pruning=pruning)
+                                pruning=pruning, angular=grid_cfg.angular)
 
 
 def radial_sizes(molecule, n_r: int) -> np.ndarray:

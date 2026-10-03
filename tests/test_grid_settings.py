@@ -194,3 +194,37 @@ def test_every_grid_is_reported(h2o):
     text = "\n".join(summary_lines(d))
     for word in ("molecular", "pair", "atom", "guess", "one-centre", "basis cutoff"):
         assert word in text
+
+
+# -- Lebedev angular grids --------------------------------------------------
+
+
+@pytest.mark.parametrize("n_a", [4, 8, 12, 15])
+def test_lebedev_grid_matches_the_product_grid_degree(n_a):
+    """Both rules must integrate Y_lm Y_l'm' exactly for l, l' <= n_a - 1."""
+    from pyxany.basis.solid_harmonics import real_spherical_harmonics
+    from pyxany.grid.angular import angular_grid
+
+    d, w = angular_grid("lebedev", n_a)
+    assert len(d) < len(angular_grid("product", n_a)[0])
+    assert w.sum() == pytest.approx(4 * np.pi, rel=1e-13)
+    Y = real_spherical_harmonics(n_a - 1, d[:, 0], d[:, 1], d[:, 2], np.ones(len(d)))
+    gram = (Y * w[:, None]).T @ Y
+    assert np.abs(gram - np.eye(len(gram))).max() < 1e-12
+
+
+def test_lebedev_scf_is_close_to_the_product_grid(h2o):
+    def run(angular):
+        cfg = make_config(grid={"n_r": 30, "n_a": 14, "angular": angular})
+        res = run_scf(h2o, build_basis(h2o, cfg), cfg, verbose=0)
+        return res
+
+    leb, prod = run("lebedev"), run("product")
+    assert len(leb.grid) < 0.8 * len(prod.grid)
+    assert leb.energies["n_electrons_integrated"] == pytest.approx(10.0, abs=1e-3)
+    assert abs(leb.total_energy - prod.total_energy) < 1e-4
+
+
+def test_unknown_angular_rule_is_rejected():
+    with pytest.raises(ConfigError, match="angular"):
+        make_config(grid={"n_r": 25, "n_a": 10, "angular": "lebedov"})

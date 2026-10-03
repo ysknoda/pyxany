@@ -49,6 +49,7 @@ grid:
   n_r:              30      # radial points for second-row atoms (scaled per element)
   n_a:              12      # polar points per atom (2*n_a azimuthal)
   partition:        becke   # Becke fuzzy cells; 'none' is rejected, see below
+  angular:          product # product (n_a x 2n_a) | lebedev (same degree, ~2/3 the points)
   poisson_l_max:    auto    # multipole cut-off of the Hartree expansion (n_a - 1)
   screening_tol:    1.0e-10 # skip atom pairs that cannot overlap this much
   n_r_by_element:   {}      # e.g. {Si: 40, Cd: 80}: overrides the per-element table

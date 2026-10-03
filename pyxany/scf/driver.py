@@ -190,7 +190,8 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
             how = ("cached" if terms.cached
                    else f"chunked, {chunk:,} points at a time")
         mpi_print(f"  DV grid            : {len(grid)} points "
-                  f"({_radial_summary(grid)}r x {grid.n_a}th x {2 * grid.n_a}ph per atom), "
+                  f"({_radial_summary(grid)}r x {grid.n_ang(grid.n_a)} {grid.angular} "
+                  f"angular per atom), "
                   f"chi {sp['chi_mb'] if sp else grid.chi_memory_mb(n_basis, chunk):.1f} "
                   f"MB/rank ({how})")
         if verbose > 1:

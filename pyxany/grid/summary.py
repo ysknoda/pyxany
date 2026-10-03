@@ -15,7 +15,7 @@ def grid_summary(cfg, grid, molecule, terms=None) -> dict:
     by_element: dict[str, int] = {}
     for atom, n in sorted(zip(molecule, grid.n_r_atom, strict=True), key=lambda x: x[0].Z):
         by_element.setdefault(atom.symbol, int(n))
-    unpruned = int(sum(int(n) * 2 * grid.n_a * grid.n_a for n in grid.n_r_atom))
+    unpruned = int(sum(int(n) * grid.n_ang(grid.n_a) for n in grid.n_r_atom))
     regions = []
     if grid.segments is not None and grid.pruned:
         regions = [[b, n] for b, n in _regions_used(cfg, grid.n_a)]
@@ -23,7 +23,8 @@ def grid_summary(cfg, grid, molecule, terms=None) -> dict:
         "molecular": {
             "n_r_input": int(g.n_r),
             "n_a": int(grid.n_a),
-            "angular_points_per_shell": 2 * int(grid.n_a) ** 2,
+            "angular": grid.angular,
+            "angular_points_per_shell": grid.n_ang(grid.n_a),
             "radial_points_by_species": by_element,
             "pruning_regions": regions,
             "points": int(len(grid)),
@@ -52,6 +53,14 @@ def _regions_used(cfg, n_a: int) -> list:
     return [(float(b), int(n)) for b, n in regions if int(n) < n_a]
 
 
+def _angular(kind: str, n_a: int) -> str:
+    from .angular import angular_grid, lebedev_order_for
+
+    if kind == "lebedev":
+        return f"Lebedev order {lebedev_order_for(n_a)} ({len(angular_grid(kind, n_a)[0])} pts)"
+    return f"{n_a} x {2 * n_a}"
+
+
 def summary_lines(d: dict) -> list[str]:
     """Text block for the reports."""
     m = d["molecular"]
@@ -60,10 +69,11 @@ def summary_lines(d: dict) -> list[str]:
         "  INTEGRATION GRIDS",
         "  " + "-" * 62,
         f"  molecular   {m['points']:,} points; radial {species}; "
-        f"angular {m['n_a']} x {2 * m['n_a']}",
+        f"angular {_angular(m['angular'], m['n_a'])}",
     ]
     if m["pruning_regions"]:
-        regs = ", ".join(f"r < {b:g} R: {n} x {2 * n}" for b, n in m["pruning_regions"])
+        regs = ", ".join(f"r < {b:g} R: {_angular(m['angular'], n)}"
+                         for b, n in m["pruning_regions"])
         lines.append(
             f"              pruned ({regs}); "
             f"{m['points'] / max(1, m['points_unpruned']):.0%} of "

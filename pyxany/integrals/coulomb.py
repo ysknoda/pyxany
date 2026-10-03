@@ -184,9 +184,9 @@ def hartree_potential(grid, rho: np.ndarray, positions: np.ndarray,
 
         def kernel(na: int) -> np.ndarray:
             if na not in kernels:
-                from ..grid.angular import spherical_product
+                from ..grid.angular import angular_grid
 
-                d0, w0 = spherical_product(na)
+                d0, w0 = angular_grid(grid.angular, na)
                 n_lm = (min(l_max, na - 1) + 1) ** 2
                 Y = real_spherical_harmonics(min(l_max, na - 1), d0[:, 0], d0[:, 1],
                                              d0[:, 2], np.ones(len(d0)))

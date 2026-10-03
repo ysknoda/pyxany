@@ -14,7 +14,6 @@ Not in the current scope; recorded so the decision to defer is explicit.
 | XANES / XES spectra from transition-state dipole intensities | Builds on ADR 0006 (c). |
 | Correlation functional (e.g. VWN5) | Changes the code's identity as an X-alpha code; separate decision. |
 | Point-group symmetry | Large effort; performance and labelling benefit only. |
-| Lebedev angular grids (Q34) | ~2/3 of the product-grid points at equal accuracy; needs the point/weight tables and a Hartree projection that does not assume the product structure. |
 | Vibrational frequencies (finite-difference Hessian of analytic forces) | Low priority for current use. |
 
 ## Resolved since this ADR was written
@@ -43,3 +42,4 @@ Not in the current scope; recorded so the decision to defer is explicit.
   no measurable gain.
 - **Large-cluster SCF divergence** -- caused by the initial guess; replaced by
   a superposition of atomic densities (ADR 0007, step 8 outcome).
+- **Lebedev angular grids** -- available as `grid.angular: lebedev` (ADR 0009).

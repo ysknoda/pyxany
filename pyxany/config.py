@@ -90,6 +90,9 @@ class GridConfig:
     n_r: int = 30
     n_a: int = 12
     partition: str = "becke"
+    #: Angular rule of the molecular grid: "product" (n_a x 2 n_a Gauss-Legendre
+    #: x uniform) or "lebedev" (the Lebedev rule of the same degree, ~2/3 the points).
+    angular: str = "product"
     #: 'auto' resolves to n_a - 1, the highest multipole the angular grid can
     #: resolve; anything lower leaves a force error set by the truncation.
     poisson_l_max: Any = "auto"
@@ -151,6 +154,12 @@ class GridConfig:
             )
         if isinstance(self.chunk_size, str) and self.chunk_size != "auto":
             raise ConfigError(f"{ctx}: grid.chunk_size must be an integer or 'auto'")
+        if self.angular not in ("product", "lebedev"):
+            raise ConfigError(f"{ctx}: grid.angular must be 'product' or 'lebedev'; "
+                              f"got {self.angular!r}")
+        if self.angular == "lebedev" and self.n_a > 66:
+            raise ConfigError(f"{ctx}: grid.angular: lebedev supports n_a <= 66 "
+                              f"(Lebedev order 131); got n_a = {self.n_a}")
         self._validate_sub_grids(ctx)
 
     #: defaults and lower bounds of the nested grid blocks
