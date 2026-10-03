@@ -248,7 +248,11 @@ class SCFConfig:
     max_iter: int = 100
     e_tol: float = 1e-6
     d_tol: float = 1e-5
-    alpha: float = 0.7
+    #: X-alpha parameter: a number for every element (default 0.7, ADR 0002),
+    #: "alpha_hf" for the recomputed Schwarz alpha_HF table, or a mapping
+    #: ``{default: 0.7, Si: 0.73}``; between atoms the Becke-weighted mean
+    #: (ADR 0011). Pseudo-hydrogens use hydrogen's value.
+    alpha: Any = 0.7
     unrestricted: bool = False
     smearing: float = 0.0
     s_threshold: float = 5e-4
@@ -260,8 +264,27 @@ class SCFConfig:
     checkpoint_every: int = 0
 
     def validate(self, ctx: str) -> None:
-        if not (0.0 < self.alpha <= 2.0):
-            raise ConfigError(f"{ctx}: scf.alpha must be in (0, 2]; got {self.alpha}")
+        a = self.alpha
+        if isinstance(a, str) and a.strip().replace(".", "", 1).isdigit():
+            self.alpha = a = float(a)                  # --set scf.alpha=0.75
+        if isinstance(a, str):
+            if a != "alpha_hf":
+                raise ConfigError(f"{ctx}: scf.alpha must be a number, 'alpha_hf' or a "
+                                  f"mapping like {{default: 0.7, Si: 0.73}}; got {a!r}")
+        elif isinstance(a, dict):
+            from .data import elements as elem
+
+            for key, value in a.items():
+                if key != "default":
+                    try:
+                        elem.atomic_number(str(key))
+                    except (KeyError, ValueError):
+                        raise ConfigError(f"{ctx}: scf.alpha: unknown element {key!r}") from None
+                if isinstance(value, bool) or not isinstance(value, (int, float)) \
+                        or not 0.0 < value <= 2.0:
+                    raise ConfigError(f"{ctx}: scf.alpha.{key} must be in (0, 2]; got {value!r}")
+        elif isinstance(a, bool) or not isinstance(a, (int, float)) or not 0.0 < a <= 2.0:
+            raise ConfigError(f"{ctx}: scf.alpha must be in (0, 2]; got {a!r}")
         if self.max_iter < 1:
             raise ConfigError(f"{ctx}: scf.max_iter must be >= 1")
         for name in ("mix_ediis", "mix_diis"):
@@ -272,6 +295,43 @@ class SCFConfig:
             raise ConfigError(f"{ctx}: scf.smearing must be >= 0")
         if self.checkpoint_every < 0:
             raise ConfigError(f"{ctx}: scf.checkpoint_every must be >= 0 (0 = only at the end)")
+
+    def alpha_for(self, element: str) -> float:
+        """The X-alpha parameter of one element (pseudo-hydrogens: pass 'H')."""
+        a = self.alpha
+        if isinstance(a, (int, float)):
+            return float(a)
+        if a == "alpha_hf":
+            from .data.loaders import alpha_hf_table
+
+            try:
+                table = alpha_hf_table()
+            except FileNotFoundError:
+                raise ConfigError("scf.alpha: alpha_hf: the table has not been built yet "
+                                  "(tools/alpha_hf.py, ADR 0011)") from None
+            if element not in table:
+                raise ConfigError(f"scf.alpha: alpha_hf: no value for {element}")
+            return float(table[element])
+        return float(a.get(element, a.get("default", 0.7)))
+
+    @property
+    def uniform_alpha(self) -> float | None:
+        """The single alpha of a uniform setting, or None when it varies by element."""
+        a = self.alpha
+        if isinstance(a, (int, float)):
+            return float(a)
+        if isinstance(a, dict) and set(a) <= {"default"}:
+            return float(a.get("default", 0.7))
+        return None
+
+    @property
+    def alpha_label(self) -> str:
+        a = self.alpha
+        if isinstance(a, (int, float)):
+            return f"{a:g}"
+        if a == "alpha_hf":
+            return "alpha_HF (by element)"
+        return "by element " + ", ".join(f"{k} {v:g}" for k, v in a.items())
 
 
 @dataclass

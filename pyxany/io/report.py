@@ -19,7 +19,7 @@ def format_results(result, config, forces=None, dipole=None) -> str:
     mol, basis = result.molecule, result.basis
 
     w("=" * 78)
-    w(f"  RESULTS  {mol.name}   basis {config.basis.set.upper()}   alpha_xc {config.scf.alpha}")
+    w(f"  RESULTS  {mol.name}   basis {config.basis.set.upper()}   alpha_xc {config.scf.alpha_label}")
     w("=" * 78)
     w("")
     w(f"  {mol.summary()}")

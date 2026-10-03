@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Element-specific X-alpha** (ADR 0011): `scf.alpha` takes a mapping
+  `{default: 0.7, Si: 0.73}` (or `alpha_hf` once its table is built), mixed
+  between atoms with the Becke weights; forces include the moving-weight
+  term (finite differences to the grid error). Spin-polarised atom solver
+  and `tools/alpha_hf.py` for the recomputed alpha_HF table.
+
 - **Point-charge (Madelung) embedding** (ADR 0010): `embedding.charges`
   reads fixed Gaussian point charges; `pyxany embed` builds them from a
   crystal as a neutral, dipole-free Evjen block (rock-salt Madelung constant
@@ -65,6 +71,11 @@
   errors).
 
 ### Fixed
+
+- **Analytic UKS forces were wrong** since the grid-derivative terms were
+  added (4f4746c): the exchange-energy density in those terms was twice its
+  value (0.46 Ha/Bohr on closed-shell H2O run as UKS). Open-shell forces and
+  optimisations from that period should be repeated.
 
 - **`--no-figure` had no effect**: the flag was parsed but never applied, so
   `run` wrote the figures whenever the input enabled them.

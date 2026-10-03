@@ -89,7 +89,7 @@ def spin_split(P: np.ndarray, molecule, basis, n_alpha: float, n_beta: float):
     return P_a, P_b
 
 
-def sad_density(molecule, basis, xc_alpha: float = 0.7, n_points: int = 2000,
+def sad_density(molecule, basis, xc_alpha=0.7, n_points: int = 2000,
                 grid_size: tuple[int, int] = (80, 14)) -> np.ndarray:
     """Superposition of atomic densities, each projected onto the molecular basis.
 
@@ -104,6 +104,8 @@ def sad_density(molecule, basis, xc_alpha: float = 0.7, n_points: int = 2000,
     quadratures on a fine one-atom DV grid (``grid_size`` = n_r, n_a; input
     ``grid.guess``), so no normalisation convention of the basis or the
     harmonics enters. ``n_points`` is the atom solver's grid (``grid.atom``).
+    ``xc_alpha`` is a number or a function of the element symbol
+    (``scf.alpha_for``); pseudo-hydrogens use hydrogen's value.
     """
     import copy
 
@@ -139,8 +141,10 @@ def sad_density(molecule, basis, xc_alpha: float = 0.7, n_points: int = 2000,
             wchi = chi * grid.weights[:, None]
             S_loc = chi.T @ wchi
             r = np.linalg.norm(grid.points, axis=1)
-            sol = (pseudo_hydrogen_solution(round(float(atom.Z), 8), xc_alpha, n_points)
-                   if atom.is_pseudo else _atom_solution(atom.element, n_points, xc_alpha))
+            a_x = xc_alpha("H" if atom.is_pseudo else atom.element) if callable(xc_alpha) \
+                else xc_alpha
+            sol = (pseudo_hydrogen_solution(round(float(atom.Z), 8), a_x, n_points)
+                   if atom.is_pseudo else _atom_solution(atom.element, n_points, a_x))
             Pa = np.zeros((len(idx), len(idx)))
             for (_, l), orb in sol.orbitals.items():
                 if orb.occupation <= 0 or orb.spline is None:

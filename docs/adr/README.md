@@ -15,3 +15,4 @@ consequences. Status is one of `Proposed`, `Accepted`, `Superseded by NNNN`.
 | [0008](0008-future-work.md) | Deferred work (backlog) | Accepted |
 | [0009](0009-grid-settings-pruning-sparsity.md) | All grids in the input; angular pruning; block-sparse basis | Accepted |
 | [0010](0010-point-charge-embedding.md) | Point-charge (Madelung) embedding | Accepted |
+| [0011](0011-element-specific-alpha.md) | Element-specific X-alpha parameter | Accepted (table open) |

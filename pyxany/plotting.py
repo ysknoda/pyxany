@@ -38,7 +38,7 @@ def summary_figure(result, config, path, forces=None) -> None:
     fig = plt.figure(figsize=(19, 10), facecolor=_BG)
     fig.suptitle(
         f"pyxany  |  {mol.name}   basis {config.basis.set.upper()}   "
-        f"alpha_xc {config.scf.alpha}   E = {result.total_energy:.6f} Ha",
+        f"alpha_xc {config.scf.alpha_label}   E = {result.total_energy:.6f} Ha",
         fontsize=13, color=_FG, fontweight="bold", y=0.975)
     gs = fig.add_gridspec(2, 4, hspace=0.42, wspace=0.34,
                           left=0.05, right=0.97, top=0.90, bottom=0.07)

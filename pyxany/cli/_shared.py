@@ -42,7 +42,7 @@ def _apply_passivation_basis(cfg, molecule) -> None:
         return
     from ..basis.pseudo_h import derive_exponents
 
-    cfg._pseudo_zeta = derive_exponents(molecule, cfg.scf.alpha, cfg.grid.atom["n_points"])
+    cfg._pseudo_zeta = derive_exponents(molecule, cfg.scf.alpha_for("H"), cfg.grid.atom["n_points"])
 
 
 def build_molecule_basis(cfg, molecule):

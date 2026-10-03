@@ -104,7 +104,9 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
         positions = molecule.positions
         pts = grid.local_points
         wts = grid.local_weights
-        alpha = config.scf.alpha
+        from ..scf.alpha_field import alpha_on_points
+
+        alpha = alpha_on_points(pts, molecule, config.scf)  # float if uniform
         n_basis = len(basis)
 
         # -- point-sized quantities on the whole rank-local grid -------------
@@ -183,7 +185,14 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
         # -- grid motion: Becke weights and atom-centred points move with R --
         with timer("forces.grid"):
             grad += _grid_motion_gradient(
-                result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc,
+                result,
+                config,
+                grad_rho_s,
+                rho,
+                rho_a,
+                rho_b,
+                V_H,
+                v_nuc,
                 None if ext is None else ext.gradient(pts),
             )
 
@@ -213,15 +222,15 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
             wanted = False
             compute_forces.last_translation_residual = None
         else:
-            compute_forces.last_translation_residual = float(
-                np.linalg.norm(forces.sum(axis=0)))
+            compute_forces.last_translation_residual = float(np.linalg.norm(forces.sum(axis=0)))
         if wanted:
             forces = project_out_translation(forces)
         return forces
 
 
-def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc,
-                          grad_v_ext=None):
+def _grid_motion_gradient(
+    result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc, grad_v_ext=None
+):
     """Derivative of the quadrature itself: ``sum_k d(w_k G(r_k)) / d R_B``.
 
     The grid-sampled energy is ``sum_k w_k G(r_k)`` with
@@ -242,7 +251,8 @@ def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_
     from ..grid.becke import own_cell_weight_gradient
 
     molecule, grid = result.molecule, result.grid
-    alpha = config.scf.alpha
+    from ..scf.alpha_field import alpha_mixture_gradient, alpha_on_points, atom_alphas
+
     n_atoms = len(molecule)
     grad = np.zeros((n_atoms, 3))
     if (n_atoms == 1 and grad_v_ext is None) or grid.partition != "becke":
@@ -251,12 +261,16 @@ def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_
     sl = grid.local_slice
     pts, wts = grid.local_points, grid.local_weights
     owner = grid.owner[sl]
+    alpha = alpha_on_points(pts, molecule, config.scf)
 
     # energy density and its gradient on the grid (grad rho per spin from the caller)
     if result.unrestricted:
-        e_xc = 2.0 * rho_a * xc.energy_density(
-            2.0 * rho_a, alpha
-        ) + 2.0 * rho_b * xc.energy_density(2.0 * rho_b, alpha)
+        # E_x = 1/2 (E_x[2 rho_a] + E_x[2 rho_b]) (xc.exchange_energy_spin), so the
+        # energy density is rho_s eps(2 rho_s) -- an extra factor 2 here made
+        # every UKS grid term wrong (0.46 Ha/Bohr on closed-shell H2O run as UKS)
+        e_xc = rho_a * xc.energy_density(2.0 * rho_a, alpha) + rho_b * xc.energy_density(
+            2.0 * rho_b, alpha
+        )
         grad_rho = grad_rho_s[0] + grad_rho_s[1]
         xc_part = (
             xc.potential_spin(rho_a, alpha)[:, None] * grad_rho_s[0]
@@ -305,6 +319,13 @@ def _grid_motion_gradient(result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_
     for A in range(n_atoms):
         sel = owner == A
         grad[A] += wts[sel] @ grad_G[sel]
+
+    # element-specific alpha: alpha(r) follows the Becke weights, which move
+    # with the nuclei; E_x is linear in alpha, so the term is e_x / alpha (ADR 0011)
+    if not np.isscalar(alpha):
+        grad += alpha_mixture_gradient(
+            pts, owner, wts * e_xc / alpha, molecule, atom_alphas(molecule, config.scf)
+        )
 
     if n_atoms == 1:
         return grad

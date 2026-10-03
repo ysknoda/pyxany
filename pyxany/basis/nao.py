@@ -38,14 +38,14 @@ def _atom_solution(element: str, n_points: int, xc_alpha: float):
 def build_nao_basis(molecule, config, pseudo_zeta=None) -> list:
     """One NAO per (n, l, m) of each atom's self-consistent atomic solution."""
     functions: list = []
-    xc_alpha = config.scf.alpha
+    alpha_for = config.scf.alpha_for
     n_points = int(config.grid.atom["n_points"])
 
     for ai, atom in enumerate(molecule):
         if atom.is_pseudo:
-            sol = pseudo_hydrogen_solution(round(float(atom.Z), 8), xc_alpha, n_points)
+            sol = pseudo_hydrogen_solution(round(float(atom.Z), 8), alpha_for("H"), n_points)
         else:
-            sol = _atom_solution(atom.element, n_points, xc_alpha)
+            sol = _atom_solution(atom.element, n_points, alpha_for(atom.element))
             if config.runtime.verbosity > 1:
                 mpi_print(f"  [NAO] {atom.element}: {len(sol.orbitals)} shells, "
                           f"{'converged' if sol.converged else 'NOT converged'}")

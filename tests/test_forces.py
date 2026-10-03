@@ -356,3 +356,52 @@ def test_chunked_force_evaluation_matches_a_single_chunk():
         analytic._force_chunk = saved
     assert n_points > 5 * 997
     assert np.abs(split - whole).max() < 1e-12
+
+
+def test_uks_forces_equal_rks_forces_for_a_closed_shell():
+    """Regression: the UKS grid terms used twice the exchange-energy density
+    (0.46 Ha/Bohr off on H2O) from 4f4746c until this test."""
+    from conftest import make_config, make_molecule
+    from pyxany.basis import build_basis
+    from pyxany.forces.analytic import compute_forces
+    from pyxany.scf import run_scf
+
+    w = [("O", 0.05, 0.02, 0.1173), ("H", 0.03, 0.7572, -0.4692), ("H", -0.02, -0.7572, -0.4492)]
+    mol = make_molecule("w", w)
+    forces = []
+    for unrestricted in (False, True):
+        cfg = make_config(basis={"set": "dz"}, grid={"n_r": 30, "n_a": 12},
+                          scf={"e_tol": 1e-10, "d_tol": 1e-8, "unrestricted": unrestricted})
+        res = run_scf(mol, build_basis(mol, cfg), cfg, verbose=0)
+        forces.append(compute_forces(res, cfg, project=False))
+    assert np.abs(forces[0] - forces[1]).max() < 1e-7
+
+
+@pytest.mark.slow
+def test_open_shell_forces_match_finite_differences():
+    """CH3 (doublet, UKS) on an asymmetric geometry, full multipole order."""
+    from conftest import make_config, make_molecule
+    from pyxany.basis import build_basis
+    from pyxany.forces.analytic import compute_forces
+    from pyxany.scf import run_scf
+
+    geom = [("C", 0.02, -0.01, 0.03), ("H", 1.08, 0.02, -0.02),
+            ("H", -0.55, 0.95, 0.04), ("H", -0.52, -0.91, -0.05)]
+    cfg = make_config(basis={"set": "dz"}, grid={"n_r": 40, "n_a": 14, "poisson_l_max": "auto"},
+                      scf={"e_tol": 1e-11, "d_tol": 1e-9, "max_iter": 150})
+
+    def run(g):
+        mol = make_molecule("ch3", g, multiplicity=2)
+        return run_scf(mol, build_basis(mol, cfg), cfg, verbose=0)
+
+    F = compute_forces(run(geom), cfg, project=False)
+    h = 1e-3 * 0.529177210903
+    fd = np.zeros_like(F)
+    for a in range(len(geom)):
+        for x in range(3):
+            p = [list(t) for t in geom]
+            m = [list(t) for t in geom]
+            p[a][1 + x] += h
+            m[a][1 + x] -= h
+            fd[a, x] = -(run(p).total_energy - run(m).total_energy) / 2e-3
+    assert np.abs(F - fd).max() < 5e-4

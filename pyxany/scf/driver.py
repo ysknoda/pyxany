@@ -141,7 +141,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
     iterations (if > 0) and at the end. See :mod:`pyxany.scf.checkpoint`.
     """
     scf_cfg, grid_cfg = config.scf, config.grid
-    alpha = scf_cfg.alpha
+    alpha = None          # X-alpha parameter on the grid, set once the grid exists
     n_electrons = molecule.n_electrons
     n_basis = len(basis)
 
@@ -175,6 +175,9 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                   + ("   [WARNING: near-linear dependence]" if cond > 1e4 else ""))
 
     grid = grid_from_config(molecule, grid_cfg)
+    from .alpha_field import alpha_on_points
+
+    alpha = alpha_on_points(grid.local_points, molecule, scf_cfg)   # float if uniform
     chunk = choose_strategy(grid, n_basis, grid_cfg.chunk_size,
                             grid_cfg.memory_budget_mb)
     terms = GridTerms(basis, molecule, grid, chunk_size=chunk,
@@ -235,7 +238,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
         P = rescale_to_electron_count(np.array(initial["P"], dtype=float), S, n_electrons)
     else:
         P = rescale_to_electron_count(
-            sad_density(molecule, basis, scf_cfg.alpha, grid_cfg.atom["n_points"],
+            sad_density(molecule, basis, scf_cfg.alpha_for, grid_cfg.atom["n_points"],
                         (grid_cfg.guess["n_r"], grid_cfg.guess["n_a"])),
             S, n_electrons)
     if unrestricted:
@@ -504,7 +507,7 @@ def _print_header(molecule, basis, config, unrestricted, n_alpha, n_beta):
               f"({len(basis)} functions, max l = {max(f.l for f in basis)})")
     mode = (f"UKS  n_alpha={n_alpha:g} n_beta={n_beta:g}" if unrestricted
             else f"RKS  n_occ={n_alpha:g}")
-    mpi_print(f"  Method             : {mode}   alpha_xc = {config.scf.alpha}")
+    mpi_print(f"  Method             : {mode}   alpha_xc = {config.scf.alpha_label}")
 
 
 def _print_table_header(unrestricted):

@@ -264,3 +264,100 @@ def _solve_channel(r, h: float, V_eff, l: int, n_nodes: int,
     if R[np.argmax(np.abs(R))] < 0:
         R = -R
     return float(eps), R
+
+
+def hund_spin_occupations(occupations: dict) -> tuple[dict, dict]:
+    """Split ``{(n, l): electrons}`` into spin-up and spin-down by Hund's rule.
+
+    Each subshell fills one spin first (up to 2l + 1 electrons): the maximum
+    spin of the configuration, spherically averaged within each subshell.
+    """
+    up, down = {}, {}
+    for (n, l), ne in occupations.items():
+        cap = 2 * l + 1
+        up[(n, l)] = min(float(ne), cap)
+        down[(n, l)] = float(ne) - up[(n, l)]
+    return up, {k: v for k, v in down.items() if v > 1e-12}
+
+
+@dataclass
+class PolarisedSolution:
+    symbol: str
+    Z: float
+    up: dict  # {(n, l): AtomicOrbital}
+    down: dict
+    r: np.ndarray
+    rho_up: np.ndarray
+    rho_down: np.ndarray
+    energy: float  # total X-alpha energy, Hartree
+    converged: bool
+    n_iterations: int
+
+
+def solve_atom_polarised(symbol: str, alpha: float = 0.7, n_points: int = 4000,
+                         occupations: dict | None = None, r_max: float | None = None,
+                         max_iter: int = 400, tol: float = 1e-10,
+                         mixing: float = 0.2) -> PolarisedSolution:
+    """Spin-polarised spherical X-alpha atom (Hund's-rule spins, ADR 0011).
+
+    Exchange per spin channel from the spin-scaling relation (as in UKS);
+    the total energy is
+
+        E = sum_s sum_i f_is eps_is - E_H + E_x - sum_s int rho_s v_x,s
+
+    on the same logarithmic grid and Numerov solver as :func:`solve_atom`.
+    """
+    Z = float(elem.atomic_number(symbol))
+    occupations = occupations or _shell_occupations(symbol)
+    occ_up, occ_dn = hund_spin_occupations(occupations)
+    r_max = r_max or max(30.0, 6.0 * elem.bragg_slater_radius(symbol))
+    r_min = 1e-6 / Z
+    h = np.log(r_max / r_min) / (n_points - 1)
+    r = r_min * np.exp(h * np.arange(n_points))
+    w_r = h * r
+
+    rho0 = _initial_density(r, Z, occupations, w_r)
+    n_tot = sum(occupations.values())
+    rho = {"up": rho0 * sum(occ_up.values()) / n_tot,
+           "down": rho0 * sum(occ_dn.values()) / n_tot}
+    occ = {"up": occ_up, "down": occ_dn}
+    orbitals = {"up": {}, "down": {}}
+    converged, it = False, 0
+    for it in range(1, max_iter + 1):
+        V_h = poisson_radial(r, w_r, rho["up"] + rho["down"])
+        new = {}
+        for s in ("up", "down"):
+            V_eff = -Z / r + V_h + xc.potential_spin(rho[s], alpha)
+            new[s] = np.zeros_like(r)
+            orbitals[s] = {}
+            for (n, l), ne in sorted(occ[s].items()):
+                eps, R = _solve_channel(r, h, V_eff, l, n_nodes=n - l - 1)
+                if R is None:
+                    continue
+                R = R / np.sqrt(np.dot(w_r, R * R * r * r))
+                new[s] += ne * R * R / (4.0 * PI)
+                orbitals[s][(n, l)] = AtomicOrbital(n=n, l=l, occupation=ne, eigenvalue=eps,
+                                                    r=r, radial=R, spline=None)
+        delta = sum(float(np.dot(w_r, np.abs(new[s] - rho[s]) * 4.0 * PI * r * r))
+                    for s in rho) / n_tot
+        for s in rho:
+            rho[s] = mixing * new[s] + (1.0 - mixing) * rho[s]
+        if delta < tol and it > 3:
+            converged = True
+            break
+
+    # total energy from the final orbitals (rho is the mixed density: use new)
+    rho_t = new["up"] + new["down"]
+    shell = 4.0 * PI * r * r
+    V_h = poisson_radial(r, w_r, rho_t)
+    E_H = 0.5 * float(np.dot(w_r, shell * rho_t * V_h))
+    E_x, vx_int, band = 0.0, 0.0, 0.0
+    for s in ("up", "down"):
+        E_x += 0.5 * float(np.dot(w_r, shell * 2.0 * new[s]
+                                  * xc.energy_density(2.0 * new[s], alpha)))
+        vx_int += float(np.dot(w_r, shell * new[s] * xc.potential_spin(new[s], alpha)))
+        band += sum(o.occupation * o.eigenvalue for o in orbitals[s].values())
+    return PolarisedSolution(symbol=symbol, Z=Z, up=orbitals["up"], down=orbitals["down"], r=r,
+                             rho_up=new["up"], rho_down=new["down"],
+                             energy=band - E_H + E_x - vx_int, converged=converged,
+                             n_iterations=it)

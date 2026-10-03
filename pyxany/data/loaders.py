@@ -71,6 +71,12 @@ def radial_point_ratios() -> dict[str, float]:
 
 
 @lru_cache(maxsize=None)
+def alpha_hf_table() -> dict[str, float]:
+    """Recomputed Schwarz alpha_HF by element (tools/alpha_hf.py, ADR 0011)."""
+    return {s: float(v) for s, v in _load("alpha_hf")["alpha_hf"].items()}
+
+
+@lru_cache(maxsize=None)
 def orbital_labels() -> dict:
     """{(n, l, m): "2pz"} short orbital labels."""
     out = {}

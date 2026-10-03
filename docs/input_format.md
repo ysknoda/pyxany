@@ -82,7 +82,7 @@ scf:
   max_iter:         100
   e_tol:            1.0e-6  # total-energy convergence (Ha)
   d_tol:            1.0e-5  # density-matrix rms convergence
-  alpha:            0.7     # Slater X-alpha exchange parameter
+  alpha:            0.7     # X-alpha parameter: a number, alpha_hf, or {default: 0.7, Si: 0.73} (ADR 0011)
   unrestricted:     false   # forced true for odd electrons or mult > 1
   smearing:         0.0     # Fermi smearing kT (Ha)
   s_threshold:      5.0e-4  # drop overlap eigenvalues below this
