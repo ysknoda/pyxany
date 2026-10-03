@@ -105,3 +105,17 @@ Deferred to ADR 0008.
 - The J and V_xc matrices are now built as one matrix per spin channel (only
   their sum enters the Fock matrix), halving the potential-matrix work of a
   closed-shell iteration without changing results.
+
+## Measured end to end
+
+Si47H60 (107 atoms, 966 basis functions), SCF (18 iterations) + forces, one
+node, nothing else running:
+
+| version | total | per SCF iteration |
+|---|---|---|
+| step 8 (ADR 0007) | 1875 s | 70 s |
+| + pruning, fused J + V_xc | 1246 s | 43 s |
+| + basis_cutoff 1e-6, single-call chi kernel (defaults) | 1189 s | 40 s |
+
+Forces agree with the unpruned dense run to 1e-5 Ha/Bohr; peak RSS 6.9 GB.
+

@@ -147,7 +147,7 @@
 - **J and V_xc built as one matrix** per spin channel (only the sum enters
   the Fock matrix), and a single-call kernel for all Slater functions (chi
   evaluation 2x faster). Si47H60 SCF + forces: 1875 s -> 1246 s with pruning
-  and the fused matrix alone.
+  and the fused matrix alone, 1189 s with all of the above (defaults).
 
 All of the following reproduce the previous numbers (numba vs numpy to
 1e-12, chunked vs single-pass forces to 1e-12, analytic vs finite-difference
