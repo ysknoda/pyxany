@@ -268,8 +268,9 @@ class SCFConfig:
         if isinstance(a, str) and a.strip().replace(".", "", 1).isdigit():
             self.alpha = a = float(a)                  # --set scf.alpha=0.75
         if isinstance(a, str):
-            if a != "alpha_hf":
-                raise ConfigError(f"{ctx}: scf.alpha must be a number, 'alpha_hf' or a "
+            if a not in ("alpha_hf", "alpha_hf_polarised"):
+                raise ConfigError(f"{ctx}: scf.alpha must be a number, 'alpha_hf', "
+                                  f"'alpha_hf_polarised' or a "
                                   f"mapping like {{default: 0.7, Si: 0.73}}; got {a!r}")
         elif isinstance(a, dict):
             from .data import elements as elem
@@ -301,16 +302,17 @@ class SCFConfig:
         a = self.alpha
         if isinstance(a, (int, float)):
             return float(a)
-        if a == "alpha_hf":
-            from .data.loaders import alpha_hf_table
+        if a in ("alpha_hf", "alpha_hf_polarised"):
+            from .data import loaders
 
             try:
-                table = alpha_hf_table()
+                table = (loaders.alpha_hf_table() if a == "alpha_hf"
+                         else loaders.alpha_hf_polarised_table())
             except FileNotFoundError:
-                raise ConfigError("scf.alpha: alpha_hf: the table has not been built yet "
-                                  "(tools/alpha_hf.py, ADR 0011)") from None
+                raise ConfigError(f"scf.alpha: {a}: the table has not been built yet "
+                                  f"(tools/alpha_hf.py, ADR 0011)") from None
             if element not in table:
-                raise ConfigError(f"scf.alpha: alpha_hf: no value for {element}")
+                raise ConfigError(f"scf.alpha: {a}: no value for {element}")
             return float(table[element])
         return float(a.get(element, a.get("default", 0.7)))
 
@@ -330,7 +332,9 @@ class SCFConfig:
         if isinstance(a, (int, float)):
             return f"{a:g}"
         if a == "alpha_hf":
-            return "alpha_HF (by element)"
+            return "alpha_HF (Schwarz, by element)"
+        if a == "alpha_hf_polarised":
+            return "alpha_HF spin-polarised (by element)"
         return "by element " + ", ".join(f"{k} {v:g}" for k, v in a.items())
 
 

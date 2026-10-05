@@ -1,0 +1,469 @@
+{
+ "_source": {
+  "1972": "K. Schwarz, Phys. Rev. B 5, 2466 (1972), Table I (H-Nb, 41 rows; H has alpha_vt only, footnote: J. H. Wood)",
+  "1974": "K. Schwarz, Theor. Chim. Acta 34, 225 (1974), Table 1 (26 heavier atoms; others by linear interpolation along a subshell sequence, as the paper recommends)",
+  "definition": "alpha_HF: statistical (X-alpha) total energy = configuration-averaged Hartree-Fock energy (Mann, LA-3690); alpha_vt: virial theorem with HF formulas and X-alpha orbitals",
+  "transcribed": "2026-10-05 from the PDFs in references/, every row, checked against 400-dpi renderings; Rb alpha_vt 0.70525 read from the image (text layer unclear)"
+ },
+ "table_1972": [
+  {
+   "symbol": "H",
+   "alpha_vt": 0.97804,
+   "alpha_hf": null,
+   "dE_dalpha_Ry": null
+  },
+  {
+   "symbol": "He",
+   "alpha_vt": 0.77236,
+   "alpha_hf": 0.77298,
+   "dE_dalpha_Ry": -2.6
+  },
+  {
+   "symbol": "Li",
+   "alpha_vt": 0.78087,
+   "alpha_hf": 0.78147,
+   "dE_dalpha_Ry": -4.5
+  },
+  {
+   "symbol": "Be",
+   "alpha_vt": 0.76756,
+   "alpha_hf": 0.76823,
+   "dE_dalpha_Ry": -6.9
+  },
+  {
+   "symbol": "B",
+   "alpha_vt": 0.76452,
+   "alpha_hf": 0.76531,
+   "dE_dalpha_Ry": -9.8
+  },
+  {
+   "symbol": "C",
+   "alpha_vt": 0.75847,
+   "alpha_hf": 0.75928,
+   "dE_dalpha_Ry": -13.2
+  },
+  {
+   "symbol": "N",
+   "alpha_vt": 0.75118,
+   "alpha_hf": 0.75197,
+   "dE_dalpha_Ry": -17.2
+  },
+  {
+   "symbol": "O",
+   "alpha_vt": 0.74367,
+   "alpha_hf": 0.74447,
+   "dE_dalpha_Ry": -21.8
+  },
+  {
+   "symbol": "F",
+   "alpha_vt": 0.73651,
+   "alpha_hf": 0.73732,
+   "dE_dalpha_Ry": -27.1
+  },
+  {
+   "symbol": "Ne",
+   "alpha_vt": 0.72997,
+   "alpha_hf": 0.73081,
+   "dE_dalpha_Ry": -33.1
+  },
+  {
+   "symbol": "Na",
+   "alpha_vt": 0.73044,
+   "alpha_hf": 0.73115,
+   "dE_dalpha_Ry": -38.4
+  },
+  {
+   "symbol": "Mg",
+   "alpha_vt": 0.7285,
+   "alpha_hf": 0.72913,
+   "dE_dalpha_Ry": -43.9
+  },
+  {
+   "symbol": "Al",
+   "alpha_vt": 0.72795,
+   "alpha_hf": 0.72853,
+   "dE_dalpha_Ry": -49.6
+  },
+  {
+   "symbol": "Si",
+   "alpha_vt": 0.72696,
+   "alpha_hf": 0.72751,
+   "dE_dalpha_Ry": -55.7
+  },
+  {
+   "symbol": "P",
+   "alpha_vt": 0.72569,
+   "alpha_hf": 0.7262,
+   "dE_dalpha_Ry": -62.2
+  },
+  {
+   "symbol": "S",
+   "alpha_vt": 0.72426,
+   "alpha_hf": 0.72475,
+   "dE_dalpha_Ry": -69.0
+  },
+  {
+   "symbol": "Cl",
+   "alpha_vt": 0.72277,
+   "alpha_hf": 0.72325,
+   "dE_dalpha_Ry": -76.2
+  },
+  {
+   "symbol": "Ar",
+   "alpha_vt": 0.72131,
+   "alpha_hf": 0.72177,
+   "dE_dalpha_Ry": -83.7
+  },
+  {
+   "symbol": "K",
+   "alpha_vt": 0.72072,
+   "alpha_hf": 0.72117,
+   "dE_dalpha_Ry": -90.7
+  },
+  {
+   "symbol": "Ca",
+   "alpha_vt": 0.71941,
+   "alpha_hf": 0.71984,
+   "dE_dalpha_Ry": -98.0
+  },
+  {
+   "symbol": "Sc",
+   "alpha_vt": 0.71793,
+   "alpha_hf": 0.71841,
+   "dE_dalpha_Ry": -105.9
+  },
+  {
+   "symbol": "Ti",
+   "alpha_vt": 0.71648,
+   "alpha_hf": 0.71695,
+   "dE_dalpha_Ry": -114.8
+  },
+  {
+   "symbol": "V",
+   "alpha_vt": 0.71506,
+   "alpha_hf": 0.71556,
+   "dE_dalpha_Ry": -123.3
+  },
+  {
+   "symbol": "Cr",
+   "alpha_vt": 0.71296,
+   "alpha_hf": 0.71352,
+   "dE_dalpha_Ry": -133.2
+  },
+  {
+   "symbol": "Mn",
+   "alpha_vt": 0.71228,
+   "alpha_hf": 0.71279,
+   "dE_dalpha_Ry": -142.1
+  },
+  {
+   "symbol": "Fe",
+   "alpha_vt": 0.71094,
+   "alpha_hf": 0.71151,
+   "dE_dalpha_Ry": -153.1
+  },
+  {
+   "symbol": "Co",
+   "alpha_vt": 0.70966,
+   "alpha_hf": 0.71018,
+   "dE_dalpha_Ry": -162.7
+  },
+  {
+   "symbol": "Ni",
+   "alpha_vt": 0.70843,
+   "alpha_hf": 0.70896,
+   "dE_dalpha_Ry": -173.6
+  },
+  {
+   "symbol": "Cu",
+   "alpha_vt": 0.70635,
+   "alpha_hf": 0.70697,
+   "dE_dalpha_Ry": -186.2
+  },
+  {
+   "symbol": "Zn",
+   "alpha_vt": 0.70619,
+   "alpha_hf": 0.70673,
+   "dE_dalpha_Ry": -197.3
+  },
+  {
+   "symbol": "Ga",
+   "alpha_vt": 0.70644,
+   "alpha_hf": 0.7069,
+   "dE_dalpha_Ry": -208.3
+  },
+  {
+   "symbol": "Ge",
+   "alpha_vt": 0.70645,
+   "alpha_hf": 0.70684,
+   "dE_dalpha_Ry": -219.0
+  },
+  {
+   "symbol": "As",
+   "alpha_vt": 0.7063,
+   "alpha_hf": 0.70665,
+   "dE_dalpha_Ry": -230.9
+  },
+  {
+   "symbol": "Se",
+   "alpha_vt": 0.70606,
+   "alpha_hf": 0.70638,
+   "dE_dalpha_Ry": -242.0
+  },
+  {
+   "symbol": "Br",
+   "alpha_vt": 0.70576,
+   "alpha_hf": 0.70606,
+   "dE_dalpha_Ry": -253.9
+  },
+  {
+   "symbol": "Kr",
+   "alpha_vt": 0.70544,
+   "alpha_hf": 0.70574,
+   "dE_dalpha_Ry": -266.8
+  },
+  {
+   "symbol": "Rb",
+   "alpha_vt": 0.70525,
+   "alpha_hf": 0.70553,
+   "dE_dalpha_Ry": -278.4
+  },
+  {
+   "symbol": "Sr",
+   "alpha_vt": 0.7048,
+   "alpha_hf": 0.70504,
+   "dE_dalpha_Ry": -290.1
+  },
+  {
+   "symbol": "Y",
+   "alpha_vt": 0.7044,
+   "alpha_hf": 0.70465,
+   "dE_dalpha_Ry": -301.5
+  },
+  {
+   "symbol": "Zr",
+   "alpha_vt": 0.70398,
+   "alpha_hf": 0.70424,
+   "dE_dalpha_Ry": -313.7
+  },
+  {
+   "symbol": "Nb",
+   "alpha_vt": 0.70357,
+   "alpha_hf": 0.70383,
+   "dE_dalpha_Ry": -327.0
+  }
+ ],
+ "table_1974": [
+  {
+   "symbol": "Mo",
+   "Z": 42,
+   "configuration": "[Kr]4d5 5s",
+   "alpha_vt": 0.70311,
+   "alpha_hf": 0.70341
+  },
+  {
+   "symbol": "Tc",
+   "Z": 43,
+   "configuration": "[Kr]4d5 5s2",
+   "alpha_vt": 0.70269,
+   "alpha_hf": 0.70299
+  },
+  {
+   "symbol": "Ru",
+   "Z": 44,
+   "configuration": "[Kr]4d7 5s",
+   "alpha_vt": 0.70227,
+   "alpha_hf": 0.70253
+  },
+  {
+   "symbol": "Rh",
+   "Z": 45,
+   "configuration": "[Kr]4d8 5s",
+   "alpha_vt": 0.70187,
+   "alpha_hf": 0.70217
+  },
+  {
+   "symbol": "Pd",
+   "Z": 46,
+   "configuration": "[Kr]4d10",
+   "alpha_vt": 0.70128,
+   "alpha_hf": 0.70158
+  },
+  {
+   "symbol": "Ag",
+   "Z": 47,
+   "configuration": "[Kr]4d10 5s",
+   "alpha_vt": 0.70114,
+   "alpha_hf": 0.70145
+  },
+  {
+   "symbol": "Cd",
+   "Z": 48,
+   "configuration": "[Kr]4d10 5s2",
+   "alpha_vt": 0.70084,
+   "alpha_hf": 0.70114
+  },
+  {
+   "symbol": "In",
+   "Z": 49,
+   "configuration": "[Kr]4d10 5s2 5p",
+   "alpha_vt": 0.70074,
+   "alpha_hf": 0.70102
+  },
+  {
+   "symbol": "Xe",
+   "Z": 54,
+   "configuration": "[Kr]4d10 5s2 5p6",
+   "alpha_vt": 0.69962,
+   "alpha_hf": 0.69984
+  },
+  {
+   "symbol": "Cs",
+   "Z": 55,
+   "configuration": "[Xe]6s",
+   "alpha_vt": 0.69939,
+   "alpha_hf": 0.69961
+  },
+  {
+   "symbol": "Ba",
+   "Z": 56,
+   "configuration": "[Xe]6s2",
+   "alpha_vt": 0.69906,
+   "alpha_hf": 0.69927
+  },
+  {
+   "symbol": "La",
+   "Z": 57,
+   "configuration": "[Xe]5d 6s2",
+   "alpha_vt": 0.69877,
+   "alpha_hf": 0.69898
+  },
+  {
+   "symbol": "Ce",
+   "Z": 58,
+   "configuration": "[Xe]4f 5d 6s2",
+   "alpha_vt": 0.69824,
+   "alpha_hf": 0.69845
+  },
+  {
+   "symbol": "Pr",
+   "Z": 59,
+   "configuration": "[Xe]4f3 6s2",
+   "alpha_vt": 0.69742,
+   "alpha_hf": 0.69765
+  },
+  {
+   "symbol": "Eu",
+   "Z": 63,
+   "configuration": "[Xe]4f7 6s2",
+   "alpha_vt": 0.69549,
+   "alpha_hf": 0.69575
+  },
+  {
+   "symbol": "Gd",
+   "Z": 64,
+   "configuration": "[Xe]4f7 5d 6s2",
+   "alpha_vt": 0.69543,
+   "alpha_hf": 0.69566
+  },
+  {
+   "symbol": "Tb",
+   "Z": 65,
+   "configuration": "[Xe]4f8 5d 6s2",
+   "alpha_vt": 0.69501,
+   "alpha_hf": 0.69525
+  },
+  {
+   "symbol": "Dy",
+   "Z": 66,
+   "configuration": "[Xe]4f10 6s2",
+   "alpha_vt": 0.69426,
+   "alpha_hf": 0.69453
+  },
+  {
+   "symbol": "Yb",
+   "Z": 70,
+   "configuration": "[Xe]4f14 6s2",
+   "alpha_vt": 0.69292,
+   "alpha_hf": 0.69317
+  },
+  {
+   "symbol": "Lu",
+   "Z": 71,
+   "configuration": "[Xe]4f14 5d 6s2",
+   "alpha_vt": 0.69302,
+   "alpha_hf": 0.69324
+  },
+  {
+   "symbol": "Ir",
+   "Z": 77,
+   "configuration": "[Xe]4f14 5d7 6s2",
+   "alpha_vt": 0.69296,
+   "alpha_hf": 0.6931
+  },
+  {
+   "symbol": "Pt",
+   "Z": 78,
+   "configuration": "[Xe]4f14 5d9 6s",
+   "alpha_vt": 0.69292,
+   "alpha_hf": 0.69306
+  },
+  {
+   "symbol": "Au",
+   "Z": 79,
+   "configuration": "[Xe]4f14 5d10 6s",
+   "alpha_vt": 0.69288,
+   "alpha_hf": 0.69301
+  },
+  {
+   "symbol": "Hg",
+   "Z": 80,
+   "configuration": "[Xe]4f14 5d10 6s2",
+   "alpha_vt": 0.69278,
+   "alpha_hf": 0.6929
+  },
+  {
+   "symbol": "Tl",
+   "Z": 81,
+   "configuration": "[Xe]4f14 5d10 6s2 6p",
+   "alpha_vt": 0.6928,
+   "alpha_hf": 0.69289
+  },
+  {
+   "symbol": "Rn",
+   "Z": 86,
+   "configuration": "[Xe]4f14 5d10 6s2 6p6",
+   "alpha_vt": 0.69245,
+   "alpha_hf": 0.69248
+  }
+ ],
+ "supplement": {
+  "H": {
+   "alpha_hf": 0.97866,
+   "source": "not in Schwarz's table; recomputed with the same definition by tools/alpha_hf.py (spin-restricted X-alpha = E_HF = -0.5 Ha)"
+  }
+ },
+ "interpolation": {
+  "_rule": "linear in Z between the tabulated end points of the subshell sequence (Theor. Chim. Acta 34, 225, Sec. 2)",
+  "5p": [
+   "In",
+   "Xe"
+  ],
+  "4f (first half)": [
+   "Pr",
+   "Eu"
+  ],
+  "4f (second half)": [
+   "Dy",
+   "Yb"
+  ],
+  "5d": [
+   "Lu",
+   "Ir"
+  ],
+  "6p": [
+   "Tl",
+   "Rn"
+  ]
+ }
+}

@@ -5,7 +5,8 @@
 ### Added
 
 - **Element-specific X-alpha** (ADR 0011): `scf.alpha` takes a mapping
-  `{default: 0.7, Si: 0.73}` (or `alpha_hf` once its table is built), mixed
+  `{default: 0.7, Si: 0.73}`, `alpha_hf` (Schwarz's published table, H-Rn, 19
+  atoms interpolated as the 1974 paper recommends) or `alpha_hf_polarised`, mixed
   between atoms with the Becke weights; forces include the moving-weight
   term (finite differences to the grid error). Spin-polarised atom solver
   and `tools/alpha_hf.py` for the recomputed alpha_HF table.

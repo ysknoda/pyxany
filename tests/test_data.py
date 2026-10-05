@@ -53,6 +53,10 @@ CHECKSUMS = {
     "sto_pol_f": "f5219201d99b068f",
     "sto_sz": "60857d4c8864bcba",
     "sto_tz": "bf289182bc9128a2",
+    # Schwarz, PRB 5, 2466 (1972) and TCA 34, 225 (1974), transcribed 2026-10-05 (ADR 0011)
+    "schwarz_alpha": "efe54b9293bb5fd1",
+    # tools/alpha_hf.py; H-Sc so far, rewritten when the H-Rn run finishes (ADR 0011)
+    "alpha_hf_polarised": "d2c9a8e48916d1f8",
 }
 
 

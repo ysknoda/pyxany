@@ -71,9 +71,46 @@ def radial_point_ratios() -> dict[str, float]:
 
 
 @lru_cache(maxsize=None)
+def schwarz_alpha() -> dict[str, dict]:
+    """Schwarz's alpha_HF for H-Rn: ``{symbol: {"alpha_hf", "origin"}}`` (ADR 0011).
+
+    Published values (Phys. Rev. B 5, 2466 (1972); Theor. Chim. Acta 34, 225
+    (1974)); the 19 elements the 1974 paper leaves out are interpolated
+    linearly in Z within their subshell sequence, as the paper recommends; H,
+    absent from the tables, is the value recomputed with the same definition.
+    """
+    from . import elements as elem
+
+    raw = _load("schwarz_alpha")
+    out: dict[str, dict] = {}
+    for row in raw["table_1972"] + raw["table_1974"]:
+        if row["alpha_hf"] is not None:
+            out[row["symbol"]] = {"alpha_hf": float(row["alpha_hf"]), "origin": "published"}
+    for symbol, row in raw["supplement"].items():
+        out[symbol] = {"alpha_hf": float(row["alpha_hf"]), "origin": "recomputed"}
+    for key, ends in raw["interpolation"].items():
+        if key.startswith("_"):
+            continue
+        lo, hi = ends
+        z_lo, z_hi = elem.atomic_number(lo), elem.atomic_number(hi)
+        a_lo, a_hi = out[lo]["alpha_hf"], out[hi]["alpha_hf"]
+        for z in range(z_lo + 1, z_hi):
+            t = (z - z_lo) / (z_hi - z_lo)
+            out[elem.symbol_for_z(z)] = {"alpha_hf": round(a_lo + t * (a_hi - a_lo), 5),
+                                        "origin": f"interpolated {lo}-{hi}"}
+    return out
+
+
+@lru_cache(maxsize=None)
 def alpha_hf_table() -> dict[str, float]:
-    """Recomputed Schwarz alpha_HF by element (tools/alpha_hf.py, ADR 0011)."""
-    return {s: float(v) for s, v in _load("alpha_hf")["alpha_hf"].items()}
+    """Schwarz's alpha_HF by element (see :func:`schwarz_alpha`)."""
+    return {s: v["alpha_hf"] for s, v in schwarz_alpha().items()}
+
+
+@lru_cache(maxsize=None)
+def alpha_hf_polarised_table() -> dict[str, float]:
+    """Spin-polarised alpha_HF recomputed by tools/alpha_hf.py (ADR 0011)."""
+    return {s: float(v) for s, v in _load("alpha_hf_polarised")["alpha_hf_polarised"].items()}
 
 
 @lru_cache(maxsize=None)

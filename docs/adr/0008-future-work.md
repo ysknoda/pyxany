@@ -8,12 +8,12 @@ Not in the current scope; recorded so the decision to defer is explicit.
 | item | why deferred / prerequisite |
 |---|---|
 | **Cluster-size convergence of the example gaps** | The example clusters (5-7 core atoms) have terminator-dominated LUMOs (Loewdin 0.52-0.72) that relaxing the terminators does not remove. A size series (e.g. Si/GaAs/CdSe with 17, 29, 47, 87 core atoms) is needed before their gaps can stand for the material; cost is set by step 8 (performance). |
-| **Element-specific X-alpha alpha** (e.g. Schwarz alpha_HF) | Needs an inter-atomic mixing rule and the full Schwarz table from the source paper; breaks Tier A PySCF comparison (ADR 0002). |
 | Multiple initial spin guesses, tried automatically | Next stage after the current scope. |
 | Effective core potentials on boundary cations of embedded clusters | Would allow anion-terminated embedded clusters (MgO6 rather than Mg19O6); needs semi-local ECP projectors on one-centre grids at each boundary site and an ECP parameter source (ADR 0010). |
 | XANES / XES spectra from transition-state dipole intensities | Builds on ADR 0006 (c). |
 | Correlation functional (e.g. VWN5) | Changes the code's identity as an X-alpha code; separate decision. |
 | Point-group symmetry | Large effort; performance and labelling benefit only. |
+| System-tuned alpha (e.g. -eps_HOMO = IP, as in optimally tuned range-separated functionals) | Physically motivated, but alpha would differ between systems and geometries, so their energies could not be compared, and forces need dalpha/dR; energy minimisation in alpha has no minimum (ADR 0011). |
 | Vibrational frequencies (finite-difference Hessian of analytic forces) | Low priority for current use. |
 
 ## Resolved since this ADR was written
@@ -44,3 +44,4 @@ Not in the current scope; recorded so the decision to defer is explicit.
   a superposition of atomic densities (ADR 0007, step 8 outcome).
 - **Lebedev angular grids** -- available as `grid.angular: lebedev` (ADR 0009).
 - **Point-charge (Madelung) embedding** -- `embedding:` and `pyxany embed` (ADR 0010).
+- **Element-specific X-alpha** -- `scf.alpha`: mapping, `alpha_hf` (Schwarz), `alpha_hf_polarised` (ADR 0011).

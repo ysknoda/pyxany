@@ -1,8 +1,8 @@
 # 0011. Element-specific X-alpha parameter
 
-- Status: Accepted (mixing, input, forces); the alpha_HF table definition is open (Q47'')
+- Status: Accepted
 - Date: 2026-10-04
-- Decisions: Q39-Q41, Q46-Q48, Q47'
+- Decisions: Q39-Q41, Q46-Q48, Q47', Q47'', Q49-Q51
 
 ## Decision
 
@@ -20,22 +20,43 @@
 - The SAD guess, NAO basis and pseudo-hydrogen exponents solve each atom
   with its own alpha.
 
-## alpha_HF without the original papers (Q39, Q46-Q48)
+## The alpha_HF tables (Q47'', Q49-Q51)
 
-Schwarz's tables were not available; `tools/alpha_hf.py` recomputes alpha_HF
-from its definition (X-alpha total energy of the atom = Hartree-Fock energy),
-with pyxany's atom solver and PySCF ROHF (uncontracted ANO-RCC, checked by an
-extended basis; PySCF only in the tool). PySCF's spherically averaged RHF
-(`AtomSphAverageRHF`) gives open-shell energies 0.2-0.55 Ha above ROHF and
-was not used.
+Schwarz's papers (in references/) define alpha_HF as the alpha for which the
+statistical total energy of the free atom equals Mann's configuration-averaged
+Hartree-Fock energy (spin-restricted X-alpha, Herman-Skillman program).
 
-Which X-alpha atom and which HF energy reproduce Schwarz is open: closed
-shells (He, Be, Ne, Mg, Ar) agree with the values recalled from the
-literature to 3e-5 in every variant; spin-restricted X-alpha against the
-ROHF energy reproduces H, Li, B, F, Na, Al, Cl (0.9787 vs 0.9780, others to
-3e-5) but gives C, N, O, Si, P 0.002-0.012 too high, consistent with Schwarz
-using the HF average-of-configuration energy. The spin-polarised variant
-(Q47') is lower for every open-shell atom (H 0.777).
+- `alpha_hf` -- **Schwarz's published values** (Q50 a), transcribed in full
+  into `data/tables/schwarz_alpha.json`: Phys. Rev. B 5, 2466 (1972) Table I,
+  41 rows H-Nb (alpha_vt, alpha_HF, dE/dalpha; H has alpha_vt only), and
+  Theor. Chim. Acta 34, 225 (1974) Table 1, 26 heavier atoms with their
+  configurations. Every digit checked against 400-dpi renderings (Rb alpha_vt
+  0.70525 from the image; the text layer was unclear). The 19 atoms the 1974
+  paper omits (Sn-I, Nd-Sm, Ho-Tm, Hf-Os, Pb-At) are interpolated linearly in
+  Z between the end points of their subshell sequence, as that paper
+  recommends; H (no alpha_HF in the table) is the recomputed 0.97866. Each
+  value carries its origin: 66 published, 19 interpolated, 1 recomputed.
+- `alpha_hf_polarised` -- no published counterpart; computed by
+  `tools/alpha_hf.py` (Q49, Q51): spin-polarised spherical X-alpha (Hund's
+  rule) against the ROHF energy of the same configuration, H-Rn, run on one
+  core (Q51). Elements that fail (ROHF configuration differs from the
+  table's, time limit) are excluded and listed in the file.
+- The same tool recomputes Schwarz's definition (spin-restricted X-alpha
+  against the HF average-of-configuration energy from spherically rebuilt
+  ROHF orbitals). He-Sc agree with the published values to 4e-5 on average,
+  1.9e-4 at most (N); the systematic small deficit is the ANO-RCC basis
+  sitting ~0.5 mHa above the HF limit (Ne). This is a test.
+
+Using the spin-polarised table in UKS and the restricted one in RKS is the
+consistent pairing (the restricted fit absorbs the missing spin-polarisation
+energy of open-shell atoms into alpha: H 0.979 vs 0.777); the choice is
+explicit in the input, not automatic (Q49 b).
+
+Per-calculation alpha by energy minimisation was considered and rejected:
+dE/dalpha = E_x/alpha < 0, so the energy has no minimum in alpha, and alpha is
+a parameter of the functional, not a variational variable. Tuning alpha per
+system by a non-energetic condition (e.g. -eps_HOMO = IP) is possible but
+makes energies of different systems or geometries incomparable (ADR 0008).
 
 ## Found on the way
 

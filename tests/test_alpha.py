@@ -101,3 +101,58 @@ def test_polarised_atom_reproduces_exchange_only_lda():
 
     assert solve_atom_polarised("H", alpha=2 / 3).energy == pytest.approx(-0.457065, abs=5e-5)
     assert solve_atom_polarised("He", alpha=2 / 3).energy == pytest.approx(-2.723592, abs=5e-5)
+
+
+# -- Schwarz's published table and the recomputation --------------------------------
+
+
+def test_schwarz_tables_are_transcribed_in_full():
+    import json
+    from pathlib import Path
+
+    raw = json.loads((Path(__file__).resolve().parents[1] / "pyxany" / "data" / "tables"
+                      / "schwarz_alpha.json").read_text())
+    assert len(raw["table_1972"]) == 41 and len(raw["table_1974"]) == 26
+    # spot values read from the PDFs (1972 Table I; 1974 Table 1)
+    rows = {r["symbol"]: r for r in raw["table_1972"] + raw["table_1974"]}
+    assert rows["H"]["alpha_hf"] is None and rows["H"]["alpha_vt"] == 0.97804
+    assert (rows["Rb"]["alpha_vt"], rows["Rb"]["alpha_hf"]) == (0.70525, 0.70553)
+    assert rows["Rn"]["alpha_hf"] == 0.69248
+
+
+def test_alpha_hf_covers_h_to_rn_with_its_origin():
+    from pyxany.data import elements as elem
+    from pyxany.data.loaders import schwarz_alpha
+
+    table = schwarz_alpha()
+    assert [elem.symbol_for_z(z) for z in range(1, 87)] == sorted(table, key=elem.atomic_number)
+    origins = [v["origin"].split()[0] for v in table.values()]
+    assert (origins.count("published"), origins.count("interpolated"),
+            origins.count("recomputed")) == (66, 19, 1)
+    # interpolation is linear between the end points of the subshell sequence
+    assert table["Te"]["alpha_hf"] == pytest.approx(
+        0.70102 + 3 / 5 * (0.69984 - 0.70102), abs=6e-6)
+    assert make_config(scf={"alpha": "alpha_hf"}).scf.alpha_for("O") == 0.74447
+
+
+def test_recomputed_definition_reproduces_the_published_values():
+    """tools/alpha_hf.py with Schwarz's definition vs his tables (2e-4: N)."""
+    from pyxany.data.loaders import _load, alpha_hf_table
+
+    recomputed = _load("alpha_hf_polarised")["alpha_hf_recomputed"]
+    published = alpha_hf_table()
+    compared = [s for s in recomputed if s != "H"]
+    assert len(compared) >= 20
+    for symbol in compared:
+        assert recomputed[symbol] == pytest.approx(published[symbol], abs=2e-4), symbol
+
+
+def test_polarised_table_is_selectable():
+    scf = make_config(scf={"alpha": "alpha_hf_polarised"}).scf
+    assert scf.alpha_for("H") == pytest.approx(0.77676, abs=1e-5)
+    # closed shells: spin polarisation and the configuration average change nothing
+    from pyxany.data.loaders import _load
+
+    recomputed = _load("alpha_hf_polarised")["alpha_hf_recomputed"]
+    for symbol in ("He", "Be", "Ne", "Mg", "Ar", "Ca"):
+        assert scf.alpha_for(symbol) == pytest.approx(recomputed[symbol], abs=1e-5)

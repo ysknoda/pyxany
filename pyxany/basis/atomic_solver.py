@@ -361,3 +361,21 @@ def solve_atom_polarised(symbol: str, alpha: float = 0.7, n_points: int = 4000,
                              rho_up=new["up"], rho_down=new["down"],
                              energy=band - E_H + E_x - vx_int, converged=converged,
                              n_iterations=it)
+
+
+def total_energy(sol: AtomicSolution, alpha: float) -> float:
+    """Total X-alpha energy of a spin-restricted :func:`solve_atom` solution.
+
+    ``E = sum_i f_i eps_i - E_H + E_x - int rho v_x`` (the orbital-energy sum
+    double counts the Hartree and exchange terms).
+    """
+    r, rho = sol.r, sol.density
+    w = np.log(r[1] / r[0]) * r
+    shell = 4.0 * PI * r * r
+    w_r = w
+    V_h = poisson_radial(r, w_r, rho)
+    E_H = 0.5 * float(np.dot(w, shell * rho * V_h))
+    E_x = float(np.dot(w, shell * rho * xc.energy_density(rho, alpha)))
+    vx = float(np.dot(w, shell * rho * xc.potential(rho, alpha)))
+    band = sum(o.occupation * o.eigenvalue for o in sol.orbitals.values())
+    return band - E_H + E_x - vx
