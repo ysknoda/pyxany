@@ -1,4 +1,4 @@
-"""Hartree potential by Becke multi-centre expansion, and nuclear attraction.
+"""Hartree potential by Becke multi-center expansion, and nuclear attraction.
 
 Method
 ------
@@ -9,7 +9,7 @@ pair loop or softening parameter:
 
        rho(r) = sum_A rho_A(r),   rho_A(r) = w_A(r) rho(r)
 
-   Each ``rho_A`` is localised on its own atom and decays in every direction.
+   Each ``rho_A`` is localized on its own atom and decays in every direction.
 
 2. Project each ``rho_A`` onto real spherical harmonics on the *angular* part of
    atom A's own sub-grid (which is an exact product grid, so this is one
@@ -89,7 +89,7 @@ def _radial_poisson_multipoles(r: np.ndarray, rho_lm: np.ndarray,
     ``r^-(l+1) int_0^r s^(l+2) rho ds`` is the same quantity but divides one
     tiny number by another near the nucleus; for l >= 8 on a heavy-atom grid
     that amplified spline and projection noise without bound (measured on the
-    GaAs4 cluster with off-centre Gaussian test charges: E_H wrong by 1.6e3 Ha at
+    GaAs4 cluster with off-center Gaussian test charges: E_H wrong by 1.6e3 Ha at
     l = 8), and the previous remedy -- overwriting rho_l and V_l with r^l power
     laws inside an l-dependent radius that reached 0.2-0.3 Bohr at l = 10 --
     discarded real core structure (the GaAs4 SCF moved by 0.15 Ha between
@@ -237,7 +237,7 @@ def _evaluate_multipoles(r_nodes: np.ndarray, v_nodes: np.ndarray,
                          l_of: np.ndarray, r: np.ndarray) -> np.ndarray:
     """Interpolate every radial multipole potential at once, with analytic tails.
 
-    Outside the charge distribution the exact behaviour is ``V ~ C / r^(l+1)``;
+    Outside the charge distribution the exact behavior is ``V ~ C / r^(l+1)``;
     near the origin it is ``V ~ r^l``.  Extrapolating with those forms rather
     than clamping is what keeps the potential correct beyond the outermost
     radial node -- a plain ``right=0`` there throws away the entire monopole

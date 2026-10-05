@@ -40,7 +40,7 @@ cached; parsed values with primary references in
 own measured error, obtained with PySCF at a large basis so that basis error is
 removed, plus the measured STO basis error -- not from guesses:
 
-- **bond lengths** (geometry optimised, DZP): intrinsic X-alpha error -0.2 %
+- **bond lengths** (geometry optimized, DZP): intrinsic X-alpha error -0.2 %
   (N2) to +4.0 % (H2), X-H bonds +1.2 to +1.8 % (cc-pVTZ); pyxany DZP measured
   -0.3 % to +4.2 %. Tolerance **5 %**. LiH excluded (STO Li basis: +5.8 %
   against intrinsic +1.8 %). The originally proposed 3 % would have failed H2
@@ -62,7 +62,7 @@ removed, plus the measured STO basis error -- not from guesses:
 quantum confinement and differ in size, so there is no physical reason for them
 to follow the bulk order.
 
-Not used for pass/fail: total energies, absolute gaps, orbital ionisation
+Not used for pass/fail: total energies, absolute gaps, orbital ionization
 energies.
 
 **Tier C -- regression.** Current values pinned.

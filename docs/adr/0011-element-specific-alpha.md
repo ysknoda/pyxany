@@ -36,8 +36,8 @@ Hartree-Fock energy (spin-restricted X-alpha, Herman-Skillman program).
   Z between the end points of their subshell sequence, as that paper
   recommends; H (no alpha_HF in the table) is the recomputed 0.97866. Each
   value carries its origin: 66 published, 19 interpolated, 1 recomputed.
-- `alpha_hf_polarised` -- no published counterpart; computed by
-  `tools/alpha_hf.py` (Q49, Q51): spin-polarised spherical X-alpha (Hund's
+- `alpha_hf_polarized` -- no published counterpart; computed by
+  `tools/alpha_hf.py` (Q49, Q51): spin-polarized spherical X-alpha (Hund's
   rule) against the ROHF energy of the same configuration, H-Rn, run on one
   core (Q51). Elements that fail (ROHF configuration differs from the
   table's, time limit) are excluded and listed in the file.
@@ -47,12 +47,12 @@ Hartree-Fock energy (spin-restricted X-alpha, Herman-Skillman program).
   1.9e-4 at most (N); the systematic small deficit is the ANO-RCC basis
   sitting ~0.5 mHa above the HF limit (Ne). This is a test.
 
-Using the spin-polarised table in UKS and the restricted one in RKS is the
-consistent pairing (the restricted fit absorbs the missing spin-polarisation
+Using the spin-polarized table in UKS and the restricted one in RKS is the
+consistent pairing (the restricted fit absorbs the missing spin-polarization
 energy of open-shell atoms into alpha: H 0.979 vs 0.777); the choice is
 explicit in the input, not automatic (Q49 b).
 
-Per-calculation alpha by energy minimisation was considered and rejected:
+Per-calculation alpha by energy minimization was considered and rejected:
 dE/dalpha = E_x/alpha < 0, so the energy has no minimum in alpha, and alpha is
 a parameter of the functional, not a variational variable. Tuning alpha per
 system by a non-energetic condition (e.g. -eps_HOMO = IP) is possible but

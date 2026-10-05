@@ -21,7 +21,7 @@ def test_every_grid_has_a_default_and_partial_blocks_are_completed():
     assert g.pair == {"n_r": 50, "n_a": 14}
     assert g.atom == {"n_points": 2000}
     assert g.guess == {"n_r": 80, "n_a": 14}
-    assert g.one_centre == {"n_r": 400}
+    assert g.one_center == {"n_r": 400}
     assert g.pruning == {"enabled": True, "regions": "auto"}
     assert g.basis_cutoff == 1e-6
 
@@ -188,11 +188,11 @@ def test_every_grid_is_reported(h2o):
     cfg = make_config()
     res = run_scf(h2o, build_basis(h2o, cfg), cfg, verbose=0)
     d = grid_summary(cfg, res.grid, h2o, res.terms)
-    assert set(d) >= {"molecular", "pair", "atom", "guess", "one_centre", "basis_cutoff"}
+    assert set(d) >= {"molecular", "pair", "atom", "guess", "one_center", "basis_cutoff"}
     assert d["molecular"]["points"] == len(res.grid)
     assert list(d["molecular"]["radial_points_by_species"]) == ["H", "O"]  # by Z
     text = "\n".join(summary_lines(d))
-    for word in ("molecular", "pair", "atom", "guess", "one-centre", "basis cutoff"):
+    for word in ("molecular", "pair", "atom", "guess", "one-center", "basis cutoff"):
         assert word in text
 
 
@@ -228,3 +228,13 @@ def test_lebedev_scf_is_close_to_the_product_grid(h2o):
 def test_unknown_angular_rule_is_rejected():
     with pytest.raises(ConfigError, match="angular"):
         make_config(grid={"n_r": 25, "n_a": 10, "angular": "lebedov"})
+
+
+@pytest.mark.parametrize("raw, new", [
+    ({"optimise": {"f_max": 1e-3}}, "optimize"),
+    ({"grid": {"one_centre": {"n_r": 400}}}, "one_center"),
+    ({"scf": {"alpha": "alpha_hf_polarised"}}, "alpha_hf_polarized"),
+])
+def test_british_spellings_name_their_american_replacement(raw, new):
+    with pytest.raises(ConfigError, match=new):
+        make_config(**raw)

@@ -69,8 +69,8 @@ than a polyatomic at the same grid. **Do not calibrate expectations on H₂.**
 
 ### Choosing
 
-- **Geometry optimisation**: analytic forces, with `grid.n_r ≥ 40` and
-  `grid.n_a ≥ 14`. Do not set `optimise.f_max` tighter than the force error at
+- **Geometry optimization**: analytic forces, with `grid.n_r ≥ 40` and
+  `grid.n_a ≥ 14`. Do not set `optimize.f_max` tighter than the force error at
   your grid — check it once with `pyxany forces --compare`.
 - **Publication-quality gradients on a small system**: `forces.method:
   finite_difference`.

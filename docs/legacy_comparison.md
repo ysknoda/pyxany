@@ -34,12 +34,12 @@ included one, scaling every grid integral by
     ∫₋₁¹ √(1−u²) du / ∫₋₁¹ du = (π/2)/2 = π/4 = 0.7854
 
 which is exactly the 0.793 seen for the single neon atom above. The same file
-contained a second, correct convention in its one-centre routines — the two
+contained a second, correct convention in its one-center routines — the two
 disagreed with each other.
 
 ### 2. No Becke partitioning
 
-The molecular grid was a plain concatenation of atom-centred grids. Each of
+The molecular grid was a plain concatenation of atom-centerd grids. Each of
 those integrates over all space on its own, so overlapping regions were counted
 once per atom. Measured on `∫|χ_1s|² dV`, whose exact value is 1:
 
@@ -90,13 +90,13 @@ capacity of 1, so each spin channel received twice its electron count. This is
 the `Tr(PS) = 16` for nine-electron CH₃ in the baseline table. Every
 odd-electron or `mult > 1` calculation was affected.
 
-### 6. GTO contractions read with the wrong normalisation convention
+### 6. GTO contractions read with the wrong normalization convention
 
-The tabulated coefficients were treated as multiplying *unnormalised*
+The tabulated coefficients were treated as multiplying *unnormalized*
 primitives. Standard basis-set tables (EMSL / Gaussian / Basis Set Exchange) use
-**normalised** primitives; the self-overlap of a shell computed that way comes
+**normalized** primitives; the self-overlap of a shell computed that way comes
 out at exactly 1.000000, and at 8.5e-1, 8.9e-3, 9.2e-3 … under the other
-convention. A global renormalisation hid the error in the total, but the
+convention. A global renormalization hid the error in the total, but the
 relative weights of the primitives — the shape of the function — were wrong.
 STO-3G hydrogen now gives T = 0.7600 Ha, the accepted value.
 
@@ -108,12 +108,12 @@ returned each rank's partial matrix without summing. `build_Vnuc` and
 
 ### 8. Smaller defects
 
-- The 6-31G(d) polarisation block tested a loop variable that had leaked out of
+- The 6-31G(d) polarization block tested a loop variable that had leaked out of
   the shell loop; with an empty shell list it raised `NameError`.
 - `_LM_TO_CART` mapped d_z² to the single monomial `z²` and d_x²−y² to `x²`,
   so the "analytical" Obara-Saika path returned approximations.
 - `eps[n_occ]` crashed for a single atom in a minimal basis (`n_occ == n_basis`).
-- J was built from the freshly diagonalised density while V_xc and the energy
+- J was built from the freshly diagonalized density while V_xc and the energy
   used the mixed one, so the printed energy was not a functional of any single
   density.
 - BDE atomic references used `mult = 1` for every even-Z atom (carbon and oxygen
@@ -136,7 +136,7 @@ Same molecules, `dz` basis, `n_r=40, n_a=14`:
 | CH₃ (doublet) | −39.062 | −39.58 | 0.987 | 0.999998 | 1.000000 |
 
 Xα without correlation sitting about 1 % above Hartree-Fock is the expected
-behaviour of the functional. The conservation columns are now exact for every
+behavior of the functional. The conservation columns are now exact for every
 system, open-shell included.
 
 ### Correction after the first release of these numbers
@@ -164,7 +164,7 @@ only the *error at one resolution*, which a looser tolerance always absorbs;
 ## What was carried over unchanged
 
 The Treutler-Ahlrichs M4 radial map, the DIIS and EDIIS accelerators, canonical
-orthogonalisation, the Obara-Saika recursions, the six-panel summary figure, and
+orthogonalization, the Obara-Saika recursions, the six-panel summary figure, and
 all ten element/basis data tables. `tests/test_data.py` re-imports the original
 script and asserts that every key and every value survived the conversion to
 JSON; it runs as long as `dv-xa.py` is present and skips afterwards.

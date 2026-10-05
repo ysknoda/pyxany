@@ -168,7 +168,7 @@ def format_results(result, config, forces=None, dipole=None) -> str:
     if config.properties.population:
         from ..properties import bonding
 
-        out.extend(bonding.report_lines(bonding.analyse(result, config), result.molecule))
+        out.extend(bonding.report_lines(bonding.analyze(result, config), result.molecule))
 
     passivation = _passivation_check(result, config.properties.terminator_weight_max)
     if passivation:
@@ -209,7 +209,7 @@ def _transition_state_lines(result) -> list[str]:
     if t["mode"] == "remove":
         out.append(f"  {t['electrons']:g} {t['spin']} electron removed from orbital {i}")
         out.append(
-            f"  eps(TS) = {t['eps_source']:.6f} Ha  ->  ionisation energy "
+            f"  eps(TS) = {t['eps_source']:.6f} Ha  ->  ionization energy "
             f"-eps(TS) = {-t['eps_source'] * ev:.4f} eV"
         )
     else:

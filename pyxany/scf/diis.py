@@ -18,7 +18,7 @@ MAX_CONDITION = 1e12
 
 
 class PulayDIIS:
-    """Extrapolate F to minimise the commutator error ``e = FPS - SPF``."""
+    """Extrapolate F to minimize the commutator error ``e = FPS - SPF``."""
 
     def __init__(self, max_vectors: int = 10):
         self.max_vectors = max_vectors
@@ -75,7 +75,7 @@ class PulayDIIS:
 
 
 class EDIIS:
-    """Energy-DIIS: minimise a quadratic model of E over density mixings."""
+    """Energy-DIIS: minimize a quadratic model of E over density mixings."""
 
     def __init__(self, max_vectors: int = 8):
         self.max_vectors = max_vectors

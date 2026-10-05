@@ -42,7 +42,7 @@ report flags whether the value is one of the standard ones.
 VASP needs a PAW dataset per pseudo-hydrogen because it is a pseudopotential
 code. `pyxany` is all-electron: a terminator with charge α is *completely*
 specified by putting `−α/r` in the nuclear attraction, `α_A Z_B/R` in the nuclear
-repulsion, and α electrons in its 1s. There is nothing left to parameterise.
+repulsion, and α electrons in its 1s. There is nothing left to parameterize.
 
 Its **basis function** is likewise solved for rather than fitted: the spherical
 Kohn-Sham problem is solved for nuclear charge α with α electrons, and a 1s
@@ -73,8 +73,8 @@ Slater function is fitted to the result. Two limits make that checkable:
 ## The X–H\* distance
 
 There is no recommended value in the literature to copy, and none is needed:
-the distance is a quantity to **optimise**, not to tabulate. The initial guess
-scales this structure's own nearest-neighbour bond by the ratio of summed
+the distance is a quantity to **optimize**, not to tabulate. The initial guess
+scales this structure's own nearest-neighbor bond by the ratio of summed
 covalent radii — an explicitly additive combination rule, not a per-element
 number reused as a pair quantity:
 
@@ -160,7 +160,7 @@ Relaxing the terminators does not remove them: GaAs4 after
 this small, not to an unrelaxed geometry.
 
 The core gap is only a guide. Its threshold is a heuristic, and when most
-atoms are terminators (MgO6: 30 of 37) even delocalised empty states carry
+atoms are terminators (MgO6: 30 of 37) even delocalized empty states carry
 more than half their weight on them, so the core gap runs off to the first
 state that happens to avoid them (10.8 eV). For a gap that represents the
 material, enlarge the cluster until the terminators are a minority and the

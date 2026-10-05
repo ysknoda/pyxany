@@ -7,7 +7,7 @@
 
 `scf.checkpoint_every` is currently rejected by the validator because no
 restart exists: a job killed at a wall-clock limit loses all work. Scans and
-optimisations also restart every point from an atomic-superposition guess.
+optimizations also restart every point from an atomic-superposition guess.
 
 ## Decision
 
@@ -23,7 +23,7 @@ optimisations also restart every point from an atomic-superposition guess.
   atomic rename, so a crash mid-write never corrupts the previous checkpoint.
 - `--restart file.npz`: if both hashes match, resume from the stored density
   and iteration count. If only the geometry differs (next scan or
-  optimisation point), downgrade to "use as initial density" with a warning.
+  optimization point), downgrade to "use as initial density" with a warning.
   A different system is an error.
 - `scan` and `opt` reuse the previous point's density automatically.
 

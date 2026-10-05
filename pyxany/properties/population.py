@@ -1,4 +1,4 @@
-"""Mulliken populations and Wiberg bond orders (vectorised)."""
+"""Mulliken populations and Wiberg bond orders (vectorized)."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def mayer_bond_orders(P: np.ndarray, S: np.ndarray, basis, molecule,
 
     This is the **Mayer** bond order, which is what the expression above is.
     The *Wiberg* index is ``sum P^2_{mu nu}`` and coincides with it only in an
-    orthonormal basis (Loewdin-orthogonalised, or a ZDO/CNDO scheme).  This
+    orthonormal basis (Loewdin-orthogonalized, or a ZDO/CNDO scheme).  This
     code uses a decidedly non-orthogonal STO/GTO basis -- ``pyxany.scf.linalg``
     exists precisely to handle ``S`` -- so the two are not interchangeable
     here, and the name matters.
@@ -117,7 +117,7 @@ def loewdin_orbital_weights(C: np.ndarray, S: np.ndarray, selector) -> np.ndarra
     """Fraction of each MO on the basis functions ``selector`` picks, in [0, 1].
 
     ``sum_{mu selected} (S^1/2 C)_{mu i}^2`` -- the orbital expressed in the
-    symmetrically orthogonalised basis, so the weights of all functions add up
+    symmetrically orthogonalized basis, so the weights of all functions add up
     to the orbital's norm, 1, and none can be negative.
     """
     mask = np.asarray(selector, dtype=bool)

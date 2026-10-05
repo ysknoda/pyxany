@@ -21,13 +21,13 @@ def dipole_moment(molecule, grid, rho_local: np.ndarray,
     longer cancel -- so a cluster cut from an ionic crystal, which frequently
     carries a net charge, gives a different answer for every origin: water
     translated by 3 A keeps |mu| = 1.85 D when neutral but goes from 2.98 D to
-    16.41 D as a cation.  ``origin`` therefore defaults to the centre of
+    16.41 D as a cation.  ``origin`` therefore defaults to the center of
     nuclear charge rather than to the coordinate origin, which at least makes
     the value translation-invariant and reproducible; callers that need a
     particular convention should pass it explicitly.
     """
     if origin is None:
-        origin = centre_of_nuclear_charge(molecule)
+        origin = center_of_nuclear_charge(molecule)
     origin = np.asarray(origin, dtype=float)
 
     electronic = -np.einsum("k,kx->x", grid.local_weights * rho_local,
@@ -38,7 +38,7 @@ def dipole_moment(molecule, grid, rho_local: np.ndarray,
     return (nuclear + electronic) * AU_TO_DEBYE
 
 
-def centre_of_nuclear_charge(molecule) -> np.ndarray:
+def center_of_nuclear_charge(molecule) -> np.ndarray:
     """``sum_A Z_A R_A / sum_A Z_A`` -- the default dipole origin."""
     charges = np.asarray(molecule.charges, dtype=float)
     total = float(charges.sum())

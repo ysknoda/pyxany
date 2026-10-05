@@ -1,4 +1,4 @@
-"""Radial quadrature for atom-centred grids."""
+"""Radial quadrature for atom-centerd grids."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def treutler_ahlrichs_m4(n: int, radius: float = 1.0, alpha: float = 0.6):
 
 
 def log_squared_map(n: int, radius: float = 1.0):
-    """Rational Gauss-Legendre map r = R (1+x)/(1-x), used for two-centre grids.
+    """Rational Gauss-Legendre map r = R (1+x)/(1-x), used for two-center grids.
 
     Returns ``(r, w)`` for ``int_0^inf f(r) dr``.
     """

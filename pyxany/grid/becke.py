@@ -4,7 +4,7 @@ Reference
 ---------
 A. D. Becke, *J. Chem. Phys.* **88**, 2547 (1988).
 
-A molecular grid built by stacking atom-centred spherical grids integrates each
+A molecular grid built by stacking atom-centerd spherical grids integrates each
 atomic sub-grid over *all* space, so a naive superposition counts every region
 once per atom -- an ``N_atoms``-fold overcounting.  Becke's construction assigns
 each point a set of weights ``w_A(r)`` with ``sum_A w_A(r) = 1`` everywhere, so
@@ -58,16 +58,16 @@ def _smooth_step(nu: np.ndarray, stiffness: int) -> np.ndarray:
 
 def becke_weights(
     points: np.ndarray,
-    centres: np.ndarray,
+    centers: np.ndarray,
     radii: np.ndarray,
     stiffness: int = DEFAULT_STIFFNESS,
 ) -> np.ndarray:
-    """Normalised cell weights ``w[k, A]`` for every point and atom.
+    """Normalized cell weights ``w[k, A]`` for every point and atom.
 
     Parameters
     ----------
     points   : (n_points, 3) Cartesian coordinates, Bohr
-    centres  : (n_atoms, 3) atomic positions, Bohr
+    centers  : (n_atoms, 3) atomic positions, Bohr
     radii    : (n_atoms,) Bragg-Slater radii, Bohr
     stiffness: number of iterations of Becke's smoothing polynomial
 
@@ -76,7 +76,7 @@ def becke_weights(
     (n_points, n_atoms) array whose rows sum to 1.
     """
     pts = np.asarray(points, dtype=float)
-    C = np.asarray(centres, dtype=float)
+    C = np.asarray(centers, dtype=float)
     n_atoms = len(C)
     if n_atoms == 1:
         return np.ones((len(pts), 1))
@@ -109,17 +109,17 @@ def becke_weights(
 def becke_weights_own_cell(
     points: np.ndarray,
     owner: np.ndarray,
-    centres: np.ndarray,
+    centers: np.ndarray,
     radii: np.ndarray,
     stiffness: int = DEFAULT_STIFFNESS,
 ) -> np.ndarray:
     """Only the weight of each point's own parent atom -- what a molecular grid needs.
 
     ``owner[k]`` is the index of the atom whose sub-grid produced ``points[k]``.
-    Equivalent to ``becke_weights(...)[k, owner[k]]`` but avoids materialising
+    Equivalent to ``becke_weights(...)[k, owner[k]]`` but avoids materializing
     the full (n_points, n_atoms) array.
     """
-    w = becke_weights(points, centres, radii, stiffness)
+    w = becke_weights(points, centers, radii, stiffness)
     return w[np.arange(len(points)), np.asarray(owner)]
 
 
@@ -137,7 +137,7 @@ def own_cell_weight_gradient(
     points: np.ndarray,
     owner: np.ndarray,
     coeff: np.ndarray,
-    centres: np.ndarray,
+    centers: np.ndarray,
     radii: np.ndarray,
     stiffness: int = DEFAULT_STIFFNESS,
 ) -> np.ndarray:
@@ -153,11 +153,11 @@ def own_cell_weight_gradient(
     ``(n_atoms, n_atoms, 3)`` array; memory stays ``O(n_points * n_atoms)``.
 
     The derivative for ``B = A`` with the points moving *with* their atom (the
-    case on an atom-centred grid) follows from translational invariance,
+    case on an atom-centerd grid) follows from translational invariance,
     ``-sum_{B != A} M[A, B]``; that bookkeeping is left to the caller.
     """
     pts = np.asarray(points, dtype=float)
-    C = np.asarray(centres, dtype=float)
+    C = np.asarray(centers, dtype=float)
     owner = np.asarray(owner)
     n_atoms = len(C)
     out = np.zeros((n_atoms, n_atoms, 3))

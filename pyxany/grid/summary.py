@@ -34,7 +34,7 @@ def grid_summary(cfg, grid, molecule, terms=None) -> dict:
         "pair": dict(g.pair),
         "atom": dict(g.atom),
         "guess": dict(g.guess),
-        "one_centre": dict(g.one_centre),
+        "one_center": dict(g.one_center),
         "basis_cutoff": float(g.basis_cutoff),
     }
     if terms is not None and getattr(terms, "sparsity", None):
@@ -84,14 +84,14 @@ def summary_lines(d: dict) -> list[str]:
     lines.append(f"              Hartree multipoles up to l = {m['poisson_l_max']}")
     lines.append(
         f"  pair        {d['pair']['n_r']} radial x {d['pair']['n_a']} x "
-        f"{2 * d['pair']['n_a']} angular per centre (S, T)"
+        f"{2 * d['pair']['n_a']} angular per center (S, T)"
     )
     lines.append(f"  atom        {d['atom']['n_points']} log-grid points (atomic solver)")
     lines.append(
         f"  guess       {d['guess']['n_r']} radial x {d['guess']['n_a']} x "
         f"{2 * d['guess']['n_a']} angular (SAD projection)"
     )
-    lines.append(f"  one-centre  {d['one_centre']['n_r']} radial points (non-Slater functions)")
+    lines.append(f"  one-center  {d['one_center']['n_r']} radial points (non-Slater functions)")
     cut = d["basis_cutoff"]
     if cut > 0:
         sp = d.get("basis_sparsity")

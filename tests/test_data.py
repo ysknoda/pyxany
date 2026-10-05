@@ -47,7 +47,7 @@ CHECKSUMS = {
     "gto_sto3g": "941711c4444cd8a0",
     "orbital_labels": "6224dbe90ee67d95",
     # measured by tools/radial_grid_sizes.py (2026-10-01), see ADR 0008
-    "radial_points": "55fb40348bcd66e2",
+    "radial_points": "ab17c9febceb8135",
     "sto_dz": "5b3b9a388a2a4628",
     "sto_pol_d": "b11eaa7f0d7f51ae",
     "sto_pol_f": "f5219201d99b068f",
@@ -56,7 +56,7 @@ CHECKSUMS = {
     # Schwarz, PRB 5, 2466 (1972) and TCA 34, 225 (1974), transcribed 2026-10-05 (ADR 0011)
     "schwarz_alpha": "efe54b9293bb5fd1",
     # tools/alpha_hf.py; H-Sc so far, rewritten when the H-Rn run finishes (ADR 0011)
-    "alpha_hf_polarised": "d2c9a8e48916d1f8",
+    "alpha_hf_polarized": "7d8d2447d4ed3e0d",
 }
 
 

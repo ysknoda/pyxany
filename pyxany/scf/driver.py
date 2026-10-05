@@ -2,7 +2,7 @@
 
 Every energy term in one iteration is built from the *same* density matrix, so
 the printed energy is a genuine functional of a single density.  (The original
-single-file version built J from the freshly diagonalised density while
+single-file version built J from the freshly diagonalized density while
 evaluating V_xc and the energy from the mixed one.)
 """
 
@@ -22,7 +22,7 @@ from ..timing import timer
 from .diis import EDIIS, PulayDIIS
 from .grid_terms import GridTerms, choose_strategy
 from .guess import rescale_to_electron_count, sad_density, spin_split
-from .linalg import solve_generalised
+from .linalg import solve_generalized
 from .occupations import (
     density_matrix,
     fermi_occupations,
@@ -135,7 +135,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
     ``basis`` sections are read here.
 
     ``initial`` is a starting density ``{"P": ..., "P_a": ..., "P_b": ...}``
-    (e.g. the previous point of an optimisation); ``restart`` is a checkpoint
+    (e.g. the previous point of an optimization); ``restart`` is a checkpoint
     file to resume from or, at another geometry, to start from. With
     ``checkpoint_path`` the state is written every ``scf.checkpoint_every``
     iterations (if > 0) and at the end. See :mod:`pyxany.scf.checkpoint`.
@@ -163,7 +163,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
     S, T = build_overlap_kinetic(molecule, basis,
                                  n_r=grid_cfg.pair["n_r"], n_a=grid_cfg.pair["n_a"],
                                  screening_tol=grid_cfg.screening_tol,
-                                 n_r_1c=grid_cfg.one_centre["n_r"])
+                                 n_r_1c=grid_cfg.one_center["n_r"])
     cond = condition_number(S)
     holes = None
     if ts_cfg.enabled:
@@ -317,7 +317,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                 F_b = T + V_nuc + JVxc_b
                 Fa_use, Fb_use, method, err, mix = _accelerate_uks(
                     accel, F_a, F_b, P_a, P_b, S, energies["E_total"], it, scf_cfg, dE)
-                eps_a, C_a, eps_b, C_b = _diagonalise_uks(Fa_use, Fb_use, S, n_basis)
+                eps_a, C_a, eps_b, C_b = _diagonalize_uks(Fa_use, Fb_use, S, n_basis)
                 occ_a = fermi_occupations(eps_a, n_alpha, scf_cfg.smearing, 1.0)
                 occ_b = fermi_occupations(eps_b, n_beta, scf_cfg.smearing, 1.0)
                 if holes is not None:
@@ -346,7 +346,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                 F = T + V_nuc + JVxc
                 F_use, method, err, mix = _accelerate_rks(
                     accel, F, P, S, energies["E_total"], it, scf_cfg, dE)
-                eps, C, _ = solve_generalised(F_use, S, scf_cfg.s_threshold)
+                eps, C, _ = solve_generalized(F_use, S, scf_cfg.s_threshold)
                 occ = fermi_occupations(eps, n_electrons, scf_cfg.smearing, 2.0)
                 P_new = density_matrix(C, occ)
                 d_rms = float(np.sqrt(np.mean((P_new - P) ** 2)))
@@ -455,7 +455,7 @@ def _diis_mixing(cfg, extrapolated: bool, error: float) -> float:
     A successful Pulay extrapolation already contains the convergence
     acceleration, so the new density is taken *whole* (mix = 1).  Damping on top
     of DIIS simply multiplies the residual by (1 - mix) every iteration and
-    throws the acceleration away -- the slow geometric decay that behaviour
+    throws the acceleration away -- the slow geometric decay that behavior
     produces is unmistakable in an SCF trace.  Damping is kept only for the
     fallback path where no extrapolation was available.
     """
@@ -492,9 +492,9 @@ def _accelerate_uks(accel, F_a, F_b, P_a, P_b, S, energy, it, cfg, dE):
     return (a if a is not None else F_a), (b if b is not None else F_b), "DIIS", err, mix
 
 
-def _diagonalise_uks(F_a, F_b, S, n_basis):
-    eps_a, C_a, _ = solve_generalised(F_a, S)
-    eps_b, C_b, _ = solve_generalised(F_b, S)
+def _diagonalize_uks(F_a, F_b, S, n_basis):
+    eps_a, C_a, _ = solve_generalized(F_a, S)
+    eps_b, C_b, _ = solve_generalized(F_b, S)
     return eps_a, C_a, eps_b, C_b
 
 
@@ -598,7 +598,7 @@ def _print_footer(converged, n_it, energies, n_electrons):
     trace = energies["trace_PS"]
     mpi_print(f"  int rho dV = {n_int:.6f}   Tr(PS) = {trace:.6f}   "
               f"(expected {n_electrons:g})")
-    # S and T are built on their own two-centre grids and with exact one-centre
+    # S and T are built on their own two-center grids and with exact one-center
     # formulas, while rho, V_H and V_xc live on the DV molecular grid.  The two
     # therefore disagree slightly about how many electrons there are, and the
     # charge that generates V_H is not exactly the charge the Fock matrix
@@ -610,5 +610,5 @@ def _print_footer(converged, n_it, energies, n_electrons):
         mpi_print(f"  [warning] the DV grid and the overlap matrix disagree on the "
                   f"electron count by {abs(n_int - trace):.2e} "
                   f"({mismatch:.1e} relative).")
-        mpi_print(f"            V_H is built from a density normalised differently "
+        mpi_print(f"            V_H is built from a density normalized differently "
                   f"from Tr(PS); raise grid.n_r / grid.n_a until this shrinks.")

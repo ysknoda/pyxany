@@ -14,7 +14,7 @@ Two criteria are measured; the table's ``n_r`` uses the second (ADR 0008, Q23):
 * ``n_r_total``: max(|dN|, |dE_ne|, |dE_H|, |dE_x|) / N -- the absolute
   total-energy error per electron. Dominated by the cores, which move rigidly
   with their atom and cancel in energy differences, forces and gaps.
-* ``n_r_ip``: the error in the grid-integrated part of the ionisation energy
+* ``n_r_ip``: the error in the grid-integrated part of the ionization energy
   E(neutral) - E(cation), removing one electron from the last subshell of the
   tabulated configuration -- a chemically meaningful energy difference.
 
@@ -174,7 +174,7 @@ def main() -> None:
                 "_source": "Measured with tools/radial_grid_sizes.py on pyxany's own DV radial grid "
                 "(Treutler-Ahlrichs M4, Bragg-Slater scaling, production Hartree solver) "
                 "against the near-exact spherical X-alpha atom and cation (alpha = 0.7).",
-                "_criterion": f"n_r: smallest n_r whose grid error in the ionisation energy stays <= "
+                "_criterion": f"n_r: smallest n_r whose grid error in the ionization energy stays <= "
                 f"{t_ip:.3e} Ha for 11 consecutive n_r; n_r_total: same for the "
                 f"total-energy error per electron <= {t_tot:.3e} Ha. Targets = worst of "
                 f"{list(SECOND_ROW)} at n_r = {args.baseline}. ratio_to_second_row = "

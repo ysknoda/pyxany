@@ -21,7 +21,7 @@ H   0.000000  -0.757200  -0.469200
 Pseudo-hydrogen terminators appear as their own species labels (`HCd`, `HO`,
 …) and must be declared in `passivation.species`. An undeclared label that is
 not an element symbol is an error, not a silently skipped line. Geometry
-optimisation writes multi-frame trajectories in the same format.
+optimization writes multi-frame trajectories in the same format.
 
 ## Settings (`.yaml`)
 
@@ -57,7 +57,7 @@ grid:
     enabled:        true
     regions:        auto    # or [[r/R_Bragg bound, n_a], ...]; auto = [[0.25, n_a/3], [0.5, 2n_a/3]]
   basis_cutoff:     1.0e-6  # drop basis functions below this on a block of points; 0 = dense
-  pair:                     # two-centre grids of the S and T matrices
+  pair:                     # two-center grids of the S and T matrices
     n_r:            40
     n_a:            14
   atom:                     # log grid of the spherical atom solver (NAO basis,
@@ -65,7 +65,7 @@ grid:
   guess:                    # one-atom grid the SAD guess is projected on
     n_r:            80
     n_a:            14
-  one_centre:               # radial quadrature of one-centre non-Slater integrals
+  one_center:               # radial quadrature of one-center non-Slater integrals
     n_r:            400
   chunk_size:       auto    # points per chi block; auto uses memory_budget_mb
   memory_budget_mb: 4096
@@ -82,7 +82,7 @@ scf:
   max_iter:         100
   e_tol:            1.0e-6  # total-energy convergence (Ha)
   d_tol:            1.0e-5  # density-matrix rms convergence
-  alpha:            0.7     # a number | alpha_hf (Schwarz) | alpha_hf_polarised | {default: 0.7, Si: 0.73}
+  alpha:            0.7     # a number | alpha_hf (Schwarz) | alpha_hf_polarized | {default: 0.7, Si: 0.73}
   unrestricted:     false   # forced true for odd electrons or mult > 1
   smearing:         0.0     # Fermi smearing kT (Ha)
   s_threshold:      5.0e-4  # drop overlap eigenvalues below this
@@ -96,7 +96,7 @@ forces:
   fd_step:              0.02       # Bohr
   project_translation:  true       # enforce sum(F) = 0
 
-optimise:
+optimize:
   enabled:    false
   method:     lbfgs       # lbfgs | cg
   f_max:      1.0e-3      # Ha/Bohr
@@ -141,24 +141,24 @@ rejected by the input validator.
 **`grid.n_r`** is the radial size for second-row atoms. With
 `radial_by_element: true` (the default) each atom gets `ceil(n_r × ratio)`
 points, the ratio *measured* per element by `tools/radial_grid_sizes.py`: the
-grid error in the ionisation energy of the near-exact X-alpha atom is brought
+grid error in the ionization energy of the near-exact X-alpha atom is brought
 to the level C, N, O and F reach at `n_r`. At `n_r = 30`: H 36, C 25, O 29,
 Si 33, Ga/As 47, Cd 60, Pb 71. Without it, a Ga or Cd atom at `n_r = 30` carries
 ~0.5 Ha of radial quadrature error in its total energy (energy *differences*
-are affected far less: 6 meV for the Ga ionisation energy).
+are affected far less: 6 meV for the Ga ionization energy).
 
 **`grid.poisson_l_max`** truncates the multipole expansion of each atom's share
 of the density. The default `auto` uses `n_a - 1`, the highest multipole the
 angular grid resolves (larger values are rejected). Lower values are cheaper --
 cost scales as `(l_max + 1)²` -- and are adequate for energies, but the force
 error is set by this truncation: on CO it is 1.6e-2 Ha/Bohr at `l_max = 6`,
-1.3e-3 at 12 and 1e-4 at 16, so keep `auto` for optimisations.
+1.3e-3 at 12 and 1e-4 at 16, so keep `auto` for optimizations.
 
 **`scf.alpha`** — 0.7 is the customary DV-Xα value. `alpha = 2/3` makes the
 functional exactly Dirac (LDA) exchange, which is what
 `tests/test_xc.py` uses to pin the absolute scale.
 
-**`optimise.freeze: core`** holds every non-terminator atom fixed, which is how
+**`optimize.freeze: core`** holds every non-terminator atom fixed, which is how
 pseudo-hydrogen positions are meant to be determined.
 
 ## Overriding from the command line
@@ -176,7 +176,7 @@ pyxany run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp -o /scr
 | `<prefix>_results.txt` | human-readable report |
 | `<prefix>_results.json` | energies, forces, eigenvalues, charges, timings |
 | `<prefix>_final.xyz` | the geometry used (or reached) |
-| `<prefix>_traj.xyz` | optimisation trajectory |
+| `<prefix>_traj.xyz` | optimization trajectory |
 | `<prefix>_results.png` | six-panel summary figure |
 | `<prefix>_timing.json` | per-section wall times |
 | `<prefix>_scan.csv` | `pyxany scan` output |
@@ -190,7 +190,7 @@ to the summary PNG, three figures as both PDF and PNG:
 | file | content |
 |---|---|
 | `<prefix>_coop.*` | MO overlap population vs orbital energy, one panel per element-pair type (bars per orbital, broadened curve; > 0 bonding, < 0 antibonding). The axis is scaled to the occupied orbitals; empty-orbital bars beyond it are clipped and marked, because Mulliken overlap populations of diffuse empty orbitals can exceed 1 by far (H2O/DZ: -7 for the O-H sigma*). |
-| `<prefix>_levels_op.*` | orbital levels coloured by the overlap population of the dominant pair type (solid occupied, dashed empty). |
+| `<prefix>_levels_op.*` | orbital levels colored by the overlap population of the dominant pair type (solid occupied, dashed empty). |
 | `<prefix>_pdos.*` | Loewdin partial DOS by element and by (element, l); species in order of nuclear charge. Beta drawn negative for open shells. |
 | `<prefix>_op_heatmap.*` | atom-pair overlap population matrix, if `overlap_population.heatmap: true`. |
 
@@ -201,8 +201,8 @@ text report (strongest pairs) and in the JSON output under `bonding`.
 
 ```yaml
 transition_state:
-  remove: homo                  # valence ionisation: 'homo', or an MO number (1-based)
-  # remove: {atom: 3, shell: 1s}  # core ionisation of atom 3 (1-based, as in the .xyz)
+  remove: homo                  # valence ionization: 'homo', or an MO number (1-based)
+  # remove: {atom: 3, shell: 1s}  # core ionization of atom 3 (1-based, as in the .xyz)
   # excite: {from: homo, to: lumo}
   spin: alpha                   # channel the half electron leaves
   electrons: 0.5
@@ -210,7 +210,7 @@ transition_state:
 
 Half an electron is removed (or moved) every SCF iteration; the run is
 unrestricted automatically and `scf.smearing` must be 0. The report gives
-`-eps(TS)` (ionisation) or `eps_to - eps_from` (excitation), which by Janak's
+`-eps(TS)` (ionization) or `eps_to - eps_from` (excitation), which by Janak's
 theorem equal the Delta-SCF energy to third order (H2O HOMO: 11.16 eV against
 Delta-SCF 11.12 eV).
 
@@ -218,10 +218,10 @@ Delta-SCF 11.12 eV).
 of `pyxany scan` is 0-based.
 
 A core hole needs a basis with principal quantum numbers (STO sets such as
-`dz`, or `nao`). With several equivalent atoms the hole is localised on the
+`dz`, or `nao`). With several equivalent atoms the hole is localized on the
 one named: the run starts by removing the combination of their core orbitals
 with the largest weight on that atom, and switches to the orbital itself once
-an eigenvector is localised (N2: 0.998 on the named atom). Keep
+an eigenvector is localized (N2: 0.998 on the named atom). Keep
 `poisson_l_max` at its default (`auto`); a low value spoils the energy/orbital
 consistency the method relies on (Janak residual 5.8e-3 Ha at l_max = 2,
 1.4e-5 at 13).

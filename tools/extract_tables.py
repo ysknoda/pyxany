@@ -63,7 +63,7 @@ def main():
         dump(name, conv)
 
     dump("gto_631gd_pol", {k: float(v) for k, v in L.GTO_631Gd_pol.items()})
-    report.append(("gto_631gd_pol.json", len(L.GTO_631Gd_pol), "d polarisation exponents"))
+    report.append(("gto_631gd_pol.json", len(L.GTO_631Gd_pol), "d polarization exponents"))
 
     # --- orbital label map: (n,l,m) -> label, stored as "n,l,m" keys ---------
     orb = {f"{n},{l},{m}": lbl for (n, l, m), lbl in L._ORB_LABEL.items()}

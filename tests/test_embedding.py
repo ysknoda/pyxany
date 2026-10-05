@@ -80,7 +80,7 @@ def test_evjen_block_is_neutral_dipole_free_and_gives_the_madelung_constant():
     assert np.abs((q[:, None] * pos).sum(axis=0)).max() < 1e-10
     d = np.linalg.norm(pos, axis=1)
     keep = d > 1e-9
-    madelung = -np.sum(q[keep] / d[keep]) * 0.5  # nearest-neighbour distance a/2
+    madelung = -np.sum(q[keep] / d[keep]) * 0.5  # nearest-neighbor distance a/2
     assert madelung == pytest.approx(1.747565, abs=2e-5)  # rock salt
 
 

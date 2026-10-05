@@ -2,7 +2,7 @@
 
 A ``Grid`` owns the full set of quadrature points and weights, knows which
 contiguous slice belongs to the current MPI rank, and can hand out chunks so
-that large (n_points x n_basis) intermediates never have to be materialised.
+that large (n_points x n_basis) intermediates never have to be materialized.
 """
 
 from __future__ import annotations
@@ -176,12 +176,12 @@ def build_molecular_grid(
     pruning: list | None = None,
     angular: str = "product",
 ) -> Grid:
-    """Superposition of atom-centred TA-radial x Gauss-Legendre-angular grids.
+    """Superposition of atom-centerd TA-radial x Gauss-Legendre-angular grids.
 
     ``n_r`` is the radial size for second-row atoms. With ``radial_by_element``
     each atom gets ``ceil(n_r * ratio)`` points, the ratio measured per element
     (data/tables/radial_points.json) so that every element reaches the
-    ionisation-energy accuracy C-F reach at ``n_r``: Ga and As get 47 at
+    ionization-energy accuracy C-F reach at ``n_r``: Ga and As get 47 at
     ``n_r = 30``, Cd 60. Pseudo-hydrogens use hydrogen's ratio.
 
     The volume element is ``dV = r^2 dr d(cos theta) d phi`` -- the angular
@@ -294,13 +294,13 @@ def radial_sizes(molecule, n_r: int) -> np.ndarray:
                      for a in molecule], dtype=int)
 
 
-def two_centre_grid(centre, n_r: int, n_a: int, scale: float = 1.0):
-    """Single-centre Gauss-Legendre 3-D grid, used for two-centre S/T integrals.
+def two_center_grid(center, n_r: int, n_a: int, scale: float = 1.0):
+    """Single-center Gauss-Legendre 3-D grid, used for two-center S/T integrals.
 
     Returns ``(points, weights)`` with ``dV = r^2 dr d(cos theta) d phi``.
     """
     dirs, w_ang = spherical_product(n_a)
     r, w_r = log_squared_map(n_r, scale)
-    pts = (r[:, None, None] * dirs[None, :, :]).reshape(-1, 3) + np.asarray(centre, dtype=float)
+    pts = (r[:, None, None] * dirs[None, :, :]).reshape(-1, 3) + np.asarray(center, dtype=float)
     wts = (w_r[:, None] * r[:, None] ** 2 * w_ang[None, :]).reshape(-1)
     return pts, wts

@@ -2,14 +2,14 @@
 
 A pseudo-hydrogen carries a fractional nuclear charge ``alpha`` and ``alpha``
 electrons.  In an all-electron Slater/numerical code that is a *complete*
-specification -- there is no pseudopotential to parameterise -- so its basis
+specification -- there is no pseudopotential to parameterize -- so its basis
 function is obtained by simply solving the spherical Kohn-Sham problem for that
 charge and fitting a 1s Slater function to the result.
 
 Consistency with the rest of the basis
 --------------------------------------
 The raw atomic solution is more diffuse than a tabulated molecular basis
-function, because X-alpha self-interaction is not cancelled: at ``alpha = 1``
+function, because X-alpha self-interaction is not canceled: at ``alpha = 1``
 the fit gives ``zeta = 0.882`` while the Clementi-Raimondi hydrogen exponent
 used everywhere else in an STO calculation is ``1.24``.  Mixing the two would
 make the terminator systematically more diffuse than every other function in the
@@ -81,7 +81,7 @@ def pseudo_hydrogen_zeta(alpha: float, xc_alpha: float = DEFAULT_ALPHA,
 def _raw_zeta(alpha: float, xc_alpha: float = DEFAULT_ALPHA, n_points: int = 2000) -> float:
     """Exponent of the Slater 1s with maximum overlap on the atomic solution.
 
-    For a nodeless function maximising the overlap is equivalent to a
+    For a nodeless function maximizing the overlap is equivalent to a
     least-squares fit, and the overlap is unimodal in zeta, so golden-section
     search finds the optimum without derivatives.
     """

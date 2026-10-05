@@ -22,8 +22,8 @@ IDEAL_POLYHEDRA: dict[int, np.ndarray] = {
 }
 
 
-def neighbour_lists(molecule, tolerance: float = 1.20) -> dict[int, list[int]]:
-    """``{atom: [neighbours]}`` using ``tolerance * (r_cov(A) + r_cov(B))``."""
+def neighbor_lists(molecule, tolerance: float = 1.20) -> dict[int, list[int]]:
+    """``{atom: [neighbors]}`` using ``tolerance * (r_cov(A) + r_cov(B))``."""
     pos = molecule.positions * BOHR_TO_ANG
     n = len(molecule)
     out: dict[int, list[int]] = {i: [] for i in range(n)}
@@ -36,7 +36,7 @@ def neighbour_lists(molecule, tolerance: float = 1.20) -> dict[int, list[int]]:
     return out
 
 
-def bond_report(molecule, neighbours, tolerance: float = 1.20) -> list[dict]:
+def bond_report(molecule, neighbors, tolerance: float = 1.20) -> list[dict]:
     """Every detected bond with its cutoff, so the choice can be checked.
 
     The cutoff is *additive* in the covalent radii; printing the combined value
@@ -46,7 +46,7 @@ def bond_report(molecule, neighbours, tolerance: float = 1.20) -> list[dict]:
     pos = molecule.positions * BOHR_TO_ANG
     seen = set()
     rows = []
-    for i, js in neighbours.items():
+    for i, js in neighbors.items():
         for j in js:
             key = (min(i, j), max(i, j))
             if key in seen:
@@ -62,7 +62,7 @@ def bond_report(molecule, neighbours, tolerance: float = 1.20) -> list[dict]:
     return sorted(rows, key=lambda r: r["distance"])
 
 
-def ideal_coordination(molecule, neighbours, override: int | None = None
+def ideal_coordination(molecule, neighbors, override: int | None = None
                        ) -> tuple[dict[str, int], list[str]]:
     """Bulk coordination number per element, inferred from the cluster interior.
 
@@ -84,7 +84,7 @@ def ideal_coordination(molecule, neighbours, override: int | None = None
     for i, atom in enumerate(molecule):
         if atom.is_pseudo:
             continue
-        counts.setdefault(atom.element, Counter())[len(neighbours[i])] += 1
+        counts.setdefault(atom.element, Counter())[len(neighbors[i])] += 1
 
     out: dict[str, int] = {}
     for el, c in counts.items():
@@ -105,18 +105,18 @@ def ideal_coordination(molecule, neighbours, override: int | None = None
     return out, warnings
 
 
-def missing_bond_directions(molecule, index: int, neighbours: list[int],
+def missing_bond_directions(molecule, index: int, neighbors: list[int],
                             n_missing: int) -> np.ndarray:
     """Unit vectors along which ``n_missing`` bonds are absent.
 
     Existing bond directions are matched against the ideal polyhedron for the
     full coordination number by finding the rotation that best aligns them
     (an orthogonal Procrustes fit); the unmatched vertices are the missing
-    bonds.  With no neighbours at all the ideal polyhedron is used unrotated.
+    bonds.  With no neighbors at all the ideal polyhedron is used unrotated.
     """
     pos = molecule.positions
-    have = np.array([pos[j] - pos[index] for j in neighbours], dtype=float)
-    n_total = len(neighbours) + n_missing
+    have = np.array([pos[j] - pos[index] for j in neighbors], dtype=float)
+    n_total = len(neighbors) + n_missing
     ideal = IDEAL_POLYHEDRA.get(n_total)
     if ideal is None:
         return _spread_directions(have, n_missing)
@@ -182,15 +182,15 @@ def directions_from_reference(molecule, reference, index: int, tolerance: float 
     """Missing bond directions recovered from a bulk reference structure.
 
     The cluster atom is matched to its counterpart in ``reference`` by position;
-    neighbours present in the bulk but absent from the cluster give the exact
+    neighbors present in the bulk but absent from the cluster give the exact
     directions of the cut bonds.
     """
     ref_pos = reference.positions
     cluster_pos = molecule.positions
     site = int(np.argmin(np.linalg.norm(ref_pos - cluster_pos[index], axis=1)))
-    ref_neigh = neighbour_lists(reference, tolerance)[site]
+    ref_neigh = neighbor_lists(reference, tolerance)[site]
     kept = {tuple(np.round(cluster_pos[j] - cluster_pos[index], 4))
-            for j in neighbour_lists(molecule, tolerance)[index]}
+            for j in neighbor_lists(molecule, tolerance)[index]}
     out = []
     for j in ref_neigh:
         d = ref_pos[j] - ref_pos[site]

@@ -2,7 +2,7 @@
 
 One-off extraction script (not a runtime dependency of pyxany): downloads the
 CCCBDB "experimental data" page for each molecule, caches the raw HTML, and
-writes the parsed geometry, dipole and ionisation energy -- each with the
+writes the parsed geometry, dipole and ionization energy -- each with the
 primary reference CCCBDB cites -- to tests/data/cccbdb_experimental.json.
 
 Requests are rate-limited (one every --delay seconds) and served from the
@@ -119,8 +119,8 @@ def parse(raw: str) -> dict:
                 out["dipole_debye"] = {"value": v, "reference": ref}
                 break
 
-    # Ionisation energy (adiabatic), eV
-    out["ionisation_energy_ev"] = None
+    # Ionization energy (adiabatic), eV
+    out["ionization_energy_ev"] = None
     if "Ionization Energies (eV)" in cells:
         e = cells.index("Ionization Energies (eV)")
         hdr = next(k for k in range(e, len(cells)) if cells[k] == "reference")
@@ -128,7 +128,7 @@ def parse(raw: str) -> dict:
         k = hdr + 1 + (cells[hdr + 1] == "Comment")
         ie = _float(cells[k])
         ref = next((c for c in cells[k + 1 : k + 5] if _REF.match(c)), None)
-        out["ionisation_energy_ev"] = None if ie is None else {"value": ie, "reference": ref}
+        out["ionization_energy_ev"] = None if ie is None else {"value": ie, "reference": ref}
     return out
 
 
@@ -146,7 +146,7 @@ def main() -> None:
         "_units": {
             "geometry": "Angstrom",
             "dipole": "Debye",
-            "ionisation_energy": "eV (adiabatic)",
+            "ionization_energy": "eV (adiabatic)",
         },
     }
     for name, cas in MOLECULES.items():
@@ -167,7 +167,7 @@ def main() -> None:
         print(
             f"{name:5s} {len(entry['geometry_angstrom'])} atoms  "
             f"internal={[(c['name'], c['value'], c['comment']) for c in entry['internal_coordinates']]}"
-            f"  mu={entry['dipole_debye']}  IE={entry['ionisation_energy_ev']}"
+            f"  mu={entry['dipole_debye']}  IE={entry['ionization_energy_ev']}"
         )
     DEST.parent.mkdir(parents=True, exist_ok=True)
     DEST.write_text(json.dumps(result, indent=1) + "\n")

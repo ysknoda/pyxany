@@ -15,7 +15,7 @@ def density_of_states(eps: np.ndarray, sigma: float = 0.3, n_points: int = 600,
     Each eigenvalue contributes unit weight, so the curve integrates to the
     number of **orbitals**, not the number of electronic states: for a
     restricted calculation each spatial orbital holds two electrons, so
-    multiply by 2 if you want states.  The axis is labelled "states/eV" by
+    multiply by 2 if you want states.  The axis is labeled "states/eV" by
     convention; this is the convention it follows.
     """
     finite = eps[np.isfinite(eps)]

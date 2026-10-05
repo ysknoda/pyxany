@@ -6,9 +6,9 @@
 
 - **Element-specific X-alpha** (ADR 0011): `scf.alpha` takes a mapping
   `{default: 0.7, Si: 0.73}`, `alpha_hf` (Schwarz's published table, H-Rn, 19
-  atoms interpolated as the 1974 paper recommends) or `alpha_hf_polarised`, mixed
+  atoms interpolated as the 1974 paper recommends) or `alpha_hf_polarized`, mixed
   between atoms with the Becke weights; forces include the moving-weight
-  term (finite differences to the grid error). Spin-polarised atom solver
+  term (finite differences to the grid error). Spin-polarized atom solver
   and `tools/alpha_hf.py` for the recomputed alpha_HF table.
 
 - **Point-charge (Madelung) embedding** (ADR 0010): `embedding.charges`
@@ -21,15 +21,15 @@
 
 - **Slater transition state** (ADR 0006): `transition_state:` removes half an
   electron from a chosen orbital (`homo`, an MO number, or a core shell
-  `{atom, shell}`) or moves it between two, and reports the ionisation or
+  `{atom, shell}`) or moves it between two, and reports the ionization or
   excitation energy. Checked against Janak's theorem by finite differences
   (1.4e-5 Ha) and Delta-SCF (0.03 eV). Core holes on equivalent atoms are
-  localised explicitly; a symmetric start does not localise them by itself.
+  localized explicitly; a symmetric start does not localize them by itself.
 - **Bond overlap population and bonding figures** (ADR 0005). Atom-pair
   Mulliken overlap populations and their MO decomposition for bonded pairs
   (Mayer bond order >= 0.2, or pairs named in the input), in the text report
   and in the JSON output; a COOP-type plot per element-pair type, a level
-  diagram coloured by bonding character, a Loewdin partial DOS by element and
+  diagram colored by bonding character, a Loewdin partial DOS by element and
   angular momentum, and an optional atom-pair heatmap, all as PDF and PNG.
   The sum rule (net + overlap populations = N) and the MO decomposition are
   tested.
@@ -76,25 +76,25 @@
 - **Analytic UKS forces were wrong** since the grid-derivative terms were
   added (4f4746c): the exchange-energy density in those terms was twice its
   value (0.46 Ha/Bohr on closed-shell H2O run as UKS). Open-shell forces and
-  optimisations from that period should be repeated.
+  optimizations from that period should be repeated.
 
 - **`--no-figure` had no effect**: the flag was parsed but never applied, so
   `run` wrote the figures whenever the input enabled them.
-- **Geometry optimisation could report a geometry that was not its answer.**
+- **Geometry optimization could report a geometry that was not its answer.**
   The returned molecule, energy and forces were those of the last evaluation,
   often a rejected line-search trial point. They are now the lowest-energy
   evaluation, i.e. scipy's solution.
-- **Optimisation ignored a point that met the force criterion.** On a finite
+- **Optimization ignored a point that met the force criterion.** On a finite
   grid the energy and analytic forces are slightly inconsistent, so L-BFGS-B
   stalled at the energy minimum with max|F| above f_max: H2O/DZ at n_r = 40
   passed max|F| = 5.8e-6 at step 7, then ran 60 steps without converging. The
-  first evaluation with max|F| < f_max now ends the optimisation (7 steps).
+  first evaluation with max|F| < f_max now ends the optimization (7 steps).
 
 - **The Hartree solver was inaccurate or unstable for heavy atoms.** It divided
   ``int_0^r s^(l+2) rho`` by ``r^(l+1)`` and patched the resulting near-nucleus
   blow-up by overwriting rho_l and V_l with r^l power laws inside a radius that
   reached 0.2-0.3 Bohr at l = 10. On GaAs4 the SCF energy moved by 0.15 Ha
-  between l_max 8 and 10; with off-centre Gaussian test charges E_H was wrong
+  between l_max 8 and 10; with off-center Gaussian test charges E_H was wrong
   by 1.6e3 Ha at l = 8. Rewritten as a Green's-function recursion in which
   every power is a ratio <= 1, integrating the spline of r^2 rho_l: stable at
   any l, and ~3x more accurate per radial grid size (1s core test charge on Ga:
@@ -104,11 +104,11 @@
   radial quadrature error there, with opposite signs.
 - **Analytic forces were the derivative of the continuum functional, not of
   the computed energy.** They omitted the motion of the Becke weights and of
-  the atom-centred grid points, and took the S and T Pulay terms from a DV-grid
-  quadrature instead of the two-centre matrices the SCF uses. Both are now
+  the atom-centerd grid points, and took the S and T Pulay terms from a DV-grid
+  quadrature instead of the two-center matrices the SCF uses. Both are now
   included (each checked against finite differences to 1e-9 relative). Force
   error vs finite differences: H2 ~1e-3 -> 2.5e-5 Ha/Bohr; CO 2e-2 -> 1.4e-3
-  at l_max = 12. CO can now be geometry-optimised.
+  at l_max = 12. CO can now be geometry-optimized.
 - **Pseudo-hydrogens carried a single-zeta basis whatever `basis.set` was.**
   They now receive the basis set's full hydrogen function list contracted by
   zeta(alpha)/zeta(1), so an alpha = 1 terminator is exactly hydrogen in every
@@ -157,8 +157,8 @@
   default stays `product`. Requires scipy >= 1.15 (`lebedev_rule`).
 
 - **Every grid is set in the input file** (ADR 0009): `grid.pair`,
-  `grid.atom`, `grid.guess`, `grid.one_centre` and `grid.n_r_by_element`
-  join `n_r` / `n_a`; omitted values keep the previous behaviour. The old
+  `grid.atom`, `grid.guess`, `grid.one_center` and `grid.n_r_by_element`
+  join `n_r` / `n_a`; omitted values keep the previous behavior. The old
   `grid.pair_n_r`, `grid.pair_n_a` and `basis.nao_n_r` are errors that name
   their replacement. `--set grid.pair.n_r=60` reaches nested keys.
   `--dry-run`, the report and the JSON (`"grids"`) list every grid.
@@ -184,7 +184,7 @@ grad V_H to < 1e-8 Ha/Bohr in the forces); each has a test.
   grid build 540 s -> 9 s, one Hartree evaluation 366 s -> 21 s, one S/T pair
   52 ms -> 22 ms. The force term grad V_H is now one gradient evaluation
   instead of six Hartree evaluations by finite differences.
-- **Exact two-centre S/T gradient in the forces**: the pair quadrature is
+- **Exact two-center S/T gradient in the forces**: the pair quadrature is
   differentiated directly (basis Hessians, moving sub-grid, Becke weights)
   instead of by six-point finite differences; 622 s -> 129 s on Si47H60,
   forces unchanged to 5e-10 Ha/Bohr. Whole SCF + forces: 2381 s -> 1875 s.
@@ -197,6 +197,14 @@ grad V_H to < 1e-8 Ha/Bohr in the forces); each has a test.
 
 ### Changed
 
+- **American spelling throughout** (code, input keys, output, docs): the
+  input section `optimise:` is now `optimize:`, `grid.one_centre` is
+  `grid.one_center`, `scf.alpha: alpha_hf_polarised` is `alpha_hf_polarized`;
+  the old names are errors that name the new ones. Modules
+  `forces/optimise.py`, `integrals/onecentre.py`, `integrals/twocentre.py`
+  are now `optimize.py`, `onecenter.py`, `twocenter.py`; the `opt` JSON block
+  is `"optimization"`.
+
 - **A negative Mulliken overlap population on a bonded pair now carries a
   note.** The Si-Si total is +0.51 (SZ) and -0.08 (DZ) in Si5H12 at the same
   geometry and -0.88 in Si47H60 (DZ), with Mayer bond orders of 0.8-0.9: a
@@ -204,7 +212,7 @@ grad V_H to < 1e-8 Ha/Bohr in the forces); each has a test.
 - **Radial grid size depends on the element.** `grid.n_r` now means the
   second-row size; each atom gets `ceil(n_r × ratio)`, the ratio measured for
   all 86 elements by `tools/radial_grid_sizes.py` so that every element
-  reaches the ionisation-energy accuracy of C-F (`data/tables/radial_points.json`).
+  reaches the ionization-energy accuracy of C-F (`data/tables/radial_points.json`).
   At n_r = 30: H 36, Si 33, Ga/As 47, Cd 60. `grid.radial_by_element: false`
   restores a uniform grid. Total energies change (Tier C re-pinned).
 - **`grid.poisson_l_max` defaults to `auto` = n_a - 1** (11 on the default
@@ -218,7 +226,7 @@ grad V_H to < 1e-8 Ha/Bohr in the forces); each has a test.
   moved from the `src/` layout to a flat layout with the package at the
   repository root. No `dvxa` compatibility alias is provided. Entries below this
   one refer to the old name. See `docs/adr/0001-flat-layout-and-rename.md`.
-- Optimisation trajectories are written to `output.dir` like every other output
+- Optimization trajectories are written to `output.dir` like every other output
   file, instead of the working directory.
 
 Findings from a systematic code review (`/code-check`) of the packaged code,
@@ -250,8 +258,8 @@ script, with the defects found during that extraction fixed.
   arbitrary coordination numbers, derives each terminator's basis function from
   its own fractional charge, and reports the electron balance.
 - **Analytic forces** (Hellmann-Feynman + Pulay), validated against finite
-  differences, and L-BFGS-B geometry optimisation with atom freezing.
-- Becke multi-centre Poisson solver for the Hartree potential, replacing a
+  differences, and L-BFGS-B geometry optimization with atom freezing.
+- Becke multi-center Poisson solver for the Hartree potential, replacing a
   pair-sum with an ad-hoc softening length.
 - Hierarchical wall-clock timing for every stage, reported and saved as JSON.
 - 186 tests covering conservation laws, closed-form integrals, backend
@@ -270,9 +278,9 @@ Each of these changed every number the original produced; see
 - d-orbital angular factors halved in the numba kernels, so results depended on
   whether an optional package was installed; `l ≥ 3` was silently spherical.
 - Open-shell occupations doubled the electron count of every UKS calculation.
-- GTO contraction coefficients read with the wrong normalisation convention.
+- GTO contraction coefficients read with the wrong normalization convention.
 - `build_J` never reduced across MPI ranks.
-- 6-31G(d) polarisation used a leaked loop variable.
+- 6-31G(d) polarization used a leaked loop variable.
 - SCF built J and V_xc from different density matrices.
 - Crash for a single atom in a minimal basis.
 - Module-level `warnings.filterwarnings("ignore")`.
@@ -281,7 +289,7 @@ Each of these changed every number the original produced; see
 
 - Kinetic energy uses the exact analytic Laplacian rather than a finite
   difference with a hand-tuned step.
-- Two-centre integrals use a Becke-partitioned two-centre grid, matching the
+- Two-center integrals use a Becke-partitioned two-center grid, matching the
   closed-form H₂ overlap to 1e-9.
 - Atomic orbital solver rewritten on a logarithmic grid with Numerov shooting;
   reproduces the hydrogenic spectrum exactly.

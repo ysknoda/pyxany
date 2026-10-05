@@ -3,7 +3,7 @@
 Subcommands
 -----------
 run         single-point SCF (energy, forces, properties)
-opt         geometry optimisation
+opt         geometry optimization
 forces      forces only, optionally comparing analytic against finite difference
 scan        scan a bond length or angle
 passivate   add pseudo-hydrogen (or real hydrogen) terminators to a cluster
@@ -17,7 +17,7 @@ info        runtime environment
 Exit codes (so batch scripts can branch on the outcome)
 ------------------------------------------------------
 0 success            2 SCF did not converge
-1 input error        3 runtime error          4 optimisation did not converge
+1 input error        3 runtime error          4 optimization did not converge
 """
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = restartable(common(sub.add_parser("run", help="single-point SCF")))
     p_run.add_argument("--no-figure", action="store_true")
 
-    p_opt = restartable(common(sub.add_parser("opt", help="geometry optimisation")))
+    p_opt = restartable(common(sub.add_parser("opt", help="geometry optimization")))
     p_opt.add_argument("--freeze-core", action="store_true",
                        help="relax only the pseudo-hydrogen terminators")
     p_opt.add_argument("--max-steps", type=int, default=None)

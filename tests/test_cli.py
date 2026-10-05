@@ -1,4 +1,4 @@
-"""Command-line behaviour: exit codes, overrides, and machine-readable output."""
+"""Command-line behavior: exit codes, overrides, and machine-readable output."""
 
 from __future__ import annotations
 

@@ -8,7 +8,7 @@ completed iteration, the iteration count, and two fingerprints:
   same thing: nuclear charges, charge, multiplicity, basis-function list,
   restricted/unrestricted, X-alpha alpha. A mismatch is an error.
 * ``geometry`` -- the nuclear positions. A mismatch with an otherwise
-  identical system (the next point of a scan or optimisation) downgrades the
+  identical system (the next point of a scan or optimization) downgrades the
   restart to "use this density as the initial guess", with a warning.
 
 DIIS history is deliberately not stored: it is up to ten Fock/error pairs, so

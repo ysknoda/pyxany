@@ -16,7 +16,7 @@ sqrt((2l+1)/4pi)``::
     S_l^m    = [ (2l-1) z S_{l-1}^m - sqrt((l-1)^2 - m^2) r^2 S_{l-2}^m ]
                / sqrt(l^2 - m^2)                                  (|m| < l)
 
-The normalised real spherical harmonic is then
+The normalized real spherical harmonic is then
 
     Y_l^m = sqrt((2l+1)/(4 pi)) * (sqrt(2) if m != 0 else 1) * S_l^m / r^l
 
@@ -108,7 +108,7 @@ def real_spherical_harmonics(l_max: int, x, y, z, r=None) -> np.ndarray:
     return real_spherical_harmonics_T(l_max, x, y, z, r).T
 
 
-def normalisation_factors(l_max: int) -> np.ndarray:
+def normalization_factors(l_max: int) -> np.ndarray:
     """Per-column ``sqrt((2l+1)/4pi) * sqrt(2)^[m != 0]`` factors."""
     return np.array([
         math.sqrt((2 * l + 1) / (4.0 * math.pi)) * (math.sqrt(2.0) if m else 1.0)

@@ -62,7 +62,7 @@ class Atom:
 
         For a pseudo-hydrogen the hydrogen radius is scaled hydrogenically as
         ``R_H / alpha``: an alpha < 1 terminator is more diffuse than hydrogen
-        and an alpha > 1 one more compact.  Validated by the grid-normalisation
+        and an alpha > 1 one more compact.  Validated by the grid-normalization
         test rather than assumed (tests/test_grid.py).
         """
         r_h = elem.bragg_slater_radius(self.element)
@@ -133,7 +133,7 @@ class Molecule:
         pos = self.positions
         return np.linalg.norm(pos[:, None, :] - pos[None, :, :], axis=2)
 
-    def centre_of_charge(self) -> np.ndarray:
+    def center_of_charge(self) -> np.ndarray:
         Z = self.charges
         return (self.positions * Z[:, None]).sum(axis=0) / Z.sum()
 

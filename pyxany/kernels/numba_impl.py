@@ -63,9 +63,9 @@ def _chi_block(norms, zetas, powers_n, lm_index, d, r, out, cols,
 
 
 @nb.njit(cache=True, parallel=True, fastmath=True)
-def _chi_all(centres, norms, zetas, powers_n, lm_index, points, out,
+def _chi_all(centers, norms, zetas, powers_n, lm_index, points, out,
              offsets, counts, coeffs, powers):
-    """``out[k, j]`` = STO ``j`` (centred at ``centres[j]``) at ``points[k]``.
+    """``out[k, j]`` = STO ``j`` (centerd at ``centers[j]``) at ``points[k]``.
 
     One call for functions on any number of atoms: the per-atom calls of
     :func:`_chi_block` cost a thread launch each, which dominates on small
@@ -75,9 +75,9 @@ def _chi_all(centres, norms, zetas, powers_n, lm_index, points, out,
     n_f = norms.shape[0]
     for k in nb.prange(n_pts):
         for j in range(n_f):
-            dx = points[k, 0] - centres[j, 0]
-            dy = points[k, 1] - centres[j, 1]
-            dz = points[k, 2] - centres[j, 2]
+            dx = points[k, 0] - centers[j, 0]
+            dy = points[k, 1] - centers[j, 1]
+            dz = points[k, 2] - centers[j, 2]
             rk = np.sqrt(dx * dx + dy * dy + dz * dz)
             rad = norms[j] * np.exp(-zetas[j] * rk)
             for _ in range(powers_n[j]):
@@ -86,10 +86,10 @@ def _chi_all(centres, norms, zetas, powers_n, lm_index, points, out,
                                                     offsets, counts, coeffs, powers)
 
 
-def chi_all(centres, norms, zetas, powers_n, l_arr, m_arr, points, out):
+def chi_all(centers, norms, zetas, powers_n, l_arr, m_arr, points, out):
     """Wrapper for :func:`_chi_all` translating (l, m) into table indices."""
     lm_index = np.array([index_of(int(l), int(m)) for l, m in zip(l_arr, m_arr)], np.int64)
-    _chi_all(np.ascontiguousarray(centres, np.float64),
+    _chi_all(np.ascontiguousarray(centers, np.float64),
              np.ascontiguousarray(norms, np.float64),
              np.ascontiguousarray(zetas, np.float64),
              np.ascontiguousarray(powers_n, np.int64),
@@ -250,7 +250,7 @@ def _chi_hess_block(norms, zetas, powers_n, lm_index, d, r, out, cols,
 
 @nb.njit(cache=True, parallel=True, fastmath=True)
 def pair_gradient_terms(fixed_v, fixed_g, mov_v, mov_g, mov_h, C, D, sign, F, dF):
-    """Per-point integrand and its derivative for the two-centre S/T gradient.
+    """Per-point integrand and its derivative for the two-center S/T gradient.
 
     ``fixed_*`` are the functions that do not move relative to the point,
     ``mov_*`` (value, gradient, Hessian) those that do; ``C`` and ``D``
@@ -416,16 +416,16 @@ def _smooth_step(nu, stiffness):
 
 
 @nb.njit(parallel=True, cache=True)
-def becke_own_cell(points, owner, centres, a, inv_r, stiffness, out):
+def becke_own_cell(points, owner, centers, a, inv_r, stiffness, out):
     """Own-cell Becke weight ``P_owner / sum_C P_C`` of every point (see grid/becke.py)."""
     n_pts = points.shape[0]
-    n_at = centres.shape[0]
+    n_at = centers.shape[0]
     for k in nb.prange(n_pts):
         dist = np.empty(n_at)
         for i in range(n_at):
-            dx = points[k, 0] - centres[i, 0]
-            dy = points[k, 1] - centres[i, 1]
-            dz = points[k, 2] - centres[i, 2]
+            dx = points[k, 0] - centers[i, 0]
+            dy = points[k, 1] - centers[i, 1]
+            dz = points[k, 2] - centers[i, 2]
             dist[i] = np.sqrt(dx * dx + dy * dy + dz * dz)
         total = 0.0
         own = 0.0
@@ -455,7 +455,7 @@ def becke_own_cell(points, owner, centres, a, inv_r, stiffness, out):
 # Hartree potential: sum of every atom's multipole expansion at each point
 # --------------------------------------------------------------------------
 @nb.njit(parallel=True, cache=True)
-def hartree_evaluate(points, centres, knots, n_knots, coefs, v_first, v_last, l_max, norms,
+def hartree_evaluate(points, centers, knots, n_knots, coefs, v_first, v_last, l_max, norms,
                      out):
     """``V(r_k) = sum_A sum_lm v^A_lm(|r_k - R_A|) Y_lm`` (see integrals/coulomb.py).
 
@@ -467,16 +467,16 @@ def hartree_evaluate(points, centres, knots, n_knots, coefs, v_first, v_last, l_
     array is ever formed.
     """
     n_pts = points.shape[0]
-    n_at = centres.shape[0]
+    n_at = centers.shape[0]
     n_lm = (l_max + 1) * (l_max + 1)
     for k in nb.prange(n_pts):
         S = np.empty(n_lm)
         v = np.empty(n_lm)
         acc = 0.0
         for A in range(n_at):
-            x = points[k, 0] - centres[A, 0]
-            y = points[k, 1] - centres[A, 1]
-            z = points[k, 2] - centres[A, 2]
+            x = points[k, 0] - centers[A, 0]
+            y = points[k, 1] - centers[A, 1]
+            z = points[k, 2] - centers[A, 2]
             r2 = x * x + y * y + z * z
             r = np.sqrt(r2)
             nk = n_knots[A]
@@ -535,7 +535,7 @@ def hartree_evaluate(points, centres, knots, n_knots, coefs, v_first, v_last, l_
 
 
 @nb.njit(parallel=True, cache=True)
-def hartree_evaluate_grad(points, centres, knots, n_knots, coefs, v_first, v_last, l_max,
+def hartree_evaluate_grad(points, centers, knots, n_knots, coefs, v_first, v_last, l_max,
                           norms, out):
     """Exact gradient of the potential :func:`hartree_evaluate` returns.
 
@@ -546,7 +546,7 @@ def hartree_evaluate_grad(points, centres, knots, n_knots, coefs, v_first, v_las
     ``grad = q_l'(r) rhat S_lm + q_l grad S_lm``.
     """
     n_pts = points.shape[0]
-    n_at = centres.shape[0]
+    n_at = centers.shape[0]
     n_lm = (l_max + 1) * (l_max + 1)
     for k in nb.prange(n_pts):
         S = np.empty(n_lm)
@@ -559,9 +559,9 @@ def hartree_evaluate_grad(points, centres, knots, n_knots, coefs, v_first, v_las
         gy = 0.0
         gz = 0.0
         for A in range(n_at):
-            x = points[k, 0] - centres[A, 0]
-            y = points[k, 1] - centres[A, 1]
-            z = points[k, 2] - centres[A, 2]
+            x = points[k, 0] - centers[A, 0]
+            y = points[k, 1] - centers[A, 1]
+            z = points[k, 2] - centers[A, 2]
             r2 = x * x + y * y + z * z
             r = np.sqrt(r2)
             nk = n_knots[A]
@@ -675,13 +675,13 @@ def hartree_evaluate_grad(points, centres, knots, n_knots, coefs, v_first, v_las
 
 
 @nb.njit(parallel=True, cache=True)
-def point_charge_field(points, centres, charges, sigma, want_grad, v_out, g_out):
+def point_charge_field(points, centers, charges, sigma, want_grad, v_out, g_out):
     """Electron potential energy of Gaussian point charges and its gradient.
 
     ``v = -sum_i q_i erf(d_i / sigma) / d_i``; see pyxany/embedding.py.
     """
     n_pts = points.shape[0]
-    n_q = centres.shape[0]
+    n_q = centers.shape[0]
     c = 2.0 / np.sqrt(np.pi) / sigma
     for k in nb.prange(n_pts):
         v = 0.0
@@ -689,9 +689,9 @@ def point_charge_field(points, centres, charges, sigma, want_grad, v_out, g_out)
         gy = 0.0
         gz = 0.0
         for i in range(n_q):
-            dx = points[k, 0] - centres[i, 0]
-            dy = points[k, 1] - centres[i, 1]
-            dz = points[k, 2] - centres[i, 2]
+            dx = points[k, 0] - centers[i, 0]
+            dy = points[k, 1] - centers[i, 1]
+            dz = points[k, 2] - centers[i, 2]
             d = np.sqrt(dx * dx + dy * dy + dz * dz)
             if d < 1e-8 * sigma:
                 v -= charges[i] * c
@@ -722,14 +722,14 @@ def _smooth_step_and_derivative(nu, stiffness):
 
 
 @nb.njit(parallel=True, cache=True)
-def own_cell_weight_gradient(points, order, starts, coeff, centres, a, stiffness, out):
+def own_cell_weight_gradient(points, order, starts, coeff, centers, a, stiffness, out):
     """``out[A, B] = sum_{k owned by A} coeff_k d w_A(r_k) / d R_B`` (points fixed).
 
     ``order[starts[A]:starts[A+1]]`` lists the points owned by atom A; each
     thread handles whole atoms, so it writes only its own ``out[A]`` rows.
     Same expressions as grid/becke.py:own_cell_weight_gradient.
     """
-    n_at = centres.shape[0]
+    n_at = centers.shape[0]
     for A in nb.prange(n_at):
         dist = np.empty(n_at)
         unit = np.empty((n_at, 3))
@@ -739,9 +739,9 @@ def own_cell_weight_gradient(points, order, starts, coeff, centres, a, stiffness
         for q in range(starts[A], starts[A + 1]):
             k = order[q]
             for i in range(n_at):
-                d0 = points[k, 0] - centres[i, 0]
-                d1 = points[k, 1] - centres[i, 1]
-                d2 = points[k, 2] - centres[i, 2]
+                d0 = points[k, 0] - centers[i, 0]
+                d1 = points[k, 1] - centers[i, 1]
+                d2 = points[k, 2] - centers[i, 2]
                 dist[i] = np.sqrt(d0 * d0 + d1 * d1 + d2 * d2)
                 inv = 1.0 / max(dist[i], 1e-300)
                 unit[i, 0] = d0 * inv
@@ -752,9 +752,9 @@ def own_cell_weight_gradient(points, order, starts, coeff, centres, a, stiffness
                 for j in range(n_at):
                     if i == j:
                         continue
-                    R0 = centres[i, 0] - centres[j, 0]
-                    R1 = centres[i, 1] - centres[j, 1]
-                    R2 = centres[i, 2] - centres[j, 2]
+                    R0 = centers[i, 0] - centers[j, 0]
+                    R1 = centers[i, 1] - centers[j, 1]
+                    R2 = centers[i, 2] - centers[j, 2]
                     Rij = np.sqrt(R0 * R0 + R1 * R1 + R2 * R2)
                     mu = (dist[i] - dist[j]) / Rij
                     sv, dsv = _smooth_step_and_derivative(mu + a[i, j] * (1.0 - mu * mu),
@@ -775,9 +775,9 @@ def own_cell_weight_gradient(points, order, starts, coeff, centres, a, stiffness
                 for j in range(n_at):
                     if i == j:
                         continue
-                    R0 = centres[i, 0] - centres[j, 0]
-                    R1 = centres[i, 1] - centres[j, 1]
-                    R2 = centres[i, 2] - centres[j, 2]
+                    R0 = centers[i, 0] - centers[j, 0]
+                    R1 = centers[i, 1] - centers[j, 1]
+                    R2 = centers[i, 2] - centers[j, 2]
                     Rij2 = R0 * R0 + R1 * R1 + R2 * R2
                     Rij = np.sqrt(Rij2)
                     mu = (dist[i] - dist[j]) / Rij

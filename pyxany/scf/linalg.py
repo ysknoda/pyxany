@@ -1,4 +1,4 @@
-"""Generalised eigenproblem with canonical orthogonalisation."""
+"""Generalized eigenproblem with canonical orthogonalization."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import numpy as np
 DEFAULT_S_THRESHOLD = 5e-4
 
 
-def canonical_orthogonaliser(S: np.ndarray, threshold: float = DEFAULT_S_THRESHOLD):
+def canonical_orthogonalizer(S: np.ndarray, threshold: float = DEFAULT_S_THRESHOLD):
     """X with ``X^T S X = I``, dropping near-linearly-dependent combinations.
 
     Returns ``(X, n_dropped)``.
@@ -18,7 +18,7 @@ def canonical_orthogonaliser(S: np.ndarray, threshold: float = DEFAULT_S_THRESHO
     return X, int((~keep).sum())
 
 
-def solve_generalised(F: np.ndarray, S: np.ndarray,
+def solve_generalized(F: np.ndarray, S: np.ndarray,
                       threshold: float = DEFAULT_S_THRESHOLD):
     """Solve ``F C = S C eps``.
 
@@ -27,7 +27,7 @@ def solve_generalised(F: np.ndarray, S: np.ndarray,
     never pick up a linearly dependent combination.
     """
     n = F.shape[0]
-    X, dropped = canonical_orthogonaliser(S, threshold)
+    X, dropped = canonical_orthogonalizer(S, threshold)
     n_keep = X.shape[1]
     eps_k, C_k = np.linalg.eigh(X.T @ F @ X)
 

@@ -7,12 +7,12 @@
 ## Decision
 
 - `embedding.charges` names a file of fixed point charges (`x y z q` or
-  `label x y z q`, `embedding.units`). Each charge is a normalised Gaussian of
+  `label x y z q`, `embedding.units`). Each charge is a normalized Gaussian of
   width `embedding.sigma` (Bohr, default 0.5), so the electron potential
   energy `-sum q erf(d/sigma)/d` is finite on every grid point.
 - `pyxany embed crystal.yaml -o charges.xyz` builds the charges from a
   conventional cell (lattice, fractional sites with formal charges): an
-  Evjen block (Phys. Rev. 39, 675 (1932)) 2 cells + 1 wide, centred on the
+  Evjen block (Phys. Rev. 39, 675 (1932)) 2 cells + 1 wide, centerd on the
   origin, with face / edge / corner sites at 1/2, 1/4, 1/8 of their charge;
   lattice sites occupied by cluster atoms are removed and their total formal
   charge printed as the `molecule.charge` the cluster needs. Check: the block
@@ -36,7 +36,7 @@
 
 No effective core potentials on the boundary cations (deferred, ADR 0008).
 On the bare `[MgO6]10-` cluster in the Evjen field (DZ, sigma 0.5 Bohr) the
-diffuse O functions put 1.57 electrons on the neighbouring Mg2+ point charges,
+diffuse O functions put 1.57 electrons on the neighboring Mg2+ point charges,
 the gap closes and the SCF does not converge; sigma 1.36 / 2.0 Bohr does not
 help (1.2 / 1.6 e). SZ converges (gap 2.2 eV, 0.48 e). Making every cation
 bonded to a quantum O quantum too (`Mg19O6`, charge +26) gives, with DZ,

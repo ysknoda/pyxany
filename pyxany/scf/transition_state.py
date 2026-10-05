@@ -1,12 +1,12 @@
 """Slater transition-state occupations (ADR 0006).
 
 Slater's transition state puts half an electron's worth of the change into
-the SCF: for an ionisation, 0.5 electron is removed from the orbital; for an
+the SCF: for an ionization, 0.5 electron is removed from the orbital; for an
 excitation i -> j, 0.5 electron is moved. By Janak's theorem
 (dE/dn_i = eps_i) the orbital energy at that half-way point approximates the
 energy difference to third order:
 
-    ionisation energy  ~ -eps_i(TS)
+    ionization energy  ~ -eps_i(TS)
     excitation energy  ~  eps_j(TS) - eps_i(TS)
 
 The SCF fills orbitals by aufbau as usual and then this module adjusts the
@@ -17,7 +17,7 @@ orbital it was asked for as the orbitals relax:
 * an MO number (1-based, energy order within the spin channel);
 * ``{atom, shell}`` (1-based atom as in the .xyz) -- the occupied orbital with
   the largest Loewdin weight on that atom's functions of that shell. With
-  several equivalent atoms the initially delocalised core orbitals localise
+  several equivalent atoms the initially delocalized core orbitals localize
   on the chosen atom as the SCF proceeds: removing charge there binds its core
   more strongly. Shells need a principal quantum number, which STO and NAO
   functions carry; Gaussian sets do not, so they are refused for core holes.
@@ -39,8 +39,8 @@ class Target:
 _L = {"s": 0, "p": 1, "d": 2, "f": 3}
 
 #: Loewdin weight on the target shell above which an eigenvector counts as a
-#: localised core orbital and the hole is taken from its occupation.
-_LOCALISED = 0.9
+#: localized core orbital and the hole is taken from its occupation.
+_LOCALIZED = 0.9
 
 
 def parse_target(spec) -> Target:
@@ -115,13 +115,13 @@ class HoleManager:
             self._proj = shell_mask(basis, atom, n, l)
             element = molecule[atom].element
             # the same shell on every atom of that element: the space a core
-            # hole can delocalise over, and has to be localised within
+            # hole can delocalize over, and has to be localized within
             self._elem_proj = np.zeros(len(basis), dtype=bool)
             for k, a in enumerate(molecule):
                 if a.element == element:
                     self._elem_proj |= shell_mask(basis, k, n, l)
         self.last = {}
-        #: x * c_h c_h^T for a localised core hole, subtracted from the density
+        #: x * c_h c_h^T for a localized core hole, subtracted from the density
         self.correction = None
 
     def _pick(self, target, eps, occ, C, occupied: bool) -> int:
@@ -140,16 +140,16 @@ class HoleManager:
         pool = np.where(finite & (occ > 1e-8))[0]
         return int(pool[np.argmax(weights[pool])])
 
-    def _localised_hole(self, eps, occ, C):
+    def _localized_hole(self, eps, occ, C):
         """Hole vector of maximal weight on the target atom's shell.
 
-        Equivalent atoms give delocalised core orbitals (N2: 1s sigma_g and
+        Equivalent atoms give delocalized core orbitals (N2: 1s sigma_g and
         sigma_u, each 0.50 on either atom) and an exactly symmetric start never
         breaks that symmetry by itself. Within the occupied orbitals that carry
         this shell of this element, the combination with the largest Loewdin
         weight on the target atom is the leading right singular vector of the
         target rows of S^1/2 C. Its energy is the Rayleigh quotient
-        sum_k v_k^2 eps_k (C diagonalises F).
+        sum_k v_k^2 eps_k (C diagonalizes F).
         """
         LC = self._sqrtS @ C
         finite = np.isfinite(eps)
@@ -172,20 +172,20 @@ class HoleManager:
         occ = np.array(occ, dtype=float)
         self.correction = None
         if self.source.kind == "shell":
-            # Once an eigenvector of F is itself localised on the target atom,
+            # Once an eigenvector of F is itself localized on the target atom,
             # take the hole from that orbital's occupation: the density then
             # commutes with F and the SCF can converge. Until then (an exactly
             # symmetric start, N2: two 1s combinations at 0.50 each) subtract
-            # the maximally localised combination to break the symmetry; that
+            # the maximally localized combination to break the symmetry; that
             # hole is not an eigenvector, so it only serves as the kick.
             LC = self._sqrtS @ C
             on_target = np.sum(LC[self._proj] ** 2, axis=0)
             pool = np.where(np.isfinite(eps) & (occ > 1e-8))[0]
             best = int(pool[np.argmax(on_target[pool])])
-            if on_target[best] < _LOCALISED:
-                c_h, e_h, i = self._localised_hole(eps, occ, C)
+            if on_target[best] < _LOCALIZED:
+                c_h, e_h, i = self._localized_hole(eps, occ, C)
                 self.correction = self.electrons * np.outer(c_h, c_h)
-                self.last = {"source": i, "eps_source": e_h, "localised": False}
+                self.last = {"source": i, "eps_source": e_h, "localized": False}
                 if self.dest is not None:
                     j = self._pick(self.dest, eps, occ, C, occupied=False)
                     occ[j] += self.electrons

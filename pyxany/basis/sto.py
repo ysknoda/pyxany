@@ -8,7 +8,7 @@ from ..data import elements as elem
 from ..data.loaders import orbital_labels, sto_table
 from .types import STO
 
-#: Recognised STO basis keys.
+#: Recognized STO basis keys.
 STO_KEYS = ("sz", "szp", "dz", "dzp", "tz", "tzp", "tzpp")
 
 
@@ -40,8 +40,8 @@ def sto_exponents(basis_key: str) -> dict[str, list]:
     ``sz``   single-zeta                  Clementi & Raimondi (1963)
     ``dz``   double-zeta                  Clementi & Roetti (1974)
     ``tz``   triple-zeta                  Clementi & Roetti (1974), extended
-    ``*p``   adds d polarisation
-    ``*pp``  adds d and f polarisation
+    ``*p``   adds d polarization
+    ``*pp``  adds d and f polarization
     """
     key = basis_key.lower().strip()
     if key not in STO_KEYS:

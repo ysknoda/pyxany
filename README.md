@@ -5,7 +5,7 @@ with a command-line interface aimed at semiconductor cluster models.
 
 Slater-type, contracted-Gaussian and numerical atomic orbital basis sets;
 restricted and unrestricted Kohn-Sham SCF; analytic nuclear forces; geometry
-optimisation; and **pseudo-hydrogen passivation** of dangling bonds using the
+optimization; and **pseudo-hydrogen passivation** of dangling bonds using the
 electron-counting rule.
 
 ## Install
@@ -50,7 +50,7 @@ forces:
 | command | purpose |
 |---|---|
 | `pyxany run in.yaml` | single-point SCF: energy, forces, populations, dipole |
-| `pyxany opt in.yaml` | geometry optimisation (L-BFGS-B on analytic forces) |
+| `pyxany opt in.yaml` | geometry optimization (L-BFGS-B on analytic forces) |
 | `pyxany forces in.yaml --compare` | analytic forces, checked against finite differences |
 | `pyxany scan in.yaml --coord bond:0,1 --range 1.0 1.6 --steps 13` | energy scan → CSV |
 | `pyxany passivate cluster.xyz` | add hydrogen / pseudo-hydrogen terminators |
@@ -67,7 +67,7 @@ pyxany run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp
 
 `--dry-run` reports grid size, memory and screening before committing to a job.
 Exit codes let batch scripts branch on the outcome: `0` success, `1` input
-error, `2` SCF not converged, `3` runtime error, `4` optimisation not converged.
+error, `2` SCF not converged, `3` runtime error, `4` optimization not converged.
 
 ### Parallel and long runs
 
@@ -115,7 +115,7 @@ pyxany opt cdse_h.yaml --freeze-core      # relax only the terminators
 All of these coincide with the pseudo-hydrogen charges distributed with VASP.
 
 Because `pyxany` is an all-electron code there is **no pseudopotential to
-parameterise**: a terminator is fully specified by its charge, and its basis
+parameterize**: a terminator is fully specified by its charge, and its basis
 function is obtained by solving the spherical Kohn-Sham problem for that charge
 rather than being fitted. The X–H\* distance starts from a covalent-radius
 estimate and is then relaxed with the code's own forces.
@@ -128,7 +128,7 @@ the comparison the reference paper is about.
 A cluster with a crowded frontier often has two orbitals a fraction of a
 millihartree apart. The occupation then swaps between them from iteration to
 iteration and the density never settles, even though the energy is already
-stable to five digits. `pyxany` recognises this and says so:
+stable to five digits. `pyxany` recognizes this and says so:
 
 ```
   [NOT CONVERGED] after 150 iterations
@@ -156,7 +156,7 @@ than against itself; `tests/` runs these as assertions.
 | real harmonics | orthonormality, l ≤ 3 | 1e-15 |
 | Xα coefficient | α = 2/3 reproduces Dirac exchange | machine precision |
 | kinetic energy | H 1s, T = ζ²/2 | 10 digits |
-| two-centre overlap | H₂ 1s–1s vs closed form | 1e-9 … 1e-11 |
+| two-center overlap | H₂ 1s–1s vs closed form | 1e-9 … 1e-11 |
 | Hartree potential | Gaussian charges vs erf(r)/r | 3e-5 relative on E_H, converging at order 4 |
 | atomic solver | hydrogenic 1s/2s/2p/3d | ε exact, R to 1e-11 |
 | analytic forces | vs central finite differences (incl. grid-motion terms) | 2.5e-5 Ha/Bohr (H2, coarse grid) |
@@ -166,7 +166,7 @@ than against itself; `tests/` runs these as assertions.
 
 Physically, Xα/DZ lands ~1 % above Hartree-Fock for closed-shell molecules
 (CO −111.69 vs −112.79 Ha; H₂O −75.29 vs −76.07 Ha), which is the expected
-behaviour of the functional rather than a numerical error.
+behavior of the functional rather than a numerical error.
 
 ## License
 

@@ -15,7 +15,7 @@ from .detect import (
     directions_from_reference,
     ideal_coordination,
     missing_bond_directions,
-    neighbour_lists,
+    neighbor_lists,
 )
 from .species import PseudoSpecies, label_for
 
@@ -47,7 +47,7 @@ class PassivationResult:
                 "deviation": float(abs(n - target))}
 
 
-def terminator_distance(element: str, neighbour_element: str,
+def terminator_distance(element: str, neighbor_element: str,
                         nn_distance_ang: float) -> float:
     """Initial X-H* distance in Angstrom.
 
@@ -63,7 +63,7 @@ def terminator_distance(element: str, neighbour_element: str,
     """
     r_x = covalent_radius(element)
     r_h = covalent_radius("H")
-    r_y = covalent_radius(neighbour_element)
+    r_y = covalent_radius(neighbor_element)
     return nn_distance_ang * (r_x + r_h) / max(r_x + r_y, 1e-6)
 
 
@@ -81,12 +81,12 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
     if scheme not in ("pseudo_hydrogen", "hydrogen"):
         raise ValueError(f"unknown passivation scheme {scheme!r}")
 
-    neighbours = neighbour_lists(molecule, tolerance)
-    bonds = bond_report(molecule, neighbours, tolerance)
-    ideal, coord_warnings = ideal_coordination(molecule, neighbours, coordination)
-    # `ideal`, not the observed neighbour count: the charge is computed with the
-    # ideal coordination, and a surface site has fewer neighbours than that.
-    roles = assign_roles(molecule, neighbours, role_overrides, ideal)
+    neighbors = neighbor_lists(molecule, tolerance)
+    bonds = bond_report(molecule, neighbors, tolerance)
+    ideal, coord_warnings = ideal_coordination(molecule, neighbors, coordination)
+    # `ideal`, not the observed neighbor count: the charge is computed with the
+    # ideal coordination, and a surface site has fewer neighbors than that.
+    roles = assign_roles(molecule, neighbors, role_overrides, ideal)
 
     pos_ang = molecule.positions * BOHR_TO_ANG
     new_atoms = list(molecule.atoms)
@@ -98,13 +98,13 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
         if atom.is_pseudo:
             continue
         want = ideal.get(atom.element, 4)
-        have = len(neighbours[i])
+        have = len(neighbors[i])
         n_missing = want - have
         if n_missing <= 0:
             continue
         if have == 0:
             warnings.append(
-                f"{atom.symbol}{i + 1} has no detected neighbours; the terminator "
+                f"{atom.symbol}{i + 1} has no detected neighbors; the terminator "
                 f"directions are arbitrary. Check grid.tolerance ({tolerance})."
             )
 
@@ -114,7 +114,7 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
             if len(dirs) < n_missing:
                 dirs = None
         if dirs is None:
-            dirs = missing_bond_directions(molecule, i, neighbours[i], n_missing)
+            dirs = missing_bond_directions(molecule, i, neighbors[i], n_missing)
         dirs = np.asarray(dirs)[:n_missing]
 
         role = roles.get(i, "cation")
@@ -132,7 +132,7 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
             valence_electrons=elem.valence_electrons(atom.element),
             coordination=want, alpha=alpha))
 
-        nn = _nearest_neighbour_distance(pos_ang, i, neighbours[i], molecule)
+        nn = _nearest_neighbor_distance(pos_ang, i, neighbors[i], molecule)
         d_ang = terminator_distance(atom.element, nn[1], nn[0])
         if bond_scale:
             d_ang *= bond_scale
@@ -174,12 +174,12 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
                              bonds=bonds, placements=placements, warnings=warnings)
 
 
-def _nearest_neighbour_distance(pos_ang, i, neighbours, molecule):
-    """(distance, element) of the closest real neighbour, for the bond-length scale."""
-    if not neighbours:
+def _nearest_neighbor_distance(pos_ang, i, neighbors, molecule):
+    """(distance, element) of the closest real neighbor, for the bond-length scale."""
+    if not neighbors:
         return 2.35, molecule[i].element        # a typical covalent bond
     ds = [(float(np.linalg.norm(pos_ang[i] - pos_ang[j])), molecule[j].element)
-          for j in neighbours]
+          for j in neighbors]
     return min(ds)
 
 

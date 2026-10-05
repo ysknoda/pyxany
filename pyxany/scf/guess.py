@@ -102,7 +102,7 @@ def sad_density(molecule, basis, xc_alpha=0.7, n_points: int = 2000,
     multiple-zeta functions: the first SCF energy of H2O/DZ is within a few
     hartree of the converged one instead of 20 Ha above it. The overlaps are
     quadratures on a fine one-atom DV grid (``grid_size`` = n_r, n_a; input
-    ``grid.guess``), so no normalisation convention of the basis or the
+    ``grid.guess``), so no normalization convention of the basis or the
     harmonics enters. ``n_points`` is the atom solver's grid (``grid.atom``).
     ``xc_alpha`` is a number or a function of the element symbol
     (``scf.alpha_for``); pseudo-hydrogens use hydrogen's value.

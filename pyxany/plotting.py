@@ -33,7 +33,7 @@ def summary_figure(result, config, path, forces=None) -> None:
     occ = result.occupations
     homo, lumo = result.homo_lumo()
     homo_ev, lumo_ev = homo * HARTREE_TO_EV, lumo * HARTREE_TO_EV
-    colours = plt.cm.Set2(np.linspace(0, 1, max(len(mol), 3)))
+    colors = plt.cm.Set2(np.linspace(0, 1, max(len(mol), 3)))
 
     fig = plt.figure(figsize=(19, 10), facecolor=_BG)
     fig.suptitle(
@@ -109,7 +109,7 @@ def summary_figure(result, config, path, forces=None) -> None:
         x = np.arange(1, len(pops) + 1)
         bottom = np.zeros(len(pops))
         for ai, atom in enumerate(mol):
-            ax_mo.bar(x, pops[:, ai], bottom=bottom, color=colours[ai],
+            ax_mo.bar(x, pops[:, ai], bottom=bottom, color=colors[ai],
                       width=0.75, label=f"{atom.symbol}{ai + 1}")
             bottom += pops[:, ai]
         ax_mo.set_xlabel("occupied MO (1-based, as in the text report)")
@@ -134,7 +134,7 @@ def summary_figure(result, config, path, forces=None) -> None:
     # -- Wiberg bond orders ------------------------------------------------
     # The diagonal is an atom's self-term, not a bond order, and is one to two
     # orders of magnitude larger; leaving it in flattens every real bond to the
-    # bottom of the colour scale.
+    # bottom of the color scale.
     bo = wiberg_bond_orders(result.P, result.S, basis, mol)
     off_diagonal = bo.copy().astype(float)
     np.fill_diagonal(off_diagonal, np.nan)
@@ -253,7 +253,7 @@ def _save(fig, stem, suffix):
 
 
 def bonding_figures(analysis, result, config, stem) -> list[str]:
-    """COOP-type plot, OP-coloured level diagram, partial DOS (+ optional heatmap)."""
+    """COOP-type plot, OP-colored level diagram, partial DOS (+ optional heatmap)."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -291,7 +291,7 @@ def bonding_figures(analysis, result, config, stem) -> list[str]:
                           linewidth=1.0, alpha=0.7)
                 ax.plot(e[clipped], shown[clipped], marker="v", linestyle="none",
                         color="#c0392b", markersize=4)
-                # normalised so an isolated level's peak equals its bar
+                # normalized so an isolated level's peak equals its bar
                 curve = _broaden(x, e, op, sigma) * sigma * np.sqrt(2.0 * np.pi)
                 ax.plot(x, np.clip(curve, -lim, lim), styles[ch.name], color="k",
                         linewidth=1.0, label=ch.name or None)
@@ -310,7 +310,7 @@ def bonding_figures(analysis, result, config, stem) -> list[str]:
         written += _save(fig, stem, "coop")
         plt.close(fig)
 
-    # -- 2. level diagram coloured by the overlap population ---------------
+    # -- 2. level diagram colored by the overlap population ---------------
     if types:
         totals = {t: abs(sum(analysis.op[p] for p, tt in zip(analysis.pairs,
                                                              analysis.pair_types, strict=True)
@@ -318,7 +318,7 @@ def bonding_figures(analysis, result, config, stem) -> list[str]:
                   for t in types}
         t_main = max(totals, key=totals.get)
         fig, ax = plt.subplots(figsize=(3.6 + 1.4 * (len(analysis.channels) - 1), 6.0))
-        # colour scale from the occupied orbitals (see the COOP note); empty
+        # color scale from the occupied orbitals (see the COOP note); empty
         # orbitals beyond it saturate
         lim = _occupied_limit(analysis, t_main, cap, lo, hi)
         norm = TwoSlopeNorm(vmin=-lim, vcenter=0.0, vmax=lim)
@@ -328,7 +328,7 @@ def bonding_figures(analysis, result, config, stem) -> list[str]:
                 if not (np.isfinite(e) and lo <= e <= hi):
                     continue
                 style = "-" if o > 1e-8 else (0, (2, 1.5))
-                # grey underlay keeps near-zero (white) levels visible
+                # gray underlay keeps near-zero (white) levels visible
                 ax.hlines(e, k + 0.1, k + 0.9, color="0.75", linewidth=3.4, linestyle=style)
                 ax.hlines(e, k + 0.1, k + 0.9, color=cmap(norm(v)), linewidth=2.2,
                           linestyle=style)
@@ -340,13 +340,13 @@ def bonding_figures(analysis, result, config, stem) -> list[str]:
         sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
         fig.colorbar(sm, ax=ax, extend="both",
                      label=f"{t_main} overlap population per orbital")
-        ax.set_title(f"{mol.name}: levels coloured by {t_main} bonding", fontsize=10)
+        ax.set_title(f"{mol.name}: levels colored by {t_main} bonding", fontsize=10)
         written += _save(fig, stem, "levels_op")
         plt.close(fig)
 
     # -- 3. partial DOS by element and by (element, l) ----------------------
     fig, (ax_e, ax_l) = plt.subplots(2, 1, figsize=(6.5, 6.0), sharex=True)
-    colours = plt.cm.tab10(np.arange(10))
+    colors = plt.cm.tab10(np.arange(10))
     for ax, key in ((ax_e, "pdos_element"), (ax_l, "pdos_element_l")):
         for ch in analysis.channels:
             groups = getattr(ch, key)
@@ -354,7 +354,7 @@ def bonding_figures(analysis, result, config, stem) -> list[str]:
             sign = -1.0 if ch.name == "beta" else 1.0
             for i, (lab, w) in enumerate(groups.items()):
                 ax.plot(x, sign * _broaden(x, ch.eps[inside], w[inside], sigma),
-                        styles[ch.name], color=colours[i % 10], linewidth=1.1,
+                        styles[ch.name], color=colors[i % 10], linewidth=1.1,
                         label=str(lab) if ch.name != "beta" else None)
         ax.axvline(analysis.homo_ev, color="0.3", linestyle=":", linewidth=1.0)
         ax.set_ylabel("PDOS (orbitals/eV)")

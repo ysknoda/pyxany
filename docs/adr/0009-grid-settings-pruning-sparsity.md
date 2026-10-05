@@ -23,13 +23,13 @@ converged by a user.
 | `pruning` | inner-shell angular reduction (below) | on, `auto` |
 | `basis_cutoff` | block-sparse basis (below) | 1e-6 |
 | `angular` | angular rule: `product` or `lebedev` | product |
-| `pair: {n_r, n_a}` | two-centre S/T grids (was `pair_n_r`, `pair_n_a`) | 40, 14 |
+| `pair: {n_r, n_a}` | two-center S/T grids (was `pair_n_r`, `pair_n_a`) | 40, 14 |
 | `atom: {n_points}` | atom solver log grid: NAO basis, SAD, pseudo-H (was `basis.nao_n_r`) | 2000 |
 | `guess: {n_r, n_a}` | one-atom grid of the SAD projection | 80, 14 |
-| `one_centre: {n_r}` | radial quadrature of one-centre non-Slater integrals | 400 |
+| `one_center: {n_r}` | radial quadrature of one-center non-Slater integrals | 400 |
 
 Every block is optional and may be partial; omitted values keep the defaults,
-which reproduce the previous behaviour of the fixed grids. The old keys are
+which reproduce the previous behavior of the fixed grids. The old keys are
 errors that name their replacement. `--set grid.pair.n_r=60` reaches nested
 keys. `--dry-run`, the SCF header (`-v`), the text report and the JSON
 (`"grids"`) list every grid with its actual sizes.

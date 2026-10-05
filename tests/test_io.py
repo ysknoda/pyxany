@@ -1,4 +1,4 @@
-"""XYZ and YAML input handling, including the strict-validation behaviour."""
+"""XYZ and YAML input handling, including the strict-validation behavior."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def test_xyz_round_trip(tmp_path):
     assert np.abs(mol.positions - again.positions).max() < 1e-9
 
 
-def test_bohr_units_are_honoured(tmp_path):
+def test_bohr_units_are_honored(tmp_path):
     src = write(tmp_path, "co.xyz", CO_XYZ)
     ang = read_xyz(src, units="angstrom")
     bohr = read_xyz(src, units="bohr")

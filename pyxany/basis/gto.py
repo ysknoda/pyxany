@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from ..data.loaders import gto_polarisation_exponents, gto_table
+from ..data.loaders import gto_polarization_exponents, gto_table
 from .harmonics import lm_pairs
 from .types import GTO
 
-#: Recognised GTO basis keys, mapped to (table name, add d polarisation).
+#: Recognized GTO basis keys, mapped to (table name, add d polarization).
 GTO_KEYS = {
     "sto3g": ("sto3g", False),
     "631g": ("631g", False),
@@ -58,9 +58,9 @@ def build_gto_basis(molecule, basis_key: str, pseudo_zeta=None) -> list:
     key = basis_key.lower().strip()
     if key not in GTO_KEYS:
         raise ValueError(f"unknown GTO basis '{basis_key}'; choose from {sorted(GTO_KEYS)}")
-    table_name, want_polarisation = GTO_KEYS[key]
+    table_name, want_polarization = GTO_KEYS[key]
     table = gto_table(table_name)
-    pol = gto_polarisation_exponents()
+    pol = gto_polarization_exponents()
     pseudo_zeta = pseudo_zeta or {}
 
     functions: list = []
@@ -99,7 +99,7 @@ def build_gto_basis(molecule, basis_key: str, pseudo_zeta=None) -> list:
             )
 
         # 6-31G(d): one uncontracted d shell per non-hydrogen atom
-        if want_polarisation and atom.element != "H":
+        if want_polarization and atom.element != "H":
             alpha = pol.get(atom.element)
             if alpha is not None:
                 for m in lm_pairs(2):

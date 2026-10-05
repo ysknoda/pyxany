@@ -52,11 +52,11 @@ def compute_forces_fd(molecule, config, step: float = 0.02,
 
 def compare_with_fd(result, config, step: float = 0.02,
                     atoms: list[int] | None = None) -> dict:
-    """Analytic vs finite-difference forces, with the differences summarised.
+    """Analytic vs finite-difference forces, with the differences summarized.
 
     Returns a dict carrying both force arrays, the maximum absolute deviation
     and the translational-invariance residual of each -- the two numbers that
-    decide whether the analytic gradient can be trusted for optimisation.
+    decide whether the analytic gradient can be trusted for optimization.
     """
     from .analytic import compute_forces, translation_residual
 

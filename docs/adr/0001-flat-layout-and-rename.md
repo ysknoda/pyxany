@@ -25,7 +25,7 @@ The package lives in `src/dvxa/` (src layout). The first proposed new name,
   working-tree changes are committed separately, so rename detection keeps
   file history.
 - Paths in `.code-check/history.md` are rewritten to the new layout.
-- Stray optimisation output (`test_traj.xyz` at the root) is removed and
+- Stray optimization output (`test_traj.xyz` at the root) is removed and
   `*_traj.xyz` is ignored, except deliberate files under `examples/`.
 - Nothing is pushed to GitHub as part of this change.
 

@@ -20,7 +20,7 @@ populations.
   1. MO-resolved overlap population (COOP-like): energy on x, overlap
      population on y, bonding (+) / antibonding (-) as bars or Gaussian-broadened
      curves, with a line at the HOMO (or Fermi level);
-  2. energy-level diagram with each level coloured by the sign and size of the
+  2. energy-level diagram with each level colored by the sign and size of the
      overlap population of a chosen pair;
   3. partial DOS by element and by angular momentum l.
 - An atom-pair heatmap of total overlap population is available as an option
@@ -31,14 +31,14 @@ populations.
 
 ## Implementation notes (2026-10-02)
 
-- The COOP axis and the level colour scale are set from the occupied orbitals:
+- The COOP axis and the level color scale are set from the occupied orbitals:
   Mulliken overlap populations of diffuse empty orbitals reach -7 per orbital
   (H2O/DZ O-H sigma*) and would otherwise flatten every occupied feature.
   Clipped bars are marked.
 - Partial DOS uses Loewdin weights (bounded, sum to 1 per orbital), not
   Mulliken; species are ordered by nuclear charge.
 - `--set` cannot reach nested keys, so `overlap_population.*` is set in YAML.
-- Possible follow-up: choose the pair type that colours the level diagram
+- Possible follow-up: choose the pair type that colors the level diagram
   (today: the type with the largest total overlap population).
 
 ## Consequences
@@ -60,7 +60,7 @@ enough to change sign. Measured at fixed geometry:
 The Mayer bond order is stable throughout, so the bonds are not
 antibonding; the equal Mulliken split of overlap terms between diffuse
 functions on closely packed atoms is the cause. A Loewdin analogue is no
-remedy (the pair overlap population vanishes in an orthogonalised basis).
+remedy (the pair overlap population vanishes in an orthogonalized basis).
 
 Decision: keep the quantity (it is what COOP plots integrate), and print a
 note whenever a pair with Mayer bond order >= 0.5 has a negative total.

@@ -95,7 +95,7 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
     if config.properties.population:
         from ..properties import bonding
 
-        out["bonding"] = bonding.to_dict(bonding.analyse(result, config), mol)
+        out["bonding"] = bonding.to_dict(bonding.analyze(result, config), mol)
     pseudo = [i for i, a in enumerate(mol) if a.is_pseudo]
     if pseudo:
         mask = np.array([f.atom_idx in set(pseudo) for f in basis], dtype=bool)

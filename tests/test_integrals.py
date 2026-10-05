@@ -1,4 +1,4 @@
-"""One- and two-centre integrals against closed-form references."""
+"""One- and two-center integrals against closed-form references."""
 
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ import pytest
 
 from pyxany.basis.types import GTO, STO
 from pyxany.grid.radial import log_squared_map
-from pyxany.integrals.onecentre import kinetic_1c, overlap_1c
-from pyxany.integrals.twocentre import overlap_kinetic_2c
+from pyxany.integrals.onecenter import kinetic_1c, overlap_1c
+from pyxany.integrals.twocenter import overlap_kinetic_2c
 
 
-def test_sto_normalisation():
+def test_sto_normalization():
     r, w = log_squared_map(500, 1.0)
     for bf in (STO(1, 0, 0, 1.24, 0), STO(2, 0, 0, 1.6083, 0),
                STO(2, 1, 0, 1.5679, 0), STO(3, 2, 0, 1.20, 0),
@@ -29,7 +29,7 @@ def test_hydrogenic_kinetic_energy_is_exact(zeta):
     assert abs(kinetic_1c(bf, bf) - zeta * zeta / 2.0) < 1e-10
 
 
-def test_closed_form_and_quadrature_one_centre_agree():
+def test_closed_form_and_quadrature_one_center_agree():
     """The analytic Slater formulas and the generic radial quadrature must match."""
     r, w = log_squared_map(500, 1.0)
     pairs = [(STO(1, 0, 0, 1.24, 0), STO(1, 0, 0, 1.24, 0)),
@@ -44,7 +44,7 @@ def test_closed_form_and_quadrature_one_centre_agree():
         assert abs(kinetic_1c(a, b) - t_quad) < 1e-8
 
 
-def test_gto_contraction_uses_normalised_primitives():
+def test_gto_contraction_uses_normalized_primitives():
     """Reading the tables with the wrong convention shows up as norm != 1."""
     shells = {
         "H 1s": (0, [(3.4252509, 0.1543290), (0.6239137, 0.5353281),
@@ -68,7 +68,7 @@ def test_sto3g_hydrogen_kinetic_energy():
 
 
 @pytest.mark.parametrize("R", [0.8, 1.4, 2.0, 3.0, 5.0])
-def test_two_centre_overlap_matches_the_closed_form(R):
+def test_two_center_overlap_matches_the_closed_form(R):
     """S(R) = exp(-x)(1 + x + x^2/3), x = zeta R, for two identical 1s Slaters."""
     zeta = 1.24
     S, _T = overlap_kinetic_2c([STO(1, 0, 0, zeta, 0)], [STO(1, 0, 0, zeta, 1)],
@@ -78,7 +78,7 @@ def test_two_centre_overlap_matches_the_closed_form(R):
     assert abs(S[0, 0] - exact) < 1e-7
 
 
-def test_gradient_form_kinetic_energy_reduces_to_one_centre():
+def test_gradient_form_kinetic_energy_reduces_to_one_center():
     """1/2 int grad chi . grad chi equals the closed-form T at zero separation."""
     zeta = 1.24
     _S, T = overlap_kinetic_2c([STO(1, 0, 0, zeta, 0)], [STO(1, 0, 0, zeta, 1)],

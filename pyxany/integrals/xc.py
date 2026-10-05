@@ -18,7 +18,7 @@ so the energy *per electron* and the potential are
 The ``V = (4/3) eps`` identity is asserted in tests/test_xc.py, and the absolute
 scale is checked against the uniform-electron-gas exchange energy.
 
-Spin-polarised case
+Spin-polarized case
 -------------------
 For an unrestricted calculation the exchange functional is evaluated per spin
 channel using the spin-scaling relation ``E_x[rho_a, rho_b] =

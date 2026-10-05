@@ -91,16 +91,16 @@ def test_forces_with_element_alpha_match_finite_differences(unrestricted):
     assert np.abs(F - fd).max() < 2.5e-4          # 1.3e-4 measured; 1.0e-4 at uniform alpha
 
 
-def test_polarised_atom_reproduces_exchange_only_lda():
-    """alpha = 2/3 is LDA exchange; spin-polarised H and closed-shell He.
+def test_polarized_atom_reproduces_exchange_only_lda():
+    """alpha = 2/3 is LDA exchange; spin-polarized H and closed-shell He.
 
     References: PySCF 2.14 exchange-only LDA ('lda,'), uncontracted ANO-RCC,
     grid level 9 (UKS for H): -0.457065 and -2.723592 Ha.
     """
-    from pyxany.basis.atomic_solver import solve_atom_polarised
+    from pyxany.basis.atomic_solver import solve_atom_polarized
 
-    assert solve_atom_polarised("H", alpha=2 / 3).energy == pytest.approx(-0.457065, abs=5e-5)
-    assert solve_atom_polarised("He", alpha=2 / 3).energy == pytest.approx(-2.723592, abs=5e-5)
+    assert solve_atom_polarized("H", alpha=2 / 3).energy == pytest.approx(-0.457065, abs=5e-5)
+    assert solve_atom_polarized("He", alpha=2 / 3).energy == pytest.approx(-2.723592, abs=5e-5)
 
 
 # -- Schwarz's published table and the recomputation --------------------------------
@@ -139,7 +139,7 @@ def test_recomputed_definition_reproduces_the_published_values():
     """tools/alpha_hf.py with Schwarz's definition vs his tables (2e-4: N)."""
     from pyxany.data.loaders import _load, alpha_hf_table
 
-    recomputed = _load("alpha_hf_polarised")["alpha_hf_recomputed"]
+    recomputed = _load("alpha_hf_polarized")["alpha_hf_recomputed"]
     published = alpha_hf_table()
     compared = [s for s in recomputed if s != "H"]
     assert len(compared) >= 20
@@ -147,12 +147,12 @@ def test_recomputed_definition_reproduces_the_published_values():
         assert recomputed[symbol] == pytest.approx(published[symbol], abs=2e-4), symbol
 
 
-def test_polarised_table_is_selectable():
-    scf = make_config(scf={"alpha": "alpha_hf_polarised"}).scf
+def test_polarized_table_is_selectable():
+    scf = make_config(scf={"alpha": "alpha_hf_polarized"}).scf
     assert scf.alpha_for("H") == pytest.approx(0.77676, abs=1e-5)
-    # closed shells: spin polarisation and the configuration average change nothing
+    # closed shells: spin polarization and the configuration average change nothing
     from pyxany.data.loaders import _load
 
-    recomputed = _load("alpha_hf_polarised")["alpha_hf_recomputed"]
+    recomputed = _load("alpha_hf_polarized")["alpha_hf_recomputed"]
     for symbol in ("He", "Be", "Ne", "Mg", "Ar", "Ca"):
         assert scf.alpha_for(symbol) == pytest.approx(recomputed[symbol], abs=1e-5)

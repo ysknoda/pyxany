@@ -14,9 +14,9 @@ orbital of the free atom.
 repelled by the whole density including itself, and the X-alpha exchange does
 not cancel that.  Hydrogen 1s comes out at about -0.204 Ha instead of the exact
 -0.5, so H NAOs are markedly more diffuse than the true hydrogen 1s.  This is
-expected X-alpha behaviour, not a defect in the solver -- which reproduces the
+expected X-alpha behavior, not a defect in the solver -- which reproduces the
 hydrogenic spectrum to 1e-11 when given the bare -Z/r potential -- but NAO
-eigenvalues must not be read as ionisation potentials or orbital energies.
+eigenvalues must not be read as ionization potentials or orbital energies.
 """
 
 from __future__ import annotations

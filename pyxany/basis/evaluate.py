@@ -8,7 +8,7 @@ Two entry points:
 ``chi_grad_matrix(basis, positions, points)``
     ``(n_points, n_basis, 3)`` gradients with respect to the *electron*
     coordinate.  The derivative with respect to the position of the atom the
-    function is centred on is the negative of this, which is what the Pulay
+    function is centerd on is the negative of this, which is what the Pulay
     force terms need.
 
 Both group functions by their parent atom so that the radius and the Cartesian

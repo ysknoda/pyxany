@@ -1,8 +1,8 @@
-"""Two-centre overlap and kinetic-energy integrals on a Becke-partitioned grid.
+"""Two-center overlap and kinetic-energy integrals on a Becke-partitioned grid.
 
-For a pair of atoms (A, B) the integrand has a cusp at *both* centres, so a
-single grid centred on A under-resolves the region around B.  This module
-therefore builds one atom-centred grid per centre and combines them with a
+For a pair of atoms (A, B) the integrand has a cusp at *both* centers, so a
+single grid centerd on A under-resolves the region around B.  This module
+therefore builds one atom-centerd grid per center and combines them with a
 two-atom Becke partition, exactly as the molecular grid does.
 
 The kinetic energy uses the gradient form
@@ -29,19 +29,19 @@ from ..grid.radial import treutler_ahlrichs_m4
 
 def pair_grid(pos_a, pos_b, radius_a: float, radius_b: float, n_r: int, n_a: int,
               raw: bool = False):
-    """Two-centre Becke-partitioned grid; returns ``(points, weights)``.
+    """Two-center Becke-partitioned grid; returns ``(points, weights)``.
 
-    With ``raw=True`` returns ``(points, raw_weights, owner, centres, radii)``
+    With ``raw=True`` returns ``(points, raw_weights, owner, centers, radii)``
     instead, the quadrature weights before the Becke cell factor.
     """
     dirs, w_ang = spherical_product(n_a)
-    centres = np.vstack([np.asarray(pos_a, float), np.asarray(pos_b, float)])
+    centers = np.vstack([np.asarray(pos_a, float), np.asarray(pos_b, float)])
     radii = np.array([radius_a, radius_b])
 
     pts_all, wts_all, owner_all = [], [], []
-    for i, (centre, radius) in enumerate(zip(centres, radii)):
+    for i, (center, radius) in enumerate(zip(centers, radii)):
         r, w_r = treutler_ahlrichs_m4(n_r, radius)
-        pts = (r[:, None, None] * dirs[None, :, :]).reshape(-1, 3) + centre
+        pts = (r[:, None, None] * dirs[None, :, :]).reshape(-1, 3) + center
         wts = (w_r[:, None] * r[:, None] ** 2 * w_ang[None, :]).reshape(-1)
         pts_all.append(pts)
         wts_all.append(wts)
@@ -51,8 +51,8 @@ def pair_grid(pos_a, pos_b, radius_a: float, radius_b: float, n_r: int, n_a: int
     weights = np.concatenate(wts_all)
     owner = np.concatenate(owner_all)
     if raw:
-        return points, weights, owner, centres, radii
-    cell = becke_weights(points, centres, radii)
+        return points, weights, owner, centers, radii
+    cell = becke_weights(points, centers, radii)
     return points, weights * cell[np.arange(len(points)), owner]
 
 
@@ -60,7 +60,7 @@ def overlap_kinetic_2c(basis_a, basis_b, pos_a, pos_b, radius_a, radius_b,
                        n_r: int = 40, n_a: int = 14):
     """Cross-atom (n_a x n_b) blocks of S and T for one atom pair.
 
-    ``basis_a`` / ``basis_b`` are the basis functions centred on A and B.
+    ``basis_a`` / ``basis_b`` are the basis functions centerd on A and B.
     Returns ``(S_block, T_block)``.
     """
     points, weights = pair_grid(pos_a, pos_b, radius_a, radius_b, n_r, n_a)
@@ -97,7 +97,7 @@ def overlap_kinetic_2c_gradient(basis_a, basis_b, pos_a, pos_b, radius_a, radius
     points and translational invariance for B's. ``d/dR_A`` is the negative.
     Returns a 3-vector, or None when the compiled Hessian is unavailable.
     """
-    points, raw, owner, centres, radii = pair_grid(
+    points, raw, owner, centers, radii = pair_grid(
         pos_a, pos_b, radius_a, radius_b, n_r, n_a, raw=True)
     from ..kernels import pair_gradient_terms_kernel
 
@@ -106,7 +106,7 @@ def overlap_kinetic_2c_gradient(basis_a, basis_b, pos_a, pos_b, radius_a, radius
         return None
     local_a = [_rebind(f, 0) for f in basis_a]
     local_b = [_rebind(f, 1) for f in basis_b]
-    cell = becke_weights(points, centres, radii)[np.arange(len(points)), owner]
+    cell = becke_weights(points, centers, radii)[np.arange(len(points)), owner]
     w = raw * cell
     F = np.empty(len(points))
     dF = np.empty((len(points), 3))
@@ -120,18 +120,18 @@ def overlap_kinetic_2c_gradient(basis_a, basis_b, pos_a, pos_b, radius_a, radius
         out_F = np.empty(len(pts))
         out_dF = np.empty((len(pts), 3))
         kernel(
-            chi_matrix(fixed, centres, pts),
-            chi_grad_matrix(fixed, centres, pts),
-            chi_matrix(moving, centres, pts),
-            chi_grad_matrix(moving, centres, pts),
-            chi_hess_matrix(moving, centres, pts),
+            chi_matrix(fixed, centers, pts),
+            chi_grad_matrix(fixed, centers, pts),
+            chi_matrix(moving, centers, pts),
+            chi_grad_matrix(moving, centers, pts),
+            chi_hess_matrix(moving, centers, pts),
             np.ascontiguousarray(C), np.ascontiguousarray(D), sign, out_F, out_dF,
         )
         F[sel] = out_F
         dF[sel] = out_dF
     grad = w @ dF
 
-    M = own_cell_weight_gradient(points, owner, raw * F, centres, radii)
+    M = own_cell_weight_gradient(points, owner, raw * F, centers, radii)
     return grad + M[0, 1] - M[1, 0]
 
 

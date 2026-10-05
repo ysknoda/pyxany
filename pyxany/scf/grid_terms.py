@@ -1,7 +1,7 @@
 """Grid-integrated matrices, either from a cached chi or in bounded-memory chunks.
 
 The chi matrix is ``(n_grid_points x n_basis)``.  For a few hundred atoms in a
-polarised basis that is tens of gigabytes on one rank, so it cannot always be
+polarized basis that is tens of gigabytes on one rank, so it cannot always be
 held.  Two strategies, chosen from the memory budget:
 
 **cached**  build chi once and reuse it for every term.  Fastest, and what a
@@ -37,7 +37,7 @@ class GridTerms:
     """Evaluates density and potential matrices on the grid.
 
     ``chunk_size=None`` caches chi; an integer processes that many points at a
-    time and never materialises the whole thing.
+    time and never materializes the whole thing.
     """
 
     def __init__(self, basis, molecule, grid, chunk_size: int | None = None,

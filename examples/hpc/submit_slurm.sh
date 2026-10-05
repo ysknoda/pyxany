@@ -5,7 +5,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --output=%x-%j.log
 
-# Keep BLAS single-threaded: pyxany parallelises over MPI ranks, and letting each
+# Keep BLAS single-threaded: pyxany parallelizes over MPI ranks, and letting each
 # rank spawn its own thread pool oversubscribes the node.
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1

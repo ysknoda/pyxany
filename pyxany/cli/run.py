@@ -96,4 +96,4 @@ def _figure(result, cfg, forces) -> None:
 
     stem = (out_path(cfg, "") if cfg.output.prefix
             else output_dir(cfg) / (result.molecule.name or "pyxany"))
-    bonding_figures(bonding.analyse(result, cfg), result, cfg, str(stem))
+    bonding_figures(bonding.analyze(result, cfg), result, cfg, str(stem))

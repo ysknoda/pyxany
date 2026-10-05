@@ -17,7 +17,7 @@ def build_basis(molecule, config, pseudo_zeta=None) -> BasisSet:
     contains pseudo-hydrogens, it is derived here rather than left empty: the
     exponents depend only on the fractional charges, so every caller would
     otherwise have to remember to pass them, and the ones that forgot
-    (``forces.optimise`` and ``forces.finite_difference``) made
+    (``forces.optimize`` and ``forces.finite_difference``) made
     ``pyxany opt --freeze-core`` -- the advertised way to relax a passivated
     cluster -- fail with a KeyError on every passivated example.
     """

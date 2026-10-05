@@ -99,15 +99,15 @@ class GridConfig:
     screening_tol: float = 1e-10
     #: Radial points per element, overriding the ratio table (e.g. {Si: 40}).
     n_r_by_element: dict = field(default_factory=dict)
-    #: Two-centre grids for the S and T matrices and their gradient.
+    #: Two-center grids for the S and T matrices and their gradient.
     pair: dict = field(default_factory=lambda: {"n_r": 40, "n_a": 14})
     #: Logarithmic radial grid of the spherical atom solver (NAO basis, SAD
     #: initial guess, pseudo-hydrogen exponents).
     atom: dict = field(default_factory=lambda: {"n_points": 2000})
     #: One-atom DV grid on which the SAD guess is projected onto the basis.
     guess: dict = field(default_factory=lambda: {"n_r": 80, "n_a": 14})
-    #: Radial quadrature for one-centre integrals of non-Slater functions.
-    one_centre: dict = field(default_factory=lambda: {"n_r": 400})
+    #: Radial quadrature for one-center integrals of non-Slater functions.
+    one_center: dict = field(default_factory=lambda: {"n_r": 400})
     #: Fewer angular points on the inner shells of the molecular grid (ADR 0009).
     pruning: dict = field(default_factory=lambda: {"enabled": True, "regions": "auto"})
     #: Basis functions below this magnitude on a block of grid points are
@@ -167,7 +167,7 @@ class GridConfig:
         "pair": ({"n_r": 40, "n_a": 14}, {"n_r": 5, "n_a": 4}),
         "atom": ({"n_points": 2000}, {"n_points": 500}),
         "guess": ({"n_r": 80, "n_a": 14}, {"n_r": 5, "n_a": 4}),
-        "one_centre": ({"n_r": 400}, {"n_r": 50}),
+        "one_center": ({"n_r": 400}, {"n_r": 50}),
     }
 
     def _validate_sub_grids(self, ctx: str) -> None:
@@ -268,9 +268,12 @@ class SCFConfig:
         if isinstance(a, str) and a.strip().replace(".", "", 1).isdigit():
             self.alpha = a = float(a)                  # --set scf.alpha=0.75
         if isinstance(a, str):
-            if a not in ("alpha_hf", "alpha_hf_polarised"):
+            if a == "alpha_hf_polarised":
+                raise ConfigError(f"{ctx}: scf.alpha: 'alpha_hf_polarised' is now spelled "
+                                  f"'alpha_hf_polarized'")
+            if a not in ("alpha_hf", "alpha_hf_polarized"):
                 raise ConfigError(f"{ctx}: scf.alpha must be a number, 'alpha_hf', "
-                                  f"'alpha_hf_polarised' or a "
+                                  f"'alpha_hf_polarized' or a "
                                   f"mapping like {{default: 0.7, Si: 0.73}}; got {a!r}")
         elif isinstance(a, dict):
             from .data import elements as elem
@@ -302,12 +305,12 @@ class SCFConfig:
         a = self.alpha
         if isinstance(a, (int, float)):
             return float(a)
-        if a in ("alpha_hf", "alpha_hf_polarised"):
+        if a in ("alpha_hf", "alpha_hf_polarized"):
             from .data import loaders
 
             try:
                 table = (loaders.alpha_hf_table() if a == "alpha_hf"
-                         else loaders.alpha_hf_polarised_table())
+                         else loaders.alpha_hf_polarized_table())
             except FileNotFoundError:
                 raise ConfigError(f"scf.alpha: {a}: the table has not been built yet "
                                   f"(tools/alpha_hf.py, ADR 0011)") from None
@@ -333,8 +336,8 @@ class SCFConfig:
             return f"{a:g}"
         if a == "alpha_hf":
             return "alpha_HF (Schwarz, by element)"
-        if a == "alpha_hf_polarised":
-            return "alpha_HF spin-polarised (by element)"
+        if a == "alpha_hf_polarized":
+            return "alpha_HF spin-polarized (by element)"
         return "by element " + ", ".join(f"{k} {v:g}" for k, v in a.items())
 
 
@@ -355,7 +358,7 @@ class ForcesConfig:
 
 
 @dataclass
-class OptimiseConfig:
+class OptimizeConfig:
     enabled: bool = False
     method: str = "lbfgs"
     f_max: float = 1e-3
@@ -366,15 +369,15 @@ class OptimiseConfig:
     def validate(self, ctx: str) -> None:
         if self.method == "steepest_descent":
             raise ConfigError(
-                f"{ctx}: optimise.method 'steepest_descent' ran scipy's conjugate "
+                f"{ctx}: optimize.method 'steepest_descent' ran scipy's conjugate "
                 f"gradient, never steepest descent. Use 'cg' for that solver, or "
                 f"'lbfgs' (the default)."
             )
         if self.method not in ("lbfgs", "cg"):
-            raise ConfigError(f"{ctx}: optimise.method must be 'lbfgs' or 'cg'")
+            raise ConfigError(f"{ctx}: optimize.method must be 'lbfgs' or 'cg'")
         if isinstance(self.freeze, str) and self.freeze not in ("none", "core"):
             raise ConfigError(
-                f"{ctx}: optimise.freeze must be 'none', 'core' or a list of atom indices"
+                f"{ctx}: optimize.freeze must be 'none', 'core' or a list of atom indices"
             )
 
 
@@ -385,7 +388,7 @@ class PropertiesConfig:
     dos: dict = field(default_factory=lambda: {"sigma": 0.3, "n_points": 600})
     bde: dict = field(default_factory=lambda: {"enabled": False})
     esp: dict = field(default_factory=lambda: {"enabled": False, "n_pts": 20, "margin": 3.0})
-    #: Bond overlap population (ADR 0005): pairs to analyse (default: Mayer bond
+    #: Bond overlap population (ADR 0005): pairs to analyze (default: Mayer bond
     #: order >= min_bond_order) and whether to draw the atom-pair heatmap.
     overlap_population: dict = field(default_factory=lambda: {
         "pairs": [], "min_bond_order": 0.2, "heatmap": False, "sigma": 0.3})
@@ -520,7 +523,11 @@ _MOVED = {
     ("grid", "pair_n_r"): "grid: {pair: {n_r: ...}}",
     ("grid", "pair_n_a"): "grid: {pair: {n_a: ...}}",
     ("basis", "nao_n_r"): "grid: {atom: {n_points: ...}}",
+    ("grid", "one_centre"): "grid: {one_center: {n_r: ...}} (American spelling)",
 }
+
+#: sections renamed to American spelling
+_RENAMED_SECTIONS = {"optimise": "optimize"}
 
 _SECTIONS = {
     "molecule": MoleculeConfig,
@@ -529,7 +536,7 @@ _SECTIONS = {
     "grid": GridConfig,
     "scf": SCFConfig,
     "forces": ForcesConfig,
-    "optimise": OptimiseConfig,
+    "optimize": OptimizeConfig,
     "properties": PropertiesConfig,
     "output": OutputConfig,
     "runtime": RuntimeConfig,
@@ -546,7 +553,7 @@ class Config:
     grid: GridConfig = field(default_factory=GridConfig)
     scf: SCFConfig = field(default_factory=SCFConfig)
     forces: ForcesConfig = field(default_factory=ForcesConfig)
-    optimise: OptimiseConfig = field(default_factory=OptimiseConfig)
+    optimize: OptimizeConfig = field(default_factory=OptimizeConfig)
     properties: PropertiesConfig = field(default_factory=PropertiesConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
@@ -559,6 +566,9 @@ class Config:
     def from_dict(cls, raw: dict, ctx: str = "<config>", source_dir: Path | None = None):
         if not isinstance(raw, dict):
             raise ConfigError(f"{ctx}: the top level of the input file must be a mapping")
+        for old, new in _RENAMED_SECTIONS.items():
+            if old in raw:
+                raise ConfigError(f"{ctx}: section '{old}' is now spelled '{new}'")
         unknown = set(raw) - set(_SECTIONS)
         if unknown:
             raise ConfigError(

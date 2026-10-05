@@ -19,7 +19,7 @@ by ``r^l``.  The polynomial itself is the *real solid harmonic*::
 which is what basis functions actually multiply, and which has a clean
 analytical gradient -- needed for Pulay force terms.
 
-The m-labelling follows the usual convention in which the cosine-type function
+The m-labeling follows the usual convention in which the cosine-type function
 carries +|m| and the sine-type function carries -|m|::
 
     l=2:  m=+2 -> (x^2 - y^2),   m=-2 -> xy

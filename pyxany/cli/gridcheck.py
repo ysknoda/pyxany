@@ -43,7 +43,7 @@ def _gridcheck(args):
         S, _ = build_overlap_kinetic(molecule, basis,
                                      n_r=cfg.grid.pair["n_r"], n_a=cfg.grid.pair["n_a"],
                                      screening_tol=cfg.grid.screening_tol,
-                                     n_r_1c=cfg.grid.one_centre["n_r"])
+                                     n_r_1c=cfg.grid.one_center["n_r"])
     P = rescale_to_electron_count(atomic_superposition(molecule, basis), S,
                                   molecule.n_electrons)
     for n_r, n_a in levels:

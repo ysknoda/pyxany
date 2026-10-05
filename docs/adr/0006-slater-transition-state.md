@@ -5,18 +5,18 @@
 
 ## Context
 
-Ionisation and excitation energies from the Slater transition state are a
+Ionization and excitation energies from the Slater transition state are a
 principal use of DV-Xalpha (XPS, XANES edge positions). Koopmans-like orbital
 energies from X-alpha carry large self-interaction errors and are not
-ionisation energies.
+ionization energies.
 
 ## Decision
 
 In scope now:
 
-- (a) valence ionisation: remove 0.5 electron from a chosen MO;
-- (b) core ionisation (XPS): remove 0.5 electron from 1s/2p of a chosen atom,
-  with the hole localised by distinguishing that one atom among equivalent
+- (a) valence ionization: remove 0.5 electron from a chosen MO;
+- (b) core ionization (XPS): remove 0.5 electron from 1s/2p of a chosen atom,
+  with the hole localized by distinguishing that one atom among equivalent
   ones;
 - (c) transition energies: move 0.5 electron from MO i to MO j.
 
@@ -24,9 +24,9 @@ Input syntax:
 
 ```yaml
 transition_state:
-  # (a) valence ionisation: MO index (1-based, by energy) or 'homo'
+  # (a) valence ionization: MO index (1-based, by energy) or 'homo'
   remove: {orbital: homo, spin: alpha, electrons: 0.5}
-  # (b) core ionisation: atom index (1-based, as in the .xyz) + nl
+  # (b) core ionization: atom index (1-based, as in the .xyz) + nl
   # remove: {atom: 3, shell: 1s, electrons: 0.5}
   # (c) excitation: from -> to
   # excite: {from: homo, to: lumo, electrons: 0.5}
@@ -52,11 +52,11 @@ Deferred: (d) XANES/XES spectra from transition-state dipole intensities
   X-alpha itself underestimates this IP: PySCF X-alpha/aug-cc-pVTZ Delta-SCF
   12.04 eV against 12.62 eV measured (CCCBDB), so experiment is not a
   pass/fail criterion.
-- Core holes on equivalent atoms do **not** localise by themselves from a
+- Core holes on equivalent atoms do **not** localize by themselves from a
   symmetric start (N2 stayed 0.50/0.50 and gave 399.6 eV). The hole is first
-  taken as the maximally localised combination of the element's core
+  taken as the maximally localized combination of the element's core
   orbitals (a density correction that breaks the symmetry), then from the
-  localised eigenvector's occupation once one exists (> 0.9 on the atom), so
+  localized eigenvector's occupation once one exists (> 0.9 on the atom), so
   the density commutes with F and the SCF converges: N2 1s 408.1 eV, H2O
   O 1s 536.9 eV (DZ, non-relativistic). Measured XPS values of roughly 409.9
   and 539.9 eV (Jolly et al. 1984, quoted from memory: UNCERTAIN, ~85 %) are

@@ -53,8 +53,8 @@ def gto_table(name: str) -> dict:
 
 
 @lru_cache(maxsize=None)
-def gto_polarisation_exponents() -> dict:
-    """6-31G(d) d-polarisation exponents, Hariharan & Pople (1973)."""
+def gto_polarization_exponents() -> dict:
+    """6-31G(d) d-polarization exponents, Hariharan & Pople (1973)."""
     return {k: float(v) for k, v in _load("gto_631gd_pol").items()}
 
 
@@ -62,7 +62,7 @@ def gto_polarisation_exponents() -> dict:
 def radial_point_ratios() -> dict[str, float]:
     """``{element: n_r(element) / n_r(second row)}`` measured by tools/radial_grid_sizes.py.
 
-    The criterion is the grid error in the ionisation energy of the near-exact
+    The criterion is the grid error in the ionization energy of the near-exact
     X-alpha atom: each element gets the radial points that bring it to the
     accuracy C, N, O, F reach at the input ``n_r`` (see the table's header).
     """
@@ -108,9 +108,9 @@ def alpha_hf_table() -> dict[str, float]:
 
 
 @lru_cache(maxsize=None)
-def alpha_hf_polarised_table() -> dict[str, float]:
-    """Spin-polarised alpha_HF recomputed by tools/alpha_hf.py (ADR 0011)."""
-    return {s: float(v) for s, v in _load("alpha_hf_polarised")["alpha_hf_polarised"].items()}
+def alpha_hf_polarized_table() -> dict[str, float]:
+    """Spin-polarized alpha_HF recomputed by tools/alpha_hf.py (ADR 0011)."""
+    return {s: float(v) for s, v in _load("alpha_hf_polarized")["alpha_hf_polarized"].items()}
 
 
 @lru_cache(maxsize=None)

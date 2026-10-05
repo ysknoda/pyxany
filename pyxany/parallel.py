@@ -117,7 +117,7 @@ def mpi_version() -> str:
 # Numba
 # --------------------------------------------------------------------------
 def _numba_requested() -> bool:
-    """Honour PYXANY_DISABLE_NUMBA=1 so tests can compare both code paths."""
+    """Honor PYXANY_DISABLE_NUMBA=1 so tests can compare both code paths."""
     return os.environ.get("PYXANY_DISABLE_NUMBA", "").strip() not in ("1", "true", "TRUE", "yes")
 
 

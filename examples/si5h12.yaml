@@ -38,7 +38,7 @@ passivation:
       coordination: 4
       alpha: 1.0
   basis: derived
-optimise:
+optimize:
   enabled: false
   freeze: core
   f_max: 0.001

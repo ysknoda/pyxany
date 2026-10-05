@@ -4,7 +4,7 @@ X-alpha (alpha = 0.7, no correlation) is less accurate in absolute terms than
 standard DFT, so these tests use only quantities it gets right *qualitatively*,
 with tolerances derived from the functional's own measured error rather than
 guessed (docs/adr/0003-validation-tiers.md). Total energies, absolute gaps and
-orbital ionisation energies are deliberately not tested against experiment.
+orbital ionization energies are deliberately not tested against experiment.
 
 Experimental data: NIST CCCBDB, parsed by tools/fetch_cccbdb.py into
 tests/data/cccbdb_experimental.json (with per-value primary references).
@@ -43,7 +43,7 @@ import pytest
 from conftest import make_config, make_molecule
 from pyxany.basis import build_basis
 from pyxany.constants import BOHR_TO_ANG
-from pyxany.forces.optimise import optimise_geometry
+from pyxany.forces.optimize import optimize_geometry
 from pyxany.properties import dipole_moment, mulliken
 from pyxany.scf import run_scf
 
@@ -92,10 +92,10 @@ def test_relaxed_bond_length_against_experiment(name, tmp_path):
         grid=GRID,
         scf=SCF,
         forces={"enabled": True},
-        optimise={"enabled": True, "f_max": 3e-4, "max_steps": 60},
+        optimize={"enabled": True, "f_max": 3e-4, "max_steps": 60},
         output={"dir": str(tmp_path), "prefix": name},
     )
-    res = optimise_geometry(_molecule(name), cfg, verbose=0)
+    res = optimize_geometry(_molecule(name), cfg, verbose=0)
     assert res.converged
     pos = res.molecule.positions * BOHR_TO_ANG
     elements = [a.element for a in res.molecule]

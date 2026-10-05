@@ -1,6 +1,6 @@
 {
  "_source": "Measured with tools/radial_grid_sizes.py on pyxany's own DV radial grid (Treutler-Ahlrichs M4, Bragg-Slater scaling, production Hartree solver) against the near-exact spherical X-alpha atom and cation (alpha = 0.7).",
- "_criterion": "n_r: smallest n_r whose grid error in the ionisation energy stays <= 5.445e-05 Ha for 11 consecutive n_r; n_r_total: same for the total-energy error per electron <= 2.474e-04 Ha. Targets = worst of ['C', 'N', 'O', 'F'] at n_r = 30. ratio_to_second_row = n_r / max over ['C', 'N', 'O', 'F'].",
+ "_criterion": "n_r: smallest n_r whose grid error in the ionization energy stays <= 5.445e-05 Ha for 11 consecutive n_r; n_r_total: same for the total-energy error per electron <= 2.474e-04 Ha. Targets = worst of ['C', 'N', 'O', 'F'] at n_r = 30. ratio_to_second_row = n_r / max over ['C', 'N', 'O', 'F'].",
  "_generated": "2026-10-01",
  "elements": {
   "H": {

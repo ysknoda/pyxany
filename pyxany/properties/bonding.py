@@ -59,7 +59,7 @@ def pair_type(molecule, a: int, b: int) -> str:
     return f"{molecule[first].symbol}-{molecule[second].symbol}"
 
 
-def analyse(result, config) -> BondingAnalysis:
+def analyze(result, config) -> BondingAnalysis:
     from ..constants import HARTREE_TO_EV
 
     mol, basis, S = result.molecule, result.basis, result.S

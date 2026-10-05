@@ -1,7 +1,7 @@
 """Overlap (S) and kinetic-energy (T) matrices.
 
-Same-atom blocks come from the exact one-centre routines; cross-atom blocks use
-a two-centre Becke-partitioned grid.  Atom pairs whose functions cannot overlap
+Same-atom blocks come from the exact one-center routines; cross-atom blocks use
+a two-center Becke-partitioned grid.  Atom pairs whose functions cannot overlap
 above ``screening_tol`` are skipped entirely, which is what makes a few-hundred
 atom cluster tractable: the number of surviving pairs grows linearly with the
 number of atoms rather than quadratically.
@@ -18,8 +18,8 @@ import numpy as np
 
 from ..parallel import allreduce_array, round_robin
 from ..timing import timer
-from .onecentre import RADIAL_POINTS, kinetic_1c, overlap_1c
-from .twocentre import overlap_kinetic_2c, overlap_kinetic_2c_gradient, pair_is_negligible
+from .onecenter import RADIAL_POINTS, kinetic_1c, overlap_1c
+from .twocenter import overlap_kinetic_2c, overlap_kinetic_2c_gradient, pair_is_negligible
 
 DEFAULT_SCREENING_TOL = 1e-10
 
@@ -50,9 +50,9 @@ def build_overlap_kinetic(molecule, basis, n_r: int = 40, n_a: int = 14,
                           n_r_1c: int = RADIAL_POINTS):
     """Return ``(S, T)`` for the whole molecule.
 
-    ``n_r`` / ``n_a`` size the two-centre grids (``grid.pair``); ``n_r_1c`` is
-    the radial quadrature of one-centre integrals of non-Slater functions
-    (``grid.one_centre``; Slater pairs use the closed form).
+    ``n_r`` / ``n_a`` size the two-center grids (``grid.pair``); ``n_r_1c`` is
+    the radial quadrature of one-center integrals of non-Slater functions
+    (``grid.one_center``; Slater pairs use the closed form).
     """
     with timer("integrals.S_T"):
         n = len(basis)
@@ -88,8 +88,8 @@ def build_overlap_kinetic(molecule, basis, n_r: int = 40, n_a: int = 14,
                     t = kinetic_1c(basis[mu], basis[nu], n_r_1c)
                     S[mu, nu] = S[nu, mu] = s
                     T[mu, nu] = T[nu, mu] = t
-        # T from the gradient form is symmetric by construction; symmetrise the
-        # one-centre closed form too so that S and T are exactly symmetric.
+        # T from the gradient form is symmetric by construction; symmetrize the
+        # one-center closed form too so that S and T are exactly symmetric.
         T = 0.5 * (T + T.T)
         return S, T
 
@@ -106,11 +106,11 @@ def overlap_kinetic_gradient(molecule, basis, P: np.ndarray, W: np.ndarray,
     """``d/dR [tr(P T) - tr(W S)]`` for the S and T that the SCF actually used.
 
     The Pulay terms involving S and T must differentiate *these* matrices --
-    built on two-centre grids and one-centre closed forms -- not a DV-grid
+    built on two-center grids and one-center closed forms -- not a DV-grid
     quadrature of the same integrals, or the two quadrature errors do not
     cancel (measured on CO/DZ at n_r = 40: 1.3e-3 and 1.7e-3 Ha/Bohr).
 
-    One-centre blocks do not depend on the geometry. A two-centre block
+    One-center blocks do not depend on the geometry. A two-center block
     depends only on ``R_B - R_A``, so ``d/dR_A = -d/dR_B``. With the compiled
     kernels the derivative is exact (:func:`overlap_kinetic_2c_gradient`,
     one pass with basis Hessians and Becke-weight derivatives); otherwise one

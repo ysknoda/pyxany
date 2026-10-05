@@ -95,14 +95,14 @@ def as_fraction(alpha: float, max_denominator: int = 24) -> Fraction:
     return Fraction(alpha).limit_denominator(max_denominator)
 
 
-def assign_roles(molecule, neighbours: dict[int, list[int]],
+def assign_roles(molecule, neighbors: dict[int, list[int]],
                  overrides: dict[str, str] | None = None,
                  ideal: dict[str, int] | None = None) -> dict[int, str]:
     """Label each atom anion or cation from its bonding environment.
 
     Within a compound the atom with **more valence electrons** is the anion:
     O(6) beats Ti(4), Se(6) beats Cd(2), As(5) beats Ga(3), Cl(7) beats Cu(1).
-    An atom is compared against the average of its actual neighbours rather than
+    An atom is compared against the average of its actual neighbors rather than
     against a global rule, so a mixed structure is handled site by site.
 
     This is a proxy for electronegativity, and it has two known failure modes.
@@ -120,14 +120,14 @@ def assign_roles(molecule, neighbours: dict[int, list[int]],
     cation, a factor of two.  So a tie between *different* elements raises
     unless the ideal coordination is 4.  A tie among atoms of the *same*
     element is different: an elemental solid has no anion/cation distinction to
-    get wrong, and its terminator simply replaces a like neighbour, so it is
+    get wrong, and its terminator simply replaces a like neighbor, so it is
     resolved silently as a cation.  ``ideal`` maps an element to the
     coordination the charge will actually be computed with -- pass it, or the
-    observed neighbour count is used, which undercounts at a surface site.
+    observed neighbor count is used, which undercounts at a surface site.
 
     **Transition metals.**  ``valence_electrons`` returns the group number for
     groups 3-10, so Mn(7), Fe(8) and Ni(10) all outscore O(6) and would be
-    labelled anions in their own oxides.  A d-block element is never the anion
+    labeled anions in their own oxides.  A d-block element is never the anion
     against a main-group partner, so that combination raises too.
 
     Explicit ``overrides`` (``{"Mn": "cation"}``) always win and bypass both
@@ -142,7 +142,7 @@ def assign_roles(molecule, neighbours: dict[int, list[int]],
         if atom.is_pseudo:
             continue
         own = elem.valence_electrons(atom.element)
-        partners = [j for j in neighbours.get(i, []) if not molecule[j].is_pseudo]
+        partners = [j for j in neighbors.get(i, []) if not molecule[j].is_pseudo]
         others = [elem.valence_electrons(molecule[j].element) for j in partners]
         if not others:
             roles[i] = CATION if own <= 4 else ANION
@@ -156,7 +156,7 @@ def assign_roles(molecule, neighbours: dict[int, list[int]],
         if own == average and not elemental and n_ideal != 4:
             raise ValueError(
                 f"cannot tell whether {atom.element} (site {i}) is the anion or the "
-                f"cation: it has the same valence-electron count as its neighbours "
+                f"cation: it has the same valence-electron count as its neighbors "
                 f"({own}), at coordination {n_ideal}. The two counting rules only "
                 f"coincide at coordination 4, so the choice changes the terminator "
                 f"charge here ((8-Z)/N = {(8 - own) / n_ideal:.4g} as an anion vs "
@@ -175,7 +175,7 @@ def assign_roles(molecule, neighbours: dict[int, list[int]],
                     f"element is not the anion against a main-group partner. The "
                     f"valence-electron count used to rank them is the group number "
                     f"for groups 3-10, so {atom.element}({own}) outscores its "
-                    f"neighbours. Set it explicitly: role_overrides="
+                    f"neighbors. Set it explicitly: role_overrides="
                     f"{{'{atom.element}': 'cation'}}."
                 )
         roles[i] = role

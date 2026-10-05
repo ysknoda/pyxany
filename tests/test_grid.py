@@ -18,9 +18,9 @@ def chain(n, spacing=2.6):
                      for i in range(n)])
 
 
-def sto_density(points, centre, zeta=1.24):
+def sto_density(points, center, zeta=1.24):
     bf = STO(1, 0, 0, zeta, 0)
-    r = np.linalg.norm(points - np.asarray(centre), axis=1)
+    r = np.linalg.norm(points - np.asarray(center), axis=1)
     return (bf.radial(r) / math.sqrt(4.0 * math.pi)) ** 2
 
 
@@ -31,7 +31,7 @@ def test_angular_weights_sum_to_four_pi():
 
 
 @pytest.mark.parametrize("n_atoms", [1, 2, 3, 4, 5])
-def test_single_function_normalisation_is_atom_count_independent(n_atoms):
+def test_single_function_normalization_is_atom_count_independent(n_atoms):
     """int |chi|^2 dV = 1 no matter how many atomic sub-grids overlap.
 
     Without Becke partitioning this integral grows roughly in proportion to the
@@ -54,17 +54,17 @@ def test_unpartitioned_grid_overcounts():
 def test_becke_weights_are_a_partition_of_unity():
     rng = np.random.default_rng(0)
     for n in (2, 3, 6):
-        centres = rng.normal(scale=3.0, size=(n, 3))
+        centers = rng.normal(scale=3.0, size=(n, 3))
         radii = rng.uniform(0.6, 3.0, size=n)
         pts = rng.normal(scale=6.0, size=(1500, 3))
-        w = becke_weights(pts, centres, radii)
+        w = becke_weights(pts, centers, radii)
         assert np.abs(w.sum(axis=1) - 1.0).max() < 1e-12
         assert w.min() >= 0.0
 
 
 def test_weight_at_own_nucleus_is_one():
-    centres = np.array([[0.0, 0, 0], [0, 0, 4.0]])
-    w = becke_weights(centres, centres, np.array([1.7, 1.32]))
+    centers = np.array([[0.0, 0, 0], [0, 0, 4.0]])
+    w = becke_weights(centers, centers, np.array([1.7, 1.32]))
     assert abs(w[0, 0] - 1.0) < 1e-12
     assert abs(w[1, 1] - 1.0) < 1e-12
 

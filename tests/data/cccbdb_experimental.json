@@ -4,7 +4,7 @@
  "_units": {
   "geometry": "Angstrom",
   "dipole": "Debye",
-  "ionisation_energy": "eV (adiabatic)"
+  "ionization_energy": "eV (adiabatic)"
  },
  "H2": {
   "geometry_angstrom": [
@@ -33,7 +33,7 @@
    "value": 0.0,
    "reference": null
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 15.426,
    "reference": "webbook"
   },
@@ -67,7 +67,7 @@
    "value": 5.88,
    "reference": "NSRDS-NBS10"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 7.9,
    "reference": "webbook"
   },
@@ -125,7 +125,7 @@
    "value": 0.0,
    "reference": "NSRDS-NBS10"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 12.61,
    "reference": "webbook"
   },
@@ -183,7 +183,7 @@
    "value": 1.476,
    "reference": "1970Shi:3572-3576"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 10.07,
    "reference": "webbook"
   },
@@ -229,7 +229,7 @@
    "value": 1.857,
    "reference": "1991Sho/Ebe:5875-5882"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 12.621,
    "reference": "webbook"
   },
@@ -263,7 +263,7 @@
    "value": 1.827,
    "reference": "NISTDiatomic"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 16.03,
    "reference": "webbook"
   },
@@ -297,7 +297,7 @@
    "value": 0.0,
    "reference": "NSRDS-NBS10"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 15.581,
    "reference": "webbook"
   },
@@ -331,7 +331,7 @@
    "value": 0.112,
    "reference": "NSRDS-NBS10"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 14.014,
    "reference": "webbook"
   },
@@ -389,7 +389,7 @@
    "value": 0.0,
    "reference": "NSRDS-NBS10"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 11.0,
    "reference": "webbook"
   },
@@ -435,7 +435,7 @@
    "value": 0.977,
    "reference": "1984Vis/Dyk:231-239"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 10.457,
    "reference": "webbook"
   },
@@ -547,7 +547,7 @@
    "value": 0.0,
    "reference": "NSRDS-NBS10"
   },
-  "ionisation_energy_ev": {
+  "ionization_energy_ev": {
    "value": 9.244,
    "reference": "webbook"
   },

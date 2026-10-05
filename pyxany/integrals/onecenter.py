@@ -1,7 +1,7 @@
-"""One-centre overlap and kinetic-energy integrals.
+"""One-center overlap and kinetic-energy integrals.
 
 Because every basis type exposes an exact analytic radial function and an exact
-analytic radial Laplacian (see :mod:`pyxany.basis.types`), all one-centre
+analytic radial Laplacian (see :mod:`pyxany.basis.types`), all one-center
 integrals reduce to one-dimensional radial quadrature and need no finite
 differences.  Slater-Slater pairs additionally have a closed form, which is used
 by default and cross-checked against the quadrature in the tests.
@@ -35,7 +35,7 @@ def _I(k: int, s: float) -> float:
 
 
 def overlap_1c(bf_i, bf_j, n_r: int = RADIAL_POINTS) -> float:
-    """<chi_i | chi_j> for two functions on the same centre."""
+    """<chi_i | chi_j> for two functions on the same center."""
     if not _same_angular(bf_i, bf_j):
         return 0.0
     if bf_i.kind == "sto" and bf_j.kind == "sto":
@@ -45,7 +45,7 @@ def overlap_1c(bf_i, bf_j, n_r: int = RADIAL_POINTS) -> float:
 
 
 def kinetic_1c(bf_i, bf_j, n_r: int = RADIAL_POINTS) -> float:
-    """<chi_i | -1/2 laplacian | chi_j> for two functions on the same centre.
+    """<chi_i | -1/2 laplacian | chi_j> for two functions on the same center.
 
     Closed form for Slater pairs, using the exact Laplacian of
     ``r^(n-1) exp(-zeta r) Y_lm``::
@@ -72,7 +72,7 @@ def kinetic_1c(bf_i, bf_j, n_r: int = RADIAL_POINTS) -> float:
 
 
 def nuclear_attraction_1c(bf_i, bf_j, Z: float) -> float:
-    """<chi_i | -Z/r | chi_j> on the same centre (used for atomic references)."""
+    """<chi_i | -Z/r | chi_j> on the same center (used for atomic references)."""
     if not _same_angular(bf_i, bf_j):
         return 0.0
     if bf_i.kind == "sto" and bf_j.kind == "sto":

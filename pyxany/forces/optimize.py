@@ -1,8 +1,8 @@
-"""Geometry optimisation driven by analytic forces.
+"""Geometry optimization driven by analytic forces.
 
 Uses scipy's L-BFGS-B on the (energy, gradient) pair.  Frozen atoms are removed
-from the optimisation vector entirely rather than having their gradient zeroed,
-so the optimiser never spends steps on coordinates that cannot move -- this is
+from the optimization vector entirely rather than having their gradient zeroed,
+so the optimizer never spends steps on coordinates that cannot move -- this is
 what makes ``--freeze-core`` (relax only the pseudo-hydrogen terminators of a
 cluster) cheap.
 """
@@ -35,7 +35,7 @@ class _Converged(Exception):
 
 
 @dataclass
-class OptimisationResult:
+class OptimizationResult:
     converged: bool
     molecule: object
     energy: float
@@ -61,25 +61,25 @@ def freeze_mask(molecule, freeze) -> np.ndarray:
             mask[i] = not atom.is_pseudo
         if mask.all():
             raise ValueError(
-                "optimise.freeze='core' would freeze every atom: the structure has "
+                "optimize.freeze='core' would freeze every atom: the structure has "
                 "no pseudo-hydrogen terminators to relax"
             )
         return mask
     for i in freeze:
         if not 0 <= i < n:
-            raise ValueError(f"optimise.freeze: atom index {i} out of range 0..{n - 1}")
+            raise ValueError(f"optimize.freeze: atom index {i} out of range 0..{n - 1}")
         mask[i] = True
     return mask
 
 
-def optimise_geometry(molecule, config, verbose: int = 1, restart=None,
-                      checkpoint_path=None) -> OptimisationResult:
-    """Relax the geometry until ``max|F| < config.optimise.f_max``."""
-    opt_cfg = config.optimise
+def optimize_geometry(molecule, config, verbose: int = 1, restart=None,
+                      checkpoint_path=None) -> OptimizationResult:
+    """Relax the geometry until ``max|F| < config.optimize.f_max``."""
+    opt_cfg = config.optimize
     frozen = freeze_mask(molecule, opt_cfg.freeze)
     moving = np.where(~frozen)[0]
     if len(moving) == 0:
-        raise ValueError("optimise: every atom is frozen, nothing to do")
+        raise ValueError("optimize: every atom is frozen, nothing to do")
 
     current = molecule.copy()
     state = {"n": 0, "best": None, "traj": [], "scf": None}
@@ -93,7 +93,7 @@ def optimise_geometry(molecule, config, verbose: int = 1, restart=None,
 
     if verbose:
         mpi_print("=" * 78)
-        mpi_print(f"  Geometry optimisation ({SCIPY_METHOD[opt_cfg.method]})   "
+        mpi_print(f"  Geometry optimization ({SCIPY_METHOD[opt_cfg.method]})   "
                   f"f_max = {opt_cfg.f_max:g} Ha/Bohr   "
                   f"{len(moving)}/{len(molecule)} atoms free")
         mpi_print("=" * 78)
@@ -147,7 +147,7 @@ def optimise_geometry(molecule, config, verbose: int = 1, restart=None,
         # Keep the evaluation the result will report: the lowest energy (which is
         # where L-BFGS-B ends, res.x) -- not simply the last one, which is often a
         # rejected line-search trial whose geometry, energy and forces do not
-        # belong to the minimiser's answer.
+        # belong to the minimizer's answer.
         if state["best"] is None or result.total_energy < state["best"][0]:
             state["best"] = record
         if f_max < opt_cfg.f_max:
@@ -157,10 +157,10 @@ def optimise_geometry(molecule, config, verbose: int = 1, restart=None,
             # and stall at the energy minimum with |F| above f_max.
             state["best"] = record
             raise _Converged
-        # scipy minimises E and wants dE/dx = -F
+        # scipy minimizes E and wants dE/dx = -F
         return result.total_energy, (-f_move).ravel()
 
-    with timer("optimise"):
+    with timer("optimize"):
         x0 = current.positions[moving].ravel()
         # `ftol` is an L-BFGS-B option; CG does not take it and scipy warns and
         # ignores it, so the energy tolerance was silently dropped on that
@@ -187,7 +187,7 @@ def optimise_geometry(molecule, config, verbose: int = 1, restart=None,
             mpi_print(f"  trajectory: {traj_path}")
         _report_geometry(current, verbose)
 
-    return OptimisationResult(converged=converged, molecule=current, energy=energy,
+    return OptimizationResult(converged=converged, molecule=current, energy=energy,
                               forces=forces, n_steps=state["n"],
                               trajectory=state["traj"], scf=state["scf"])
 

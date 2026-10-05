@@ -1,4 +1,4 @@
-"""Slater transition state (ADR 0006): Janak, Delta-SCF, core-hole localisation."""
+"""Slater transition state (ADR 0006): Janak, Delta-SCF, core-hole localization."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def test_janak_derivative_matches_the_transition_state_eigenvalue():
     assert (ep - em) / (2 * d) == pytest.approx(-ts.transition_state["eps_source"], abs=1e-4)
 
 
-def test_ionisation_energy_agrees_with_delta_scf():
+def test_ionization_energy_agrees_with_delta_scf():
     """TS and Delta-SCF differ only at third order (measured 0.03 eV for H2O)."""
     e0 = _run(WATER)[0].total_energy
     ec = _run(WATER, charge=1, mult=2)[0].total_energy
@@ -64,7 +64,7 @@ def test_ionisation_energy_agrees_with_delta_scf():
 
 
 @pytest.mark.slow
-def test_core_hole_localises_on_one_of_two_equivalent_atoms():
+def test_core_hole_localizes_on_one_of_two_equivalent_atoms():
     """N2 starts with 1s sigma_g/sigma_u at 0.50 each; the hole must end on atom 1."""
     res, basis = _run(N2, {"remove": {"atom": 1, "shell": "1s"}})
     i = res.transition_state["source"]

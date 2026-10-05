@@ -10,7 +10,7 @@ single formula that works for any basis type::
 
     grad chi = g'(r) * rhat * S_lm  +  g(r) * grad S_lm
 
-which is what the Pulay force terms need.  Normalisation is always
+which is what the Pulay force terms need.  Normalization is always
 ``int |chi|^2 dV = 1``, i.e. ``int R(r)^2 r^2 dr = 1``.
 """
 
@@ -54,7 +54,7 @@ class BasisFunction:
         return self.d2g_dr2(r) + 2.0 * (self.l + 1) * self.dg_dr(r) / r
 
     def radial(self, r: np.ndarray) -> np.ndarray:
-        """R(r) = g(r) * r^l, the conventionally normalised radial function."""
+        """R(r) = g(r) * r^l, the conventionally normalized radial function."""
         return self.g(r) * np.asarray(r) ** self.l
 
     def exponent_scale(self) -> float:
@@ -118,13 +118,13 @@ class GTO(BasisFunction):
 
     ``chi = norm * sum_k d_k N_k r^l exp(-alpha_k r^2) * Y_lm``
 
-    The tabulated ``d_k`` are contraction coefficients for **normalised**
+    The tabulated ``d_k`` are contraction coefficients for **normalized**
     primitives -- the standard EMSL / Gaussian / Basis Set Exchange convention.
     Each primitive therefore carries
 
         N_k = [ Gamma(l + 3/2) / (2 (2 alpha_k)^(l + 3/2)) ]^(-1/2)
 
-    and ``norm`` is a residual renormalisation that is 1.0 to ~7 digits for
+    and ``norm`` is a residual renormalization that is 1.0 to ~7 digits for
     every shell in the shipped tables (a useful self-check: a table read with
     the wrong convention gives ``norm`` far from 1).
 
@@ -148,7 +148,7 @@ class GTO(BasisFunction):
 
     @classmethod
     def contracted(cls, l: int, m: int, prims, atom_idx: int, label: str = "") -> "GTO":
-        """Build from tabulated (alpha, coefficient) pairs on normalised primitives."""
+        """Build from tabulated (alpha, coefficient) pairs on normalized primitives."""
         prims = tuple((float(a), float(d)) for a, d in prims)
         scaled = [(a, d * cls.primitive_norm(l, a)) for a, d in prims]
         # int_0^inf r^(2l+2) exp(-s r^2) dr = Gamma(l + 3/2) / (2 s^(l + 3/2))
@@ -268,7 +268,7 @@ class BasisSet(list):
         return groups
 
     def angular_arrays(self):
-        """``(l, m, atom_idx)`` as int arrays, for vectorised code."""
+        """``(l, m, atom_idx)`` as int arrays, for vectorized code."""
         return (
             np.array([f.l for f in self], dtype=np.int64),
             np.array([f.m for f in self], dtype=np.int64),

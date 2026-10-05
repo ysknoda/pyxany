@@ -1,10 +1,10 @@
 {
  "_source": "Computed with tools/alpha_hf.py (ADR 0011); no published counterpart",
- "_alpha_hf_polarised": "spin-polarised spherical X-alpha atom (Hund's rule) = ROHF energy of the same configuration",
+ "_alpha_hf_polarized": "spin-polarized spherical X-alpha atom (Hund's rule) = ROHF energy of the same configuration",
  "_alpha_hf_recomputed": "Schwarz's definition recomputed (spin-restricted X-alpha = HF average-of-configuration energy); a check against the published values, which pyxany uses for 'alpha_hf'",
  "_hf": "PySCF ROHF, uncontracted ANO-RCC (+ extended-basis check), non-relativistic",
  "_n_elements": 21,
- "alpha_hf_polarised": {
+ "alpha_hf_polarized": {
   "H": 0.77676,
   "He": 0.772949,
   "Li": 0.771566,

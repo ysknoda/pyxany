@@ -2,7 +2,7 @@
 
 The cluster sits in the electrostatic field of fixed point charges ``q_i`` at
 ``R_i`` -- typically the ions of the surrounding crystal. Each charge is a
-normalised Gaussian of width ``sigma``, so the potential energy of an electron
+normalized Gaussian of width ``sigma``, so the potential energy of an electron
 is finite everywhere on the grid:
 
     v_ext(r) = - sum_i q_i erf(|r - R_i| / sigma) / |r - R_i|

@@ -14,7 +14,7 @@ from pyxany.passivation import (
     CATION,
     VASP_CHARGES,
     as_fraction,
-    neighbour_lists,
+    neighbor_lists,
     passivate,
     terminator_charge_for,
     terminator_distance,
@@ -67,14 +67,14 @@ def cluster(atoms):
     return Molecule([Atom.from_element(s, np.array(p) * ANG_TO_BOHR) for s, p in atoms])
 
 
-def tetrahedral(centre, ligand, bond):
+def tetrahedral(center, ligand, bond):
     dirs = np.array([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]]) / np.sqrt(3)
-    return [(centre, [0, 0, 0])] + [(ligand, d * bond) for d in dirs]
+    return [(center, [0, 0, 0])] + [(ligand, d * bond) for d in dirs]
 
 
-def octahedral(centre, ligand, bond):
+def octahedral(center, ligand, bond):
     dirs = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
-    return [(centre, [0, 0, 0])] + [(ligand, d * bond) for d in dirs]
+    return [(center, [0, 0, 0])] + [(ligand, d * bond) for d in dirs]
 
 
 CLUSTERS = [
@@ -116,9 +116,9 @@ def test_terminator_distance_matches_known_x_h_bonds():
         assert abs(d - expected) < 0.12, f"{element}: got {d:.3f}, expected ~{expected}"
 
 
-def test_neighbour_detection_finds_the_right_coordination():
+def test_neighbor_detection_finds_the_right_coordination():
     mol = cluster(tetrahedral("Si", "Si", 2.352))
-    counts = [len(v) for v in neighbour_lists(mol, 1.20).values()]
+    counts = [len(v) for v in neighbor_lists(mol, 1.20).values()]
     assert counts[0] == 4
     assert counts[1:] == [1, 1, 1, 1]
 
@@ -176,7 +176,7 @@ def test_terminated_cluster_has_a_clean_gap():
 
 
 def _octahedral_pair(a_symbol, b_symbol, n=6):
-    """One A site with n octahedral B neighbours, and each B bonded back to A."""
+    """One A site with n octahedral B neighbors, and each B bonded back to A."""
     import numpy as np
     from pyxany.constants import ANG_TO_BOHR
     from pyxany.molecule import Atom, Molecule
@@ -184,48 +184,48 @@ def _octahedral_pair(a_symbol, b_symbol, n=6):
                      [0, -1, 0], [0, 0, 1], [0, 0, -1]], float)[:n]
     atoms = [Atom.from_element(a_symbol, np.zeros(3))]
     atoms += [Atom.from_element(b_symbol, v * 2.1 * ANG_TO_BOHR) for v in dirs]
-    neighbours = {0: list(range(1, n + 1))}
+    neighbors = {0: list(range(1, n + 1))}
     for k in range(1, n + 1):
-        neighbours[k] = [0]
-    return Molecule(atoms, name=f"{a_symbol}{b_symbol}"), neighbours
+        neighbors[k] = [0]
+    return Molecule(atoms, name=f"{a_symbol}{b_symbol}"), neighbors
 
 
 def test_a_tie_away_from_tetrahedral_coordination_is_refused():
     """TiC: both group IV, both 6-coordinate, and the two rules disagree 2:1.
 
-    The old code labelled every tie a cation on the stated grounds that the two
+    The old code labeled every tie a cation on the stated grounds that the two
     expressions agree whenever the coordinations are equal.  They agree only at
     coordination 4: at 6, (8-4)/6 = 2/3 against (2*6-4)/6 = 4/3.
     """
     from pyxany.passivation.counting import assign_roles
-    molecule, neighbours = _octahedral_pair("Ti", "C")
+    molecule, neighbors = _octahedral_pair("Ti", "C")
     with pytest.raises(ValueError, match="anion or the cation"):
-        assign_roles(molecule, neighbours)
+        assign_roles(molecule, neighbors)
     # An explicit role resolves it.
-    roles = assign_roles(molecule, neighbours, {"Ti": "cation", "C": "anion"})
+    roles = assign_roles(molecule, neighbors, {"Ti": "cation", "C": "anion"})
     assert roles[0] == "cation" and roles[1] == "anion"
 
 
 def test_a_transition_metal_is_never_the_anion_against_a_main_group_partner():
     """MnO: valence_electrons is the group number for groups 3-10, so Mn(7)
-    outscores O(6) and the metal would be labelled the anion in its own oxide.
+    outscores O(6) and the metal would be labeled the anion in its own oxide.
 
     The electron-balance check cannot catch this: a symmetric role inversion in
     a stoichiometric AB compound leaves the total electron count unchanged.
     """
     from pyxany.passivation.counting import assign_roles
-    molecule, neighbours = _octahedral_pair("Mn", "O")
+    molecule, neighbors = _octahedral_pair("Mn", "O")
     with pytest.raises(ValueError, match="d-block element is not the anion"):
-        assign_roles(molecule, neighbours)
-    roles = assign_roles(molecule, neighbours, {"Mn": "cation", "O": "anion"})
+        assign_roles(molecule, neighbors)
+    roles = assign_roles(molecule, neighbors, {"Mn": "cation", "O": "anion"})
     assert roles[0] == "cation" and roles[1] == "anion"
 
 
 @pytest.mark.parametrize("cation,anion", [("Mg", "O"), ("Cd", "Se"), ("Ga", "As")])
 def test_unambiguous_binaries_still_resolve_without_help(cation, anion):
     from pyxany.passivation.counting import assign_roles
-    molecule, neighbours = _octahedral_pair(cation, anion)
-    roles = assign_roles(molecule, neighbours)
+    molecule, neighbors = _octahedral_pair(cation, anion)
+    roles = assign_roles(molecule, neighbors)
     assert roles[0] == "cation", cation
     assert roles[1] == "anion", anion
 

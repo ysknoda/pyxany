@@ -1,4 +1,4 @@
-"""Nuclear forces and geometry optimisation."""
+"""Nuclear forces and geometry optimization."""
 
 from .analytic import (
     compute_forces,
@@ -8,9 +8,9 @@ from .analytic import (
     translation_residual,
 )
 from .finite_difference import compare_with_fd, compute_forces_fd
-from .optimise import OptimisationResult, freeze_mask, optimise_geometry
+from .optimize import OptimizationResult, freeze_mask, optimize_geometry
 
 __all__ = ["compute_forces", "compute_forces_fd", "compare_with_fd",
            "nuclear_repulsion_gradient", "hellmann_feynman_gradient",
            "project_out_translation", "translation_residual",
-           "optimise_geometry", "OptimisationResult", "freeze_mask"]
+           "optimize_geometry", "OptimizationResult", "freeze_mask"]

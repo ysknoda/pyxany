@@ -34,7 +34,7 @@ import pytest
 from conftest import make_config, make_molecule
 from pyxany.basis import build_basis
 from pyxany.basis.gto import GTO_KEYS
-from pyxany.data.loaders import gto_polarisation_exponents, gto_table
+from pyxany.data.loaders import gto_polarization_exponents, gto_table
 from pyxany.properties import dipole_moment, mulliken
 from pyxany.scf import run_scf
 
@@ -107,7 +107,7 @@ CASES = [
         "631g",
         1,
     ),
-    # d polarisation functions (real solid harmonics on both sides)
+    # d polarization functions (real solid harmonics on both sides)
     (
         "H2O-631gd",
         [("O", 0, 0, 0.1173), ("H", 0, 0.7572, -0.4692), ("H", 0, -0.7572, -0.4692)],
@@ -129,7 +129,7 @@ def _pyscf_basis(elements, key):
     """pyxany's GTO table as a PySCF basis dict (6-31G sp shells split into s + p)."""
     table_name, want_pol = GTO_KEYS[key]
     table = gto_table(table_name)
-    pol = gto_polarisation_exponents()
+    pol = gto_polarization_exponents()
     out = {}
     for el in set(elements):
         shells = []

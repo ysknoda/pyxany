@@ -11,7 +11,7 @@ Reads a small YAML description of the crystal::
       - [O,  0.5, 0.0, 0.0, -2]
       ...
     origin: [0, 0, 0]   # Cartesian position (Angstrom) of fractional (0, 0, 0)
-    cells: 3            # block 2 cells + 1 wide, centred on the origin
+    cells: 3            # block 2 cells + 1 wide, centerd on the origin
     cluster: mgo6.xyz   # quantum atoms; lattice sites on them are left out
 
 and writes ``label x y z q`` lines for ``embedding.charges``. The block is
@@ -37,7 +37,7 @@ from . import EXIT_INPUT, EXIT_OK
 def evjen_charges(lattice, sites, cells: int, origin=(0.0, 0.0, 0.0), tol: float = 1e-6):
     """``(positions_ang, charges, labels)`` of an Evjen-weighted block of cells."""
     L = np.asarray(lattice, dtype=float)
-    # 2 cells + 1 cells wide, centred on fractional (0, 0, 0): the cluster sees a
+    # 2 cells + 1 cells wide, centerd on fractional (0, 0, 0): the cluster sees a
     # symmetric surrounding, and any integer width keeps Evjen's neutrality
     lo, hi = -cells - 0.5, cells + 0.5
     pos, q, lab = [], [], []

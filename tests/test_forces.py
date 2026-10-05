@@ -181,7 +181,7 @@ def _pseudo_terminated_molecule():
 
 
 def _pseudo_config():
-    # The shared 25x10 test grid is too coarse for a fractional-charge centre
+    # The shared 25x10 test grid is too coarse for a fractional-charge center
     # (27.6% analytic-vs-FD residual); 30x12 brings it to 6.9%.
     return make_config(basis={"set": "sz"},
                        grid={"n_r": 30, "n_a": 12, "poisson_l_max": 4},
@@ -191,7 +191,7 @@ def _pseudo_config():
 def test_forces_work_on_a_pseudo_hydrogen_terminated_molecule():
     """The passivated-cluster force path must not need a pre-derived exponent.
 
-    ``optimise_geometry`` and ``compute_forces_fd`` used to call ``build_basis``
+    ``optimize_geometry`` and ``compute_forces_fd`` used to call ``build_basis``
     without the pseudo-hydrogen exponents, which only the CLI derived, so
     ``pyxany opt --freeze-core`` -- the documented way to relax a passivated
     cluster -- raised KeyError on every passivated example.  ``build_basis``
@@ -210,18 +210,18 @@ def test_forces_work_on_a_pseudo_hydrogen_terminated_molecule():
     assert np.abs(analytic - fd).max() < 1.2e-2
 
 
-def test_optimisation_runs_with_pseudo_hydrogens_and_a_freeze_mask(tmp_path, monkeypatch):
+def test_optimization_runs_with_pseudo_hydrogens_and_a_freeze_mask(tmp_path, monkeypatch):
     """The `--freeze-core` workflow end to end: relax only the terminators."""
     monkeypatch.chdir(tmp_path)
-    from pyxany.forces.optimise import optimise_geometry
+    from pyxany.forces.optimize import optimize_geometry
     molecule = _pseudo_terminated_molecule()
     cfg = make_config(basis={"set": "sz"},
                       grid={"n_r": 25, "n_a": 10, "poisson_l_max": 4},
                       scf={"max_iter": 60}, forces={"enabled": True},
-                      optimise={"enabled": True, "max_steps": 2, "freeze": "core"},
+                      optimize={"enabled": True, "max_steps": 2, "freeze": "core"},
                       output={"dir": str(tmp_path / "out"), "prefix": "t",
                               "figure": False, "json": False, "timing": False})
-    result = optimise_geometry(molecule, cfg, verbose=0)
+    result = optimize_geometry(molecule, cfg, verbose=0)
     assert np.all(np.isfinite(result.molecule.positions))
     # The trajectory belongs in output.dir, not in the working directory.
     assert (tmp_path / "out" / "t_traj.xyz").is_file()
@@ -274,7 +274,7 @@ def test_raw_translation_residual_is_recorded():
     assert raw > 1e-6, "the raw residual should be a real, non-trivial number"
 
 
-def _fake_optimiser_backend(monkeypatch, energy_min_bohr, force_zero_bohr, k=0.5):
+def _fake_optimizer_backend(monkeypatch, energy_min_bohr, force_zero_bohr, k=0.5):
     """Replace SCF and forces with a harmonic H2 whose E-minimum and F-zero differ.
 
     On a finite DV grid the energy and the analytic forces are not exactly
@@ -283,7 +283,7 @@ def _fake_optimiser_backend(monkeypatch, energy_min_bohr, force_zero_bohr, k=0.5
     """
     from types import SimpleNamespace
 
-    import pyxany.forces.optimise as opt
+    import pyxany.forces.optimize as opt
 
     def fake_scf(mol, basis, config, verbose=0, **kwargs):
         r = float(np.linalg.norm(mol.positions[1] - mol.positions[0]))
@@ -309,31 +309,31 @@ def _h2(r_bohr):
                      Atom.from_element("H", np.array([0.0, 0.0, r_bohr]))], name="h2")
 
 
-def test_optimiser_returns_the_geometry_its_energy_and_forces_belong_to(monkeypatch, tmp_path):
+def test_optimizer_returns_the_geometry_its_energy_and_forces_belong_to(monkeypatch, tmp_path):
     """The result must not be the last line-search trial point but a coherent one."""
-    from pyxany.forces.optimise import optimise_geometry
+    from pyxany.forces.optimize import optimize_geometry
 
-    _fake_optimiser_backend(monkeypatch, 1.40, 1.40)
-    cfg = make_config(optimise={"enabled": True, "f_max": 1e-4, "max_steps": 50},
+    _fake_optimizer_backend(monkeypatch, 1.40, 1.40)
+    cfg = make_config(optimize={"enabled": True, "f_max": 1e-4, "max_steps": 50},
                       output={"dir": str(tmp_path), "prefix": "t"})
-    res = optimise_geometry(_h2(1.70), cfg, verbose=0)
+    res = optimize_geometry(_h2(1.70), cfg, verbose=0)
     r = float(np.linalg.norm(res.molecule.positions[1] - res.molecule.positions[0]))
     assert res.converged
     assert res.energy == pytest.approx(0.5 * (r - 1.40) ** 2, abs=1e-14)
     assert np.abs(res.forces).max() < 1e-4
 
 
-def test_optimiser_accepts_a_force_converged_point_despite_grid_inconsistency(
+def test_optimizer_accepts_a_force_converged_point_despite_grid_inconsistency(
         monkeypatch, tmp_path):
     """Measured on H2O/dz at n_r=40: max|F| hit 5.8e-6 on one evaluation, but L-BFGS
     settled on the energy minimum where max|F| = 3.6e-4 and ran out of steps."""
-    from pyxany.forces.optimise import optimise_geometry
+    from pyxany.forces.optimize import optimize_geometry
 
     # F = 0 sits 1e-3 Bohr from the energy minimum: |F| = 1e-3 Ha/Bohr at E_min
-    _fake_optimiser_backend(monkeypatch, 1.400, 1.401)
-    cfg = make_config(optimise={"enabled": True, "f_max": 3e-4, "max_steps": 50},
+    _fake_optimizer_backend(monkeypatch, 1.400, 1.401)
+    cfg = make_config(optimize={"enabled": True, "f_max": 3e-4, "max_steps": 50},
                       output={"dir": str(tmp_path), "prefix": "t"})
-    res = optimise_geometry(_h2(1.70), cfg, verbose=0)
+    res = optimize_geometry(_h2(1.70), cfg, verbose=0)
     assert res.converged
     assert np.abs(res.forces).max() < 3e-4
 

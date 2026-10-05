@@ -1,7 +1,7 @@
-"""Spin-polarised alpha_HF for H-Rn, and a recomputation of Schwarz's alpha_HF (ADR 0011).
+"""Spin-polarized alpha_HF for H-Rn, and a recomputation of Schwarz's alpha_HF (ADR 0011).
 
 pyxany's ``alpha_hf`` uses Schwarz's published values (pyxany/data/tables/
-schwarz_alpha.json); this tool provides the spin-polarised table, which has no
+schwarz_alpha.json); this tool provides the spin-polarized table, which has no
 published counterpart, and recomputes the restricted one as a check.
 
 alpha_HF is the X-alpha parameter for which the X-alpha total energy of the
@@ -16,8 +16,8 @@ available. Two tables are built from one PySCF ROHF calculation per element:
     leading singular vector of the shell's occupied orbitals). Checked against
     values recalled from the literature: Li, B, C, O, F, Na, Si, P, Cl within
     6e-5, N 1.9e-4, H 6.6e-4.
-``alpha_hf_polarised``
-    spin-polarised spherical X-alpha atom (Hund's rule, ``solve_atom_polarised``)
+``alpha_hf_polarized``
+    spin-polarized spherical X-alpha atom (Hund's rule, ``solve_atom_polarized``)
     against the ROHF energy of that configuration.
 
 HF: PySCF ROHF, uncontracted ANO-RCC, non-relativistic. A second run with
@@ -48,7 +48,7 @@ from pathlib import Path
 
 import numpy as np
 
-TABLE = Path(__file__).resolve().parents[1] / "pyxany" / "data" / "tables" / "alpha_hf_polarised.json"
+TABLE = Path(__file__).resolve().parents[1] / "pyxany" / "data" / "tables" / "alpha_hf_polarized.json"
 FLAG_D_ALPHA = 1e-4
 
 
@@ -212,7 +212,7 @@ def one_element(symbol: str) -> dict:
         _shell_occupations,
         hund_spin_occupations,
         solve_atom,
-        solve_atom_polarised,
+        solve_atom_polarized,
         total_energy,
     )
     from pyxany.data import elements as elem
@@ -227,13 +227,13 @@ def one_element(symbol: str) -> dict:
     def restricted(a):
         return total_energy(solve_atom(symbol, alpha=a, n_points=4000, tol=1e-11), a)
 
-    def polarised(a):
-        return solve_atom_polarised(symbol, alpha=a).energy
+    def polarized(a):
+        return solve_atom_polarized(symbol, alpha=a).energy
 
     e_av = min(hf["E_av"], hf2["E_av"])
     e_rohf = min(hf["E_rohf"], hf2["E_rohf"])
     a_r, slope_r = _alpha_for(e_av, restricted)
-    a_p, slope_p = _alpha_for(e_rohf, polarised)
+    a_p, slope_p = _alpha_for(e_rohf, polarized)
     d_r = abs(hf["E_av"] - hf2["E_av"]) / abs(slope_r)
     d_p = abs(hf["E_rohf"] - hf2["E_rohf"]) / abs(slope_p)
 
@@ -252,7 +252,7 @@ def one_element(symbol: str) -> dict:
         "Z": elem.atomic_number(symbol),
         "spin": spin,
         "alpha_hf": round(a_r, 6),
-        "alpha_hf_polarised": round(a_p, 6),
+        "alpha_hf_polarized": round(a_p, 6),
         "E_av": e_av,
         "E_rohf": e_rohf,
         "d_alpha_basis": max(d_r, d_p),
@@ -288,14 +288,14 @@ def main() -> None:
         good = [r for r in rows if not r["flags"]]
         table = {
             "_source": "Computed with tools/alpha_hf.py (ADR 0011); no published counterpart",
-            "_alpha_hf_polarised": "spin-polarised spherical X-alpha atom (Hund's rule) = "
+            "_alpha_hf_polarized": "spin-polarized spherical X-alpha atom (Hund's rule) = "
                                    "ROHF energy of the same configuration",
             "_alpha_hf_recomputed": "Schwarz's definition recomputed (spin-restricted X-alpha = "
                                     "HF average-of-configuration energy); a check against the "
                                     "published values, which pyxany uses for 'alpha_hf'",
             "_hf": "PySCF ROHF, uncontracted ANO-RCC (+ extended-basis check), non-relativistic",
             "_n_elements": len(good),
-            "alpha_hf_polarised": {r["symbol"]: r["alpha_hf_polarised"] for r in good},
+            "alpha_hf_polarized": {r["symbol"]: r["alpha_hf_polarized"] for r in good},
             "alpha_hf_recomputed": {r["symbol"]: r["alpha_hf"] for r in good},
             "excluded": {r["symbol"]: r["flags"] for r in rows if r["flags"]},
         }
@@ -325,7 +325,7 @@ def main() -> None:
                 "symbol": symbol,
                 "Z": elem.atomic_number(symbol),
                 "alpha_hf": None,
-                "alpha_hf_polarised": None,
+                "alpha_hf_polarized": None,
                 "d_alpha_basis": None,
                 "flags": [f"time limit {args.timeout:g} s exceeded"],
                 "seconds": round(time.perf_counter() - t0, 1),
@@ -335,7 +335,7 @@ def main() -> None:
                 "symbol": symbol,
                 "Z": elem.atomic_number(symbol),
                 "alpha_hf": None,
-                "alpha_hf_polarised": None,
+                "alpha_hf_polarized": None,
                 "d_alpha_basis": None,
                 "flags": [f"worker failed: {out.stderr.strip()[-200:]}"],
                 "seconds": round(time.perf_counter() - t0, 1),
@@ -343,9 +343,9 @@ def main() -> None:
         with ledger.open("a") as fh:
             fh.write(json.dumps(row) + "\n")
         a_r = "-" if row["alpha_hf"] is None else f"{row['alpha_hf']:.5f}"
-        a_p = "-" if row["alpha_hf_polarised"] is None else f"{row['alpha_hf_polarised']:.5f}"
+        a_p = "-" if row["alpha_hf_polarized"] is None else f"{row['alpha_hf_polarized']:.5f}"
         print(
-            f"{row['Z']:>3} {symbol:<2} alpha_HF {a_r}  polarised {a_p}  "
+            f"{row['Z']:>3} {symbol:<2} alpha_HF {a_r}  polarized {a_p}  "
             f"{'; '.join(row['flags'])}  ({row['seconds']} s)",
             flush=True,
         )

@@ -1,10 +1,10 @@
 """Analytic nuclear forces: Hellmann-Feynman plus Pulay basis-derivative terms.
 
-With atom-centred basis functions the total energy depends on a nuclear position
+With atom-centerd basis functions the total energy depends on a nuclear position
 in three ways, and all three must be differentiated:
 
 1. **Hellmann-Feynman** -- the ``-Z_A / |r - R_A|`` operator itself moves.
-2. **Pulay** -- the basis functions centred on A move, changing every matrix
+2. **Pulay** -- the basis functions centerd on A move, changing every matrix
    element they enter and the density they build.
 3. **Nuclear repulsion** -- classical.
 
@@ -182,7 +182,7 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
                     "kmx,mn,kn->kx", D_c, P_s, chi_c, optimize=True
                 )
 
-        # -- grid motion: Becke weights and atom-centred points move with R --
+        # -- grid motion: Becke weights and atom-centerd points move with R --
         with timer("forces.grid"):
             grad += _grid_motion_gradient(
                 result,
@@ -370,7 +370,7 @@ def project_out_translation(forces: np.ndarray) -> np.ndarray:
        all-atom mean is not an error component and subtracting it injects a
        uniform spurious force into the moving atoms -- measured at 1.8e-3
        Ha/Bohr for water on the default grid, against a default
-       ``optimise.f_max`` of 1e-3.  :func:`pyxany.forces.optimise_geometry`
+       ``optimize.f_max`` of 1e-3.  :func:`pyxany.forces.optimize_geometry`
        therefore turns it off whenever anything is frozen.
     """
     return forces - forces.mean(axis=0)

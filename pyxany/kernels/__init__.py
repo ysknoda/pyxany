@@ -47,7 +47,7 @@ def pair_gradient_terms_kernel():
     return mod.pair_gradient_terms if mod is not None else None
 
 
-def point_charge_field(points, centres, charges, sigma, gradient=False):
+def point_charge_field(points, centers, charges, sigma, gradient=False):
     """Compiled Gaussian point-charge potential (and gradient), or None."""
     import numpy as np
 
@@ -57,7 +57,7 @@ def point_charge_field(points, centres, charges, sigma, gradient=False):
     pts = np.ascontiguousarray(points, dtype=float)
     v = np.empty(len(pts))
     g = np.empty((len(pts), 3)) if gradient else np.empty((0, 3))
-    mod.point_charge_field(pts, np.ascontiguousarray(centres, dtype=float),
+    mod.point_charge_field(pts, np.ascontiguousarray(centers, dtype=float),
                            np.ascontiguousarray(charges, dtype=float), float(sigma),
                            bool(gradient), v, g)
     return (v, g) if gradient else v
@@ -116,23 +116,23 @@ __all__ = ["backend_name", "chi_block_kernel", "chi_grad_block_kernel", "chi_hes
            "numerov_outward", "numerov_inward"]
 
 
-def becke_own_cell(points, owner, centres, a, stiffness):
+def becke_own_cell(points, owner, centers, a, stiffness):
     """Own-cell Becke weights; compiled when numba is available."""
     import numpy as np
 
     mod = _numba()
     if mod is None:
         return None
-    R = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2)
+    R = np.linalg.norm(centers[:, None, :] - centers[None, :, :], axis=2)
     np.fill_diagonal(R, 1.0)
     out = np.empty(len(points))
     mod.becke_own_cell(np.ascontiguousarray(points, dtype=float), np.asarray(owner, np.int64),
-                       np.ascontiguousarray(centres, dtype=float), np.ascontiguousarray(a),
+                       np.ascontiguousarray(centers, dtype=float), np.ascontiguousarray(a),
                        1.0 / R, int(stiffness), out)
     return out
 
 
-def hartree_evaluate(points, centres, radii, v_radial, l_max, gradient: bool = False):
+def hartree_evaluate(points, centers, radii, v_radial, l_max, gradient: bool = False):
     """Compiled multipole summation, or None to use the numpy path.
 
     With ``gradient=True`` returns the exact (n_points, 3) gradient of the
@@ -141,7 +141,7 @@ def hartree_evaluate(points, centres, radii, v_radial, l_max, gradient: bool = F
     import numpy as np
     from scipy.interpolate import CubicSpline
 
-    from ..basis.solid_harmonics import normalisation_factors
+    from ..basis.solid_harmonics import normalization_factors
 
     mod = _numba()
     if mod is None:
@@ -164,12 +164,12 @@ def hartree_evaluate(points, centres, radii, v_radial, l_max, gradient: bool = F
     kernel = mod.hartree_evaluate_grad if gradient else mod.hartree_evaluate
     out = np.empty((len(points), 3)) if gradient else np.empty(len(points))
     kernel(np.ascontiguousarray(points, dtype=float),
-           np.ascontiguousarray(centres, dtype=float), knots, n_knots, coefs,
-           v_first, v_last, int(l_max), normalisation_factors(l_max), out)
+           np.ascontiguousarray(centers, dtype=float), knots, n_knots, coefs,
+           v_first, v_last, int(l_max), normalization_factors(l_max), out)
     return out
 
 
-def own_cell_weight_gradient(points, owner, coeff, centres, a, stiffness):
+def own_cell_weight_gradient(points, owner, coeff, centers, a, stiffness):
     """Compiled Becke-weight gradient contraction, or None for the numpy path."""
     import numpy as np
 
@@ -177,12 +177,12 @@ def own_cell_weight_gradient(points, owner, coeff, centres, a, stiffness):
     if mod is None:
         return None
     owner = np.asarray(owner, np.int64)
-    n_at = len(centres)
+    n_at = len(centers)
     order = np.argsort(owner, kind="stable").astype(np.int64)
     starts = np.searchsorted(owner[order], np.arange(n_at + 1)).astype(np.int64)
     out = np.zeros((n_at, n_at, 3))
     mod.own_cell_weight_gradient(np.ascontiguousarray(points, dtype=float), order, starts,
                                  np.ascontiguousarray(coeff, dtype=float),
-                                 np.ascontiguousarray(centres, dtype=float),
+                                 np.ascontiguousarray(centers, dtype=float),
                                  np.ascontiguousarray(a), int(stiffness), out)
     return out

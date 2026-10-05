@@ -217,10 +217,10 @@ def test_compiled_basis_hessian_matches_finite_differences(h2o):
     assert np.abs(H - H.transpose(0, 1, 3, 2)).max() < 1e-10 * np.abs(H).max()
 
 
-def test_exact_two_centre_gradient_matches_finite_differences(h2o):
+def test_exact_two_center_gradient_matches_finite_differences(h2o):
     """Basis Hessians, moving sub-grid and Becke-weight terms together."""
     _numba_or_skip()
-    from pyxany.integrals.twocentre import overlap_kinetic_2c, overlap_kinetic_2c_gradient
+    from pyxany.integrals.twocenter import overlap_kinetic_2c, overlap_kinetic_2c_gradient
 
     basis = build_basis(h2o, make_config(basis={"set": "dzp"}))
     fa = [f for f in basis if f.atom_idx == 0]

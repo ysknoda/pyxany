@@ -18,7 +18,7 @@ turns the equation into
     -1/2 d^2 v/dx^2 + [ (l + 1/2)^2 / 2 + r^2 V_eff ] v = eps r^2 v
 
 Bound states are found by **Numerov integration with node counting**, the
-standard method for this equation.  (Reducing the generalised tridiagonal
+standard method for this equation.  (Reducing the generalized tridiagonal
 eigenproblem ``A v = eps diag(r^2) v`` to standard form instead is exact on
 paper but useless in practice: on a mesh reaching r ~ 1e-6 the reduction
 multiplies the matrix by ``1/r^2``, giving a condition number around 1e16 and
@@ -54,7 +54,7 @@ class AtomicOrbital:
     occupation: float
     eigenvalue: float
     r: np.ndarray
-    radial: np.ndarray          # R(r), normalised so int R^2 r^2 dr = 1
+    radial: np.ndarray          # R(r), normalized so int R^2 r^2 dr = 1
     spline: object
 
 
@@ -226,7 +226,7 @@ def _solve_channel(r, h: float, V_eff, l: int, n_nodes: int,
         nodes == n_nodes and mismatch < 0   (past the root inside this window)
 
     and below it otherwise.  Node count alone is constant across the whole gap
-    between neighbouring states, and the mismatch alone vanishes at every state,
+    between neighboring states, and the mismatch alone vanishes at every state,
     so neither is sufficient on its own.
     """
     Z_eff = max(-float(V_eff[0]) * r[0], 1.0)
@@ -256,7 +256,7 @@ def _solve_channel(r, h: float, V_eff, l: int, n_nodes: int,
         return 0.0, None
     # The Numerov integration starts from an arbitrary seed (1e-30) and is
     # rescaled on overflow, so the returned amplitude is meaningless.  Fix the
-    # scale here; the caller normalises properly against the radial measure.
+    # scale here; the caller normalizes properly against the radial measure.
     peak = float(np.abs(R).max())
     if peak < 1e-300:
         return 0.0, None
@@ -281,7 +281,7 @@ def hund_spin_occupations(occupations: dict) -> tuple[dict, dict]:
 
 
 @dataclass
-class PolarisedSolution:
+class PolarizedSolution:
     symbol: str
     Z: float
     up: dict  # {(n, l): AtomicOrbital}
@@ -294,11 +294,11 @@ class PolarisedSolution:
     n_iterations: int
 
 
-def solve_atom_polarised(symbol: str, alpha: float = 0.7, n_points: int = 4000,
+def solve_atom_polarized(symbol: str, alpha: float = 0.7, n_points: int = 4000,
                          occupations: dict | None = None, r_max: float | None = None,
                          max_iter: int = 400, tol: float = 1e-10,
-                         mixing: float = 0.2) -> PolarisedSolution:
-    """Spin-polarised spherical X-alpha atom (Hund's-rule spins, ADR 0011).
+                         mixing: float = 0.2) -> PolarizedSolution:
+    """Spin-polarized spherical X-alpha atom (Hund's-rule spins, ADR 0011).
 
     Exchange per spin channel from the spin-scaling relation (as in UKS);
     the total energy is
@@ -357,7 +357,7 @@ def solve_atom_polarised(symbol: str, alpha: float = 0.7, n_points: int = 4000,
                                   * xc.energy_density(2.0 * new[s], alpha)))
         vx_int += float(np.dot(w_r, shell * new[s] * xc.potential_spin(new[s], alpha)))
         band += sum(o.occupation * o.eigenvalue for o in orbitals[s].values())
-    return PolarisedSolution(symbol=symbol, Z=Z, up=orbitals["up"], down=orbitals["down"], r=r,
+    return PolarizedSolution(symbol=symbol, Z=Z, up=orbitals["up"], down=orbitals["down"], r=r,
                              rho_up=new["up"], rho_down=new["down"],
                              energy=band - E_H + E_x - vx_int, converged=converged,
                              n_iterations=it)

@@ -61,7 +61,7 @@ forces:
   enabled: true
   method:  analytic      # analytic | finite_difference
 
-optimise:
+optimize:
   enabled:   false
   f_max:     1.0e-3      # Ha/Bohr
   max_steps: 100
