@@ -21,3 +21,5 @@ venv/
 .claude/
 .code-check/
 examples/*_charges.xyz
+# copyrighted source papers (kept locally, not distributed)
+references/
