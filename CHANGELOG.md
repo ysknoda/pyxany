@@ -10,6 +10,11 @@
   between atoms with the Becke weights; forces include the moving-weight
   term (finite differences to the grid error). Spin-polarized atom solver
   and `tools/alpha_hf.py` for the recomputed alpha_HF table.
+- `alpha_hf_polarized` now covers H-Rn (86 elements, none excluded): ROHF
+  kept in its configuration by a targeted guess or by SO3 symmetry with fixed
+  (l, m) occupations, a level shift, and a settled-energy rule for Sm; the
+  recomputed Schwarz alpha_HF matches the 66 published values to a median of
+  2.2e-5 (ADR 0011).
 
 - **Point-charge (Madelung) embedding** (ADR 0010): `embedding.charges`
   reads fixed Gaussian point charges; `pyxany embed` builds them from a

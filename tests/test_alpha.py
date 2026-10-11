@@ -136,15 +136,21 @@ def test_alpha_hf_covers_h_to_rn_with_its_origin():
 
 
 def test_recomputed_definition_reproduces_the_published_values():
-    """tools/alpha_hf.py with Schwarz's definition vs his tables (2e-4: N)."""
+    """tools/alpha_hf.py with Schwarz's definition vs his tables (2e-4: N).
+
+    Tb is 3.7e-4 off by construction: Schwarz used 4f8 5d 6s2, the tool the
+    ground configuration 4f9 6s2 (ADR 0011, Q58).
+    """
     from pyxany.data.loaders import _load, alpha_hf_table
 
     recomputed = _load("alpha_hf_polarized")["alpha_hf_recomputed"]
     published = alpha_hf_table()
-    compared = [s for s in recomputed if s != "H"]
-    assert len(compared) >= 20
-    for symbol in compared:
+    assert len(recomputed) == 86  # H-Rn
+    for symbol in recomputed:
+        if symbol in ("H", "Tb"):
+            continue
         assert recomputed[symbol] == pytest.approx(published[symbol], abs=2e-4), symbol
+    assert recomputed["Tb"] == pytest.approx(published["Tb"], abs=4e-4)
 
 
 def test_polarized_table_is_selectable():
