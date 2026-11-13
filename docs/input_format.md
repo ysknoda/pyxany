@@ -79,9 +79,10 @@ embedding:                  # optional point-charge (Madelung) embedding, ADR 00
   spill_warn:       0.1     # and warn above this many
 
 scf:
-  max_iter:         100
+  max_iter:         100     # 300 for a transition-state run unless set (ADR 0014)
   e_tol:            1.0e-6  # total-energy convergence (Ha)
   d_tol:            1.0e-5  # density-matrix rms convergence
+  c_tol:            1.0e-5  # self-consistency: rms of F P S - S P F (ADR 0014)
   alpha:            0.7     # a number | alpha_hf (Schwarz) | alpha_hf_polarized | {default: 0.7, Si: 0.73}
   unrestricted:     false   # forced true for odd electrons or mult > 1
   smearing:         0.0     # Fermi smearing kT (Ha)

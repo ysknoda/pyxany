@@ -229,7 +229,8 @@ input keys are documented in [docs/input_format.md](docs/input_format.md).
 ```bash
 pip install -e ".[dev,fast,plot]"
 pytest -m "not slow and not mpi"     # fast suite, a few minutes
-pytest -m slow                       # validation on real molecules and clusters (~15 min)
+pytest -m slow                       # validation on real molecules and clusters (~15 min;
+                                     # on GitHub only when CI is started by hand)
 pytest -m mpi                        # serial/parallel agreement (needs the mpi extra and mpirun)
 ruff check pyxany tests tools
 ```

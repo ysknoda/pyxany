@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.0a2 (2026-11-13)
+
+### Fixed
+
+- **The SCF could report convergence without being self-consistent.** The
+  test looked only at the energy change and the density change; a stalled
+  Pulay DIIS can hold the density still while F and P do not commute. A core
+  hole on one of two equivalent atoms (the N2 1s transition state) converges
+  along a slow mode and was stopped this way: at the default tolerances after
+  30 iterations with -eps 65 meV too large, and the slow test passed on macOS
+  (10 meV off) while failing on Linux CI, where the stall did not happen
+  (ADR 0014). The rms of the commutator F P S - S P F, projected onto the
+  space left after dropping near-linearly-dependent directions, must now also
+  fall below the new `scf.c_tol` (default 1e-5); the H2O, CO, N2 and CH3
+  checks met it already when they stopped and take no extra iterations.
+  Transition-state runs on equivalent atoms take ~200 iterations and should
+  be repeated if they mattered.
+
+### Changed
+
+- `scf.max_iter` defaults to 300 for a transition-state run (100 otherwise)
+  when the input does not set it: the equivalent-atom core hole needs ~200.
+- A run whose energy and density have settled but whose commutator has not is
+  diagnosed as a slow mode, with the advice to raise `scf.max_iter`.
+- CI: the slow tests + MPI job runs only when the workflow is started by hand.
+- `tools/debug_ts_convergence.py`: per-iteration trace of the N2 core-hole SCF.
+
 ## 0.2.0a1 (2026-11-13)
 
 First release published on GitHub (`ysknoda/pyxany`), as an alpha.

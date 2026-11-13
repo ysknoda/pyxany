@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The slow tests + MPI job runs only when started by hand (Actions tab, or
+  # `gh workflow run ci.yml`): ~20 minutes, too costly for every push (ADR 0014).
+  workflow_dispatch:
 
 jobs:
   test:
@@ -36,6 +39,7 @@ jobs:
         run: pytest -q -m "not slow and not mpi"
 
   slow:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     name: slow tests + MPI
     steps:

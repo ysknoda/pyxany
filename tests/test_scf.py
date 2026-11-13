@@ -113,6 +113,37 @@ def test_non_convergence_is_diagnosed():
     assert "scf.smearing" in lines
 
 
+def test_converged_means_f_and_p_commute(h2o):
+    """The convergence test includes the commutator, not only dE and d_rms."""
+    result, _ = run(h2o, scf={"c_tol": 1e-7})
+    assert result.converged
+    assert result.history[-1]["commutator"] < 1e-7
+
+
+def test_scf_tolerances_are_validated():
+    from pyxany.config import Config, ConfigError
+
+    for bad in ({"c_tol": 0}, {"c_tol": -1e-5}, {"e_tol": "x"}, {"max_iter": 0},
+                {"max_iter": 1.5}):
+        with pytest.raises(ConfigError):
+            Config.from_dict({"molecule": {"structure": "x.xyz"}, "scf": bad})
+
+
+def test_slow_mode_is_diagnosed_as_such():
+    """Energy and density settled, commutator not: a slow mode, not a failure."""
+    from pyxany.config import SCFConfig
+    from pyxany.scf.driver import diagnose_non_convergence
+
+    history = [{"E": -100.0, "dE": 1e-9, "error": 5e-5, "d_rms": 1e-8,
+                "commutator": 5e-5, "method": "DIIS", "iter": i} for i in range(20)]
+    eps = np.array([-15.0, -14.3, -1.3, 0.2])
+    occ = np.array([0.5, 1.0, 1.0, 0.0])
+    lines = "\n".join(diagnose_non_convergence(history, eps, occ, SCFConfig()))
+    assert "do not" in lines and "commute" in lines
+    assert "scf.max_iter" in lines
+    assert "Near-degenerate" not in lines
+
+
 def test_smearing_resolves_a_degenerate_frontier():
     """The suggested remedy has to actually work."""
     from pyxany.config import SCFConfig

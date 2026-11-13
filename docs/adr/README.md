@@ -18,3 +18,4 @@ consequences. Status is one of `Proposed`, `Accepted`, `Superseded by NNNN`.
 | [0011](0011-element-specific-alpha.md) | Element-specific X-alpha parameter | Accepted (table open) |
 | [0012](0012-roadmap-after-0.1.md) | Roadmap after 0.1: fixes, features, first GitHub release | Accepted (items Proposed) |
 | [0013](0013-inert-configuration-keys.md) | Configuration keys that are validated but never read | Accepted (not implemented) |
+| [0014](0014-scf-self-consistency-test.md) | SCF convergence requires self-consistency (commutator test) | Accepted |

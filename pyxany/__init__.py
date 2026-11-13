@@ -1,6 +1,6 @@
 """pyxany -- DV-Xalpha all-electron molecular orbital calculations."""
 
-__version__ = "0.2.0a1"
+__version__ = "0.2.0a2"
 
 from .config import Config
 from .molecule import Atom, Molecule

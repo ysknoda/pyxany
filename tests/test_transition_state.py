@@ -20,10 +20,10 @@ GRID = {"n_r": 30, "n_a": 12, "poisson_l_max": 11}
 SCF = {"max_iter": 200, "e_tol": 1e-11, "d_tol": 1e-9}
 
 
-def _run(geom, ts=None, basis="dz", charge=0, mult=1):
+def _run(geom, ts=None, basis="dz", charge=0, mult=1, scf=SCF):
     mol = make_molecule("m", geom, multiplicity=mult)
     mol.charge = charge
-    kw = {"basis": {"set": basis}, "grid": GRID, "scf": SCF}
+    kw = {"basis": {"set": basis}, "grid": GRID, "scf": scf}
     if ts is not None:
         kw["transition_state"] = ts
     cfg = make_config(**kw)
@@ -63,10 +63,26 @@ def test_ionization_energy_agrees_with_delta_scf():
     assert ip_ts == pytest.approx((ec - e0) * HARTREE_TO_EV, abs=0.1)
 
 
+# N2 1s hole on atom 1, this grid: converged eigenvalue from 500 iterations with
+# the convergence test disabled (commutator rms 7e-8; ADR 0014).
+N2_1S_EPS = -14.997803748
+# Equivalent-atom core holes converge along a slow mode: ~315 iterations to a
+# commutator of 1e-6 (|d eps| 0.25 meV), so this test needs more than the TS
+# default of 300.
+N2_SCF = {"max_iter": 400, "e_tol": 1e-11, "d_tol": 1e-9, "c_tol": 1e-6}
+
+
 @pytest.mark.slow
 def test_core_hole_localizes_on_one_of_two_equivalent_atoms():
-    """N2 starts with 1s sigma_g/sigma_u at 0.50 each; the hole must end on atom 1."""
-    res, basis = _run(N2, {"remove": {"atom": 1, "shell": "1s"}})
+    """N2 starts with 1s sigma_g/sigma_u at 0.50 each; the hole must end on atom 1.
+
+    Until ADR 0014 this passed on macOS through a stalled DIIS that the energy
+    and density tests accepted (commutator 5.9e-5, eps 10 meV off), and failed on
+    Linux, where the stall did not happen.
+    """
+    res, basis = _run(N2, {"remove": {"atom": 1, "shell": "1s"}}, scf=N2_SCF)
+    assert res.history[-1]["commutator"] < 1e-6
+    assert res.transition_state["eps_source"] == pytest.approx(N2_1S_EPS, abs=2e-5)
     i = res.transition_state["source"]
     on_atom1 = np.array([f.atom_idx == 0 for f in basis])
     assert loewdin_orbital_weights(res.C_a, res.S, on_atom1)[i] > 0.95
@@ -87,3 +103,28 @@ def test_excitation_moves_half_an_electron():
     assert res.occ_a[t["dest"]] == pytest.approx(0.5)
     assert res.occ_a.sum() + res.occ_b.sum() == pytest.approx(10.0)
     assert t["eps_dest"] > t["eps_source"]
+
+
+@pytest.mark.slow
+def test_equivalent_atom_core_hole_is_self_consistent_at_the_default_tolerances():
+    """With the default scf settings the result must not stop short (ADR 0014).
+
+    Before scf.c_tol the energy and density tests stopped this run after 30
+    iterations with -eps 65 meV too large. The default
+    c_tol (1e-5) bounds that at ~2.4 meV, and the transition-state default of 300
+    iterations leaves room for the ~200 it needs.
+    """
+    # conftest.make_config sets test tolerances; put back the shipped defaults
+    defaults = {"max_iter": None, "e_tol": 1e-6, "d_tol": 1e-5}
+    res, _ = _run(N2, {"remove": {"atom": 1, "shell": "1s"}}, scf=defaults)
+    assert res.n_iterations > 100      # the TS default of 300 is what made room
+    assert res.history[-1]["commutator"] < 1e-5
+    assert abs(res.transition_state["eps_source"] - N2_1S_EPS) * HARTREE_TO_EV < 5e-3
+
+
+def test_transition_state_raises_the_default_iteration_limit():
+    base = {"molecule": {"structure": "x.xyz"}}
+    assert Config.from_dict(base).scf.max_iter == 100
+    ts = {**base, "transition_state": {"remove": "homo"}}
+    assert Config.from_dict(ts).scf.max_iter == 300
+    assert Config.from_dict({**ts, "scf": {"max_iter": 40}}).scf.max_iter == 40

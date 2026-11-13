@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: Noda
     given-names: Yusuke
-version: 0.2.0a1
+version: 0.2.0a2
 license: MIT
 repository-code: "https://github.com/ysknoda/pyxany"
 keywords:

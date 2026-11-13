@@ -57,6 +57,8 @@ Size: S <= 1 day, M a few days, L a week or more.
 | F5 | The summary figure (`<prefix>_results.png`) of a UKS run draws the alpha levels only while its HOMO/LUMO span both channels (`plotting.summary_figure`); the bonding figures were already fixed | S | -- | Proposed |
 | F6 | Documentation drift: README (SciPy floor, `embed`, transition state, embedding, `alpha_hf`, restart) -- done in 0.2.0a1; ADR 0005 still says `--set` cannot reach nested keys (fixed by ADR 0009) | S | -- | README done in 0.2.0a1; ADR 0005 note Proposed |
 | F7 | Without matplotlib, `pyxany run` failed with exit code 3 after a converged SCF: the guard imported `pyxany.plotting`, which imports matplotlib only inside its functions. Found by the wheel smoke test while preparing 0.2.0a1; the CI package job (bare wheel, `pyxany run h2o.yaml`) would have failed on it. Guard on matplotlib itself; regression test | S | -- | Done in 0.2.0a1 |
+| F8 | The SCF could report convergence without self-consistency (energy and density tests only); the N2 1s transition state stopped 65 meV off at the defaults and the slow test failed on Linux CI. Found by the first CI run. Design in ADR 0014 | S | -- | Done in 0.2.0a2 |
+| F9 | The UKS diagonalization ignores `scf.s_threshold` (`_diagonalize_uks` calls `solve_generalized` with the default 5e-4); found with F8 | S | -- | Proposed |
 | R0 | The code is non-relativistic, which nothing said. README statement (done in 0.2.0a1); a run-time warning, once per run, when an element with Z > 36 is present; for a core-ionization transition state an unconditional note plus, for a 1s hole, the hydrogen-like estimate of the missing correction (Zalpha)^2/4 x abs(E) (Q79) | S | -- | README done in 0.2.0a1; warnings Proposed |
 
 R0 numbers: the Dirac 1s level of a one-electron atom is
@@ -86,6 +88,8 @@ not a measured threshold for this code.
 | A5 | Several initial spin guesses tried automatically, reporting the lowest (ADR 0008; code-check MEDIUM on `scf/guess.py`). Open-shell defects in clusters | M | P0 gate | Proposed |
 | A6 | Irreducible-representation labels for MOs: point-group detection and projection of the converged orbitals (a1, t2, ...), without a symmetry-adapted basis | M | P0 gate | Proposed |
 | A7 | XANES / XES from transition-state dipole intensities (ADR 0006 (d)) | M-L | R0; A8 for heavy absorbers | Proposed |
+| A9 | Faster convergence of equivalent-atom core holes: the slow mode of ADR 0014 halves the commutator only every ~50 iterations (~200 to 1e-5). Candidates: a second-order step in the occupied-occupied rotation between the localized core orbitals, or a damped/level-shifted treatment of that block. Research; measure on N2 and a symmetric cluster first | M-L | F8 | Proposed |
+| A10 | Project the Pulay DIIS error vector onto the retained (non-linearly-dependent) space, as the convergence test now does (ADR 0014). With dropped directions the unprojected error carries a constant component (MgO6H: 1.4e-4); may help DIIS on diffuse bases. Changes every SCF trajectory, so measure first | S-M | F8 | Proposed |
 | A8 | Scalar-relativistic ZORA (atomic solver, molecular Hamiltonian, force terms). Variant and gauge treatment to be decided in its own ADR when scheduled. Spin-orbit coupling stays out of scope (no L2/L3 splitting) | L | R0 | Proposed |
 
 ### Kept in the backlog (from ADR 0008)
@@ -107,13 +111,16 @@ not a measured threshold for this code.
 ## Recommended order
 
 1. **P0** and every Critical/High it finds.
-2. F1, F2, F7, the README part of F6 and of R0, G1 -- done with 0.2.0a1.
-3. F3, F4, F5, the rest of F6 and R0 (all S, independent of each other).
+2. F1, F2, F7, the README part of F6 and of R0, G1 -- done with 0.2.0a1;
+   F8 (High, found by the first CI run) -- done with 0.2.0a2.
+3. F3, F4, F5, F9, the rest of F6 and R0 (all S, independent of each other).
 4. A1 (small enough to come first; unblocks A4 scripting and G2).
 5. A2.
 6. A3, then A4.
 7. A5, A6.
 8. A7, then A8 (or A8 first if the absorbers of interest are heavy).
+   A9 before A7 if core holes on equivalent atoms (symmetric clusters) are
+   routine: each such run costs ~200 SCF iterations until then.
 
 ## Consequences
 

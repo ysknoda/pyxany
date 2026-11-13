@@ -22,7 +22,7 @@ from ..timing import timer
 from .diis import EDIIS, PulayDIIS
 from .grid_terms import GridTerms, choose_strategy
 from .guess import rescale_to_electron_count, sad_density, spin_split
-from .linalg import solve_generalized
+from .linalg import canonical_orthogonalizer, solve_generalized
 from .occupations import (
     density_matrix,
     fermi_occupations,
@@ -163,6 +163,8 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                                  screening_tol=grid_cfg.screening_tol,
                                  n_r_1c=grid_cfg.one_center["n_r"])
     cond = condition_number(S)
+    # Retained (non-linearly-dependent) space, for the self-consistency test.
+    X_keep, _ = canonical_orthogonalizer(S, scf_cfg.s_threshold)
     holes = None
     if ts_cfg.enabled:
         from .transition_state import HoleManager
@@ -313,6 +315,8 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
             if unrestricted:
                 F_a = T + V_nuc + JVxc_a
                 F_b = T + V_nuc + JVxc_b
+                commutator = max(_commutator_rms(F_a, P_a, S, X_keep),
+                                 _commutator_rms(F_b, P_b, S, X_keep))
                 Fa_use, Fb_use, method, err, mix = _accelerate_uks(
                     accel, F_a, F_b, P_a, P_b, S, energies["E_total"], it, scf_cfg, dE)
                 eps_a, C_a, eps_b, C_b = _diagonalize_uks(Fa_use, Fb_use, S, n_basis)
@@ -342,6 +346,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                          float(eps_b[np.argsort(eps_b)][max(int(round(n_beta)) - 1, 0)]))
             else:
                 F = T + V_nuc + JVxc
+                commutator = _commutator_rms(F, P, S, X_keep)
                 F_use, method, err, mix = _accelerate_rks(
                     accel, F, P, S, energies["E_total"], it, scf_cfg, dE)
                 eps, C, _ = solve_generalized(F_use, S, scf_cfg.s_threshold)
@@ -357,11 +362,15 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
             bcast_array(P)
             history.append({"iter": it, "E": energies["E_total"], "E_free": e_current,
                             "dE": dE, "error": err, "d_rms": d_rms,
-                            "method": method, "mix": mix})
+                            "commutator": commutator, "method": method, "mix": mix})
             if verbose:
                 _print_row(it, energies["E_total"], dE, err, d_rms, extra, method)
 
-            if it > start_it + 2 and dE < scf_cfg.e_tol and d_rms < scf_cfg.d_tol:
+            # The commutator test is what makes this self-consistency: a stalled
+            # DIIS can hold the density still while F and P do not commute
+            # (ADR 0014; N2 1s transition state, 45 meV off at the defaults).
+            if (it > start_it + 2 and dE < scf_cfg.e_tol and d_rms < scf_cfg.d_tol
+                    and commutator < scf_cfg.c_tol):
                 converged = True
                 break
             if checkpoint_path is not None and every > 0 and it % every == 0:
@@ -445,6 +454,21 @@ def _gather_full(grid, rho_local: np.ndarray) -> np.ndarray:
     full = np.zeros(len(grid))
     full[grid.local_slice] = rho_local
     return allreduce_array(full)
+
+
+def _commutator_rms(F: np.ndarray, P: np.ndarray, S: np.ndarray, X: np.ndarray) -> float:
+    """rms of X^T (F P S - S P F) X for the F built from P: zero at self-consistency.
+
+    X is the canonical orthogonalizer of S, so this is the commutator in the
+    orthonormal space the SCF actually diagonalizes in. Directions dropped for
+    near-linear dependence (s_threshold) can carry a commutator the SCF cannot
+    remove: the MgO6H example (9 of 132 dropped) sits at 1.4e-4 unprojected
+    for ever while the projected value falls to 4e-7 by iteration 15 (ADR 0014).
+    F is the unextrapolated Fock matrix, available every iteration (EDIIS too).
+    """
+    e = F @ P @ S
+    e = X.T @ (e - e.T) @ X
+    return float(np.sqrt(np.mean(e ** 2)))
 
 
 def _diis_mixing(cfg, extrapolated: bool, error: float) -> float:
@@ -551,6 +575,19 @@ def diagnose_non_convergence(history, eps, occ, scf_cfg) -> list[str]:
         if len(filled) and len(empty):
             gap = float(empty.min() - filled.max())
 
+    last = history[-1] if history else {}
+    density_settled = last.get("d_rms", float("inf")) < scf_cfg.d_tol
+    commutator = last.get("commutator", 0.0)
+    if energy_settled and density_settled and commutator >= scf_cfg.c_tol:
+        lines += [
+            "  [diagnosis] the energy and density have settled but F and P do not",
+            f"  commute yet (rms {commutator:.1e} > scf.c_tol {scf_cfg.c_tol:g}): the",
+            "  SCF is creeping along a slow mode rather than diverging. A core hole on",
+            "  one of several equivalent atoms does this (ADR 0014); raise",
+            "  scf.max_iter rather than loosening scf.c_tol, which would accept a",
+            "  result that is not self-consistent.",
+        ]
+        return lines
     if not energy_settled:
         lines += [
             f"  [diagnosis] the energy is still moving ({spread:.1e} Ha spread over the",

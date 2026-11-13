@@ -23,6 +23,11 @@ def DEFAULT_PRUNING(n_a: int) -> list:
     return [[0.25, max(4, n_a // 3)], [0.5, max(4, (2 * n_a) // 3)]]
 
 
+#: scf.max_iter when the input does not set it (ADR 0014)
+DEFAULT_MAX_ITER = 100
+DEFAULT_MAX_ITER_TS = 300
+
+
 class ConfigError(ValueError):
     """Raised for anything wrong with an input file."""
 
@@ -246,9 +251,16 @@ class GridConfig:
 
 @dataclass
 class SCFConfig:
-    max_iter: int = 100
+    #: Iteration limit. ``None`` (the default) resolves in Config.validate to
+    #: 100, or to 300 for a transition-state run, whose SCF converges slowly
+    #: (ADR 0014: ~200 iterations for a core hole on one of two N atoms).
+    max_iter: Any = None
     e_tol: float = 1e-6
     d_tol: float = 1e-5
+    #: Self-consistency: rms of the commutator F P S - S P F, which must also
+    #: fall below this. The energy and density tests alone accepted a stalled,
+    #: non-self-consistent DIIS state (ADR 0014).
+    c_tol: float = 1e-5
     #: X-alpha parameter: a number for every element (default 0.7, ADR 0002),
     #: "alpha_hf" for the recomputed Schwarz alpha_HF table, or a mapping
     #: ``{default: 0.7, Si: 0.73}``; between atoms the Becke-weighted mean
@@ -290,8 +302,14 @@ class SCFConfig:
                     raise ConfigError(f"{ctx}: scf.alpha.{key} must be in (0, 2]; got {value!r}")
         elif isinstance(a, bool) or not isinstance(a, (int, float)) or not 0.0 < a <= 2.0:
             raise ConfigError(f"{ctx}: scf.alpha must be in (0, 2]; got {a!r}")
-        if self.max_iter < 1:
-            raise ConfigError(f"{ctx}: scf.max_iter must be >= 1")
+        if self.max_iter is not None and (isinstance(self.max_iter, bool)
+                                          or not isinstance(self.max_iter, int)
+                                          or self.max_iter < 1):
+            raise ConfigError(f"{ctx}: scf.max_iter must be an integer >= 1")
+        for name in ("e_tol", "d_tol", "c_tol"):
+            v = getattr(self, name)
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not v > 0:
+                raise ConfigError(f"{ctx}: scf.{name} must be > 0; got {v!r}")
         for name in ("mix_ediis", "mix_diis"):
             v = getattr(self, name)
             if not (0.0 < v <= 1.0):
@@ -601,6 +619,9 @@ class Config:
     def validate(self, ctx: str = "<config>") -> None:
         for name in _SECTIONS:
             getattr(self, name).validate(ctx)
+        if self.scf.max_iter is None:
+            self.scf.max_iter = (DEFAULT_MAX_ITER_TS if self.transition_state.enabled
+                                 else DEFAULT_MAX_ITER)
         if self.transition_state.enabled and self.scf.smearing > 0:
             raise ConfigError(f"{ctx}: a transition state fixes occupations by hand; "
                               f"scf.smearing must be 0")
