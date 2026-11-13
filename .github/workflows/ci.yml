@@ -51,6 +51,12 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     name: slow tests + MPI
+    env:
+      # A runner may expose fewer MPI slots than the 2 ranks the test starts
+      # (Open MPI 5 / PRRTE then stops with prte-rmaps-base:alloc-error).
+      # Oversubscription is fine for a correctness test; set for Open MPI 4 and 5.
+      OMPI_MCA_rmaps_base_oversubscribe: "1"
+      PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
