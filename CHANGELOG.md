@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- CI: a manual run takes `suite=all` or `suite=mpi-only`; the MPI test shows
+  mpirun's stderr when it fails; the runner's MPI job allows oversubscription
+  (Open MPI 5 refused 2 ranks with prte-rmaps-base:alloc-error).
+
 ## 0.2.0a2 (2026-11-13)
 
 ### Fixed
