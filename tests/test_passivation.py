@@ -178,6 +178,7 @@ def test_terminated_cluster_has_a_clean_gap():
 def _octahedral_pair(a_symbol, b_symbol, n=6):
     """One A site with n octahedral B neighbors, and each B bonded back to A."""
     import numpy as np
+
     from pyxany.constants import ANG_TO_BOHR
     from pyxany.molecule import Atom, Molecule
     dirs = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0],
@@ -233,6 +234,7 @@ def test_unambiguous_binaries_still_resolve_without_help(cation, anion):
 def test_the_two_counting_rules_coincide_only_at_tetrahedral_coordination():
     """Pins the fact the tie rule depends on."""
     from fractions import Fraction
+
     from pyxany.passivation.counting import terminator_charge
 
     def charge(role, z, n):

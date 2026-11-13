@@ -264,7 +264,7 @@ def nuclear_potential(points: np.ndarray, positions: np.ndarray,
                       charges: np.ndarray) -> np.ndarray:
     """``sum_A -Z_A / |r - R_A|`` at each point (Hartree)."""
     v = np.zeros(len(points))
-    for pos, Z in zip(positions, charges):
+    for pos, Z in zip(positions, charges, strict=True):
         r = np.linalg.norm(points - pos, axis=1)
         v -= Z / np.maximum(r, 1e-12)
     return v

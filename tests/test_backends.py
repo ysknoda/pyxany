@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from conftest import make_config, make_molecule
+from conftest import make_config
 from pyxany.basis import build_basis
 from pyxany.kernels import backend_name, numpy_impl, poisson_radial
 from pyxany.scf import run_scf

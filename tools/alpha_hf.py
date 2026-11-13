@@ -50,9 +50,11 @@ from pathlib import Path
 
 import numpy as np
 
-TABLE = Path(__file__).resolve().parents[1] / "pyxany" / "data" / "tables" / "alpha_hf_polarized.json"
+TABLE = (Path(__file__).resolve().parents[1] / "pyxany" / "data" / "tables"
+         / "alpha_hf_polarized.json")
 FLAG_D_ALPHA = 1e-4
-FLAG_SCHWARZ = 1e-3  # recomputed vs published alpha_hf; Tb (4f9 6s2 here, 4f8 5d 6s2 there) is 3.7e-4
+# recomputed vs published alpha_hf; Tb (4f9 6s2 here, 4f8 5d 6s2 there) is 3.7e-4
+FLAG_SCHWARZ = 1e-3
 NEWTON_MAX_CYCLE = 50  # Q63
 SETTLED_E = 1e-5  # Q62: Hartree, spread of the last ten SCF energies
 GUESS_SYMMETRIC = "SO3 symmetry, fixed (l, m) occupations"
@@ -220,7 +222,7 @@ def symmetric_occupations(mol, config: dict) -> dict:
 
     up, down = hund_spin_occupations(config)
     nelec = {name: [0, 0] for name in mol.irrep_name}
-    for (n, l), q in config.items():
+    for (n, l) in config:
         for spin, count in ((0, up.get((n, l), 0.0)), (1, down.get((n, l), 0.0))):
             if abs(count - round(count)) > 1e-9:
                 raise ValueError(f"fractional occupation {count} in shell {(n, l)}")

@@ -70,7 +70,6 @@ def test_scf_energy_is_chunk_independent(request, molecule_name):
                                 "memory_budget_mb": budget},
                           scf={"max_iter": 60, "e_tol": 1e-9, "d_tol": 1e-8},
                           forces={"enabled": True})
-        basis = build_basis(molecule.copy(), cfg)
         mol = molecule.copy()
         res = run_scf(mol, build_basis(mol, cfg), cfg, verbose=0)
         results[label] = (res.total_energy, compute_forces(res, cfg),

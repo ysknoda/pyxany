@@ -462,7 +462,8 @@ def hartree_evaluate(points, centers, knots, n_knots, coefs, v_first, v_last, l_
     ``knots[A, :n_knots[A]]`` and ``coefs[A, :, :n_knots[A] - 1]`` are the
     cubic-spline breakpoints and coefficients (scipy's ``CubicSpline.c``
     layout) of atom A's radial multipole potentials, zero-padded to a common
-    length; inside the first node V_l ~ r^l, beyond the last V_l ~ r^-(l+1). Solid harmonics are built by the same recursion as
+    length; inside the first node V_l ~ r^l, beyond the last V_l ~ r^-(l+1).
+    Solid harmonics are built by the same recursion as
     basis/solid_harmonics.py, one point at a time, so no (n_lm, n_points)
     array is ever formed.
     """
@@ -521,7 +522,8 @@ def hartree_evaluate(points, centers, knots, n_knots, coefs, v_first, v_last, l_
                 for m in range(-(l - 1), l):
                     num = (2.0 * l - 1.0) * z * S[(l - 1) * (l - 1) + m + l - 1]
                     if l >= 2 and abs(m) <= l - 2:
-                        num -= np.sqrt((l - 1.0) ** 2 - m * m) * r2 * S[(l - 2) * (l - 2) + m + l - 2]
+                        num -= (np.sqrt((l - 1.0) ** 2 - m * m) * r2
+                                * S[(l - 2) * (l - 2) + m + l - 2])
                     S[l * l + m + l] = num / np.sqrt(l * l - m * m)
             acc += v[0] * norms[0]
             if r > 1e-300:

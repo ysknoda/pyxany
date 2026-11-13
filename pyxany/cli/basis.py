@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..data import elements as elem
 from ..data.loaders import coverage_report
-from . import EXIT_OK, EXIT_INPUT
+from . import EXIT_INPUT, EXIT_OK
 
 
 def execute(args) -> int:
@@ -40,7 +40,7 @@ def _element_report(symbol: str) -> int:
           + ("" if elem.multiplicity_is_reliable(symbol)
              else "  [derived from Hund's rule; d/f-block exceptions not captured]"))
     print(f"  Bragg-Slater radius {elem.bragg_slater_radius(symbol):.3f} Bohr")
-    print(f"  configuration: " + "  ".join(
+    print("  configuration: " + "  ".join(
         f"{k}={v:g}" for k, v in sorted(elem.occupations(symbol).items())))
     print()
     print(f"  {'basis':<8} {'functions':>10}   exponents")

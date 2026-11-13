@@ -6,7 +6,8 @@
 ## Decision
 
 Each step ends with the full test suite passing and a local commit. Nothing is
-pushed to GitHub.
+pushed to GitHub. (Superseded by ADR 0012: the repository is published on
+GitHub from 0.2.0a1 on.)
 
 1. Commit the pending working-tree changes.
 2. Flat layout and rename (ADR 0001).

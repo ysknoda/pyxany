@@ -154,8 +154,6 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
         spin_electron_counts(n_electrons, molecule.multiplicity)
         if unrestricted else (n_electrons / 2.0, n_electrons / 2.0)
     )
-    max_occ = 1.0 if unrestricted else 2.0
-
     if verbose:
         _print_header(molecule, basis, config, unrestricted, n_alpha, n_beta)
 
@@ -610,5 +608,5 @@ def _print_footer(converged, n_it, energies, n_electrons):
         mpi_print(f"  [warning] the DV grid and the overlap matrix disagree on the "
                   f"electron count by {abs(n_int - trace):.2e} "
                   f"({mismatch:.1e} relative).")
-        mpi_print(f"            V_H is built from a density normalized differently "
-                  f"from Tr(PS); raise grid.n_r / grid.n_a until this shrinks.")
+        mpi_print("            V_H is built from a density normalized differently "
+                  "from Tr(PS); raise grid.n_r / grid.n_a until this shrinks.")

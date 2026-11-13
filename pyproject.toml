@@ -1,13 +1,14 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]   # 1.27: PEP 639 license / license-files
 build-backend = "hatchling.build"
 
 [project]
 name = "pyxany"
-version = "0.1.0"
+version = "0.2.0a1"
 description = "DV-Xalpha (Discrete Variational Xalpha) all-electron molecular orbital code"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Yusuke Noda" }]
 keywords = ["DV-Xalpha", "quantum chemistry", "electronic structure",
@@ -15,8 +16,11 @@ keywords = ["DV-Xalpha", "quantum chemistry", "electronic structure",
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Chemistry",
     "Topic :: Scientific/Engineering :: Physics",
 ]
@@ -27,18 +31,25 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Compiled (threaded) kernels for the grid, Hartree and force hot spots. Without it the
+# pure-numpy path runs and gives the same numbers (tested to 1e-12), only slower.
 fast = ["numba>=0.59"]
+# Domain decomposition of the DV grid under mpirun. Without it every run is serial.
 mpi  = ["mpi4py>=3.1"]
+# Summary and bonding figures. Without it `pyxany run` skips them with a note.
 plot = ["matplotlib>=3.7"]
 all  = ["pyxany[fast,mpi,plot]"]
-dev  = ["pytest>=8", "pytest-cov", "ruff"]
+# Test suite and lint. ruff is pinned to a minor series so a new release cannot add
+# rules that turn CI red (ADR 0012, F2).
+dev  = ["pytest>=8", "pytest-cov", "ruff>=0.16,<0.17"]
 
 [project.scripts]
 pyxany = "pyxany.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yusuke/pyxany"
-Issues = "https://github.com/yusuke/pyxany/issues"
+Homepage = "https://github.com/ysknoda/pyxany"
+Repository = "https://github.com/ysknoda/pyxany"
+Issues = "https://github.com/ysknoda/pyxany/issues"
 
 [tool.hatch.build.targets.wheel]
 # Everything under pyxany/ ships, including the data/tables/*.json tables --
@@ -66,3 +77,7 @@ src = [".", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "NPY"]
 ignore = ["E741"]  # ambiguous variable name 'l' -- standard for angular momentum
+
+[tool.ruff.lint.per-file-ignores]
+# zip(strict=...) is not supported inside numba-compiled functions.
+"pyxany/kernels/numba_impl.py" = ["B905"]

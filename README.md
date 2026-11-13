@@ -1,5 +1,10 @@
 # pyxany
 
+> **Alpha release.** This project is under active development.
+> Interfaces, behavior, and output formats may change without notice
+> between releases, and it has not yet been broadly tested. Do not
+> rely on it for production use.
+
 All-electron **DV-Xα** (Discrete Variational Xα) molecular orbital calculations,
 with a command-line interface aimed at semiconductor cluster models.
 
@@ -8,15 +13,39 @@ restricted and unrestricted Kohn-Sham SCF; analytic nuclear forces; geometry
 optimization; and **pseudo-hydrogen passivation** of dangling bonds using the
 electron-counting rule.
 
-## Install
+## Features
+
+- Restricted and unrestricted X-alpha SCF with DIIS/EDIIS, Fermi smearing, a
+  superposition-of-atomic-densities guess, and checkpoint/restart
+  (`--restart`).
+- Analytic nuclear forces (including the grid-weight terms), geometry
+  optimization, coordinate scans.
+- Pseudo-hydrogen passivation (`pyxany passivate`) and point-charge (Madelung)
+  embedding of ionic clusters (`pyxany embed`, [docs/embedding.md](docs/embedding.md)).
+- Element-specific X-alpha parameters: Schwarz's alpha_HF table or a
+  spin-polarized recomputation, H-Rn (`scf.alpha: alpha_hf`).
+- Slater transition state for valence and core ionization and excitation
+  energies (`transition_state:`).
+- Mulliken, Loewdin and Mayer analyses, bond overlap populations with
+  COOP-type and partial-DOS figures, dipole moments.
+- Optional numba kernels and MPI domain decomposition for clusters of a few
+  hundred atoms.
+
+## Installation
 
 ```bash
-pip install -e ".[all]"     # numba, mpi4py and matplotlib are all optional
+pip install "pyxany @ git+https://github.com/ysknoda/pyxany.git"
 ```
 
-Required: Python ≥ 3.10, NumPy ≥ 2.0, SciPy ≥ 1.11, PyYAML.
-Everything works without the optional extras — more slowly, serially, and
-without figures.
+or, from a clone, `pip install -e .`. Required: Python ≥ 3.10, NumPy ≥ 2.0,
+SciPy ≥ 1.15 (for `scipy.integrate.lebedev_rule`), PyYAML. Optional extras:
+
+```bash
+pip install -e ".[fast]"    # numba: compiled kernels; without it the numpy path gives the same numbers, slower
+pip install -e ".[mpi]"     # mpi4py: grid decomposition under mpirun; without it runs are serial
+pip install -e ".[plot]"    # matplotlib: summary and bonding figures; without it they are skipped
+pip install -e ".[all]"     # all three
+```
 
 ## Quick start
 
@@ -54,6 +83,7 @@ forces:
 | `pyxany forces in.yaml --compare` | analytic forces, checked against finite differences |
 | `pyxany scan in.yaml --coord bond:0,1 --range 1.0 1.6 --steps 13` | energy scan → CSV |
 | `pyxany passivate cluster.xyz` | add hydrogen / pseudo-hydrogen terminators |
+| `pyxany embed crystal.yaml -o charges.xyz` | point charges of the surrounding crystal (Evjen block) |
 | `pyxany gridcheck in.yaml` | integration-grid quality diagnostic |
 | `pyxany validate in.yaml` | check the input and print the resolved settings |
 | `pyxany basis dz --element Se` | basis-set coverage |
@@ -168,9 +198,18 @@ Physically, Xα/DZ lands ~1 % above Hartree-Fock for closed-shell molecules
 (CO −111.69 vs −112.79 Ha; H₂O −75.29 vs −76.07 Ha), which is the expected
 behavior of the functional rather than a numerical error.
 
-## License
+## Limitations
 
-MIT — see [LICENSE](LICENSE).
+- **Non-relativistic.** Neither scalar-relativistic nor spin-orbit effects are
+  included. Valence properties of compounds with heavy elements (fifth period
+  and beyond) and absolute core-level energies (several eV already for Si 1s)
+  carry that error; core-level chemical shifts largely cancel it.
+- Exchange only (X-alpha); no correlation functional.
+- One initial spin guess, so an open-shell or transition-metal result should
+  be checked against alternatives by hand.
+
+The planned work is in [docs/adr/0012-roadmap-after-0.1.md](docs/adr/0012-roadmap-after-0.1.md);
+input keys are documented in [docs/input_format.md](docs/input_format.md).
 
 ## References
 
@@ -184,3 +223,20 @@ MIT — see [LICENSE](LICENSE).
 - Clementi & Roetti, *At. Data Nucl. Data Tables* **14**, 177 (1974) — double/triple-zeta STO
 - Cordero *et al.*, *Dalton Trans.* 2832 (2008) — covalent radii
 - Deng, Li, Li & Wei, *Phys. Rev. B* **85**, 195328 (2012) — pseudo-hydrogen passivation
+
+## Testing
+
+```bash
+pip install -e ".[dev,fast,plot]"
+pytest -m "not slow and not mpi"     # fast suite, a few minutes
+pytest -m slow                       # validation on real molecules and clusters (~15 min)
+pytest -m mpi                        # serial/parallel agreement (needs the mpi extra and mpirun)
+ruff check pyxany tests tools
+```
+
+The cross-validation against PySCF (`tests/test_tier_a_pyscf.py`) runs only
+where PySCF is installed; it is a development tool, not a dependency.
+
+## License
+
+MIT -- see [LICENSE](LICENSE).

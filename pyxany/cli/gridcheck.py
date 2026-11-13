@@ -8,9 +8,9 @@ import numpy as np
 
 from ..basis.evaluate import chi_matrix
 from ..grid.molecular import grid_from_config
+from ..integrals.overlap import build_overlap_kinetic
 from ..parallel import mpi_print
 from ..scf.guess import atomic_superposition, rescale_to_electron_count
-from ..integrals.overlap import build_overlap_kinetic
 from ..timing import REGISTRY, timer
 from . import EXIT_OK
 from ._shared import build_molecule_basis, prepare, report_timing

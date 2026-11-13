@@ -1,4 +1,10 @@
 *.egg-info/
+.eggs/
+*.egg
+.tox/
+.mypy_cache/
+.vscode/
+.idea/
 *.npy
 *.npz
 *.py[cod]
@@ -20,6 +26,9 @@ venv/
 # AI-assisted development tooling (local only)
 .claude/
 .code-check/
+.github_release/
+# legacy status-note path of the github_release skill
+.pip_preparation/
 examples/*_charges.xyz
 # copyrighted source papers (kept locally, not distributed)
 references/

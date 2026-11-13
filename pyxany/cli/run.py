@@ -33,8 +33,14 @@ def execute(args) -> int:
             return EXIT_OK
 
         verbose = cfg.runtime.verbosity
-        result = run_scf(molecule, basis, cfg, verbose=verbose, restart=args.restart,
-                         checkpoint_path=out_path(cfg, "_scf.npz"))
+        result = run_scf(
+            molecule,
+            basis,
+            cfg,
+            verbose=verbose,
+            restart=args.restart,
+            checkpoint_path=out_path(cfg, "_scf.npz"),
+        )
 
         forces = None
         if cfg.forces.enabled:
@@ -53,8 +59,11 @@ def execute(args) -> int:
 
         if is_root():
             write_text(out_path(cfg, "_results.txt"), text)
-            write_xyz(out_path(cfg, "_final.xyz"), molecule,
-                      f"{molecule.name}  E = {result.total_energy:.9f} Ha")
+            write_xyz(
+                out_path(cfg, "_final.xyz"),
+                molecule,
+                f"{molecule.name}  E = {result.total_energy:.9f} Ha",
+            )
             payload = result_dict(result, cfg, forces=forces, dipole=dipole)
             if cfg.output.json:
                 write_json(out_path(cfg, "_results.json"), payload)
@@ -77,23 +86,30 @@ def _forces(result, cfg):
     from ..forces import compute_forces, compute_forces_fd
 
     if cfg.forces.method == "finite_difference":
-        return compute_forces_fd(result.molecule, cfg, step=cfg.forces.fd_step,
-                                 verbose=cfg.runtime.verbosity)
+        return compute_forces_fd(
+            result.molecule, cfg, step=cfg.forces.fd_step, verbose=cfg.runtime.verbosity
+        )
     return compute_forces(result, cfg)
 
 
 def _figure(result, cfg, forces) -> None:
+    # pyxany.plotting imports matplotlib inside its functions, so importing the
+    # module succeeds without matplotlib; test for matplotlib itself.
     try:
-        from ..plotting import summary_figure
+        import matplotlib  # noqa: F401
     except ImportError:
         mpi_print("  [note] matplotlib is not installed; skipping the figure")
         return
+    from ..plotting import summary_figure
+
     summary_figure(result, cfg, out_path(cfg, "_results.png"), forces=forces)
     from ..plotting import bonding_figures
     from ..properties import bonding
-
     from ._shared import output_dir
 
-    stem = (out_path(cfg, "") if cfg.output.prefix
-            else output_dir(cfg) / (result.molecule.name or "pyxany"))
+    stem = (
+        out_path(cfg, "")
+        if cfg.output.prefix
+        else output_dir(cfg) / (result.molecule.name or "pyxany")
+    )
     bonding_figures(bonding.analyze(result, cfg), result, cfg, str(stem))

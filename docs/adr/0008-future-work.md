@@ -1,6 +1,6 @@
 # 0008. Deferred work (backlog)
 
-- Status: Accepted
+- Status: Superseded by 0012
 - Date: 2026-10-01
 
 Not in the current scope; recorded so the decision to defer is explicit.

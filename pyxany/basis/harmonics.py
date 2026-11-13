@@ -107,7 +107,9 @@ def solid_harmonic_grad(l: int, m: int, x, y, z):
     """grad S_lm, returned as ``(dS/dx, dS/dy, dS/dz)`` arrays."""
     _check(l, m)
     shape = np.shape(x)
-    gx = np.zeros(shape); gy = np.zeros(shape); gz = np.zeros(shape)
+    gx = np.zeros(shape)
+    gy = np.zeros(shape)
+    gz = np.zeros(shape)
     for coeff, (px, py, pz) in SOLID_HARMONIC_TERMS[(l, m)]:
         if px:
             t = np.full(shape, coeff * px, dtype=float)

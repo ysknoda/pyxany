@@ -29,7 +29,7 @@ jobs:
             pip install -e ".[dev,plot]"
           fi
       - name: Lint
-        run: ruff check src tests
+        run: ruff check pyxany tests tools
       - name: Test
         env:
           PYXANY_DISABLE_NUMBA: ${{ matrix.backend == 'numpy' && '1' || '0' }}
@@ -73,15 +73,21 @@ jobs:
       - name: Data tables must be inside the wheel
         run: |
           python - <<'PY'
-          import glob, sys, zipfile
+          import glob, pathlib, sys, zipfile
           wheel = glob.glob("dist/*.whl")[0]
           names = zipfile.ZipFile(wheel).namelist()
           tables = sorted(n for n in names if n.startswith("pyxany/data/tables/"))
           print(f"{wheel}: {len(tables)} data tables")
           for n in tables:
               print("   ", n)
-          if len(tables) != 12:
-              sys.exit(f"expected 12 data tables in the wheel, found {len(tables)}")
+          # Compare against the tables in the source tree rather than a fixed count,
+          # which went stale when ADR 0011 added two (ADR 0012, F1).
+          expected = sorted("pyxany/data/tables/" + p.name
+                            for p in pathlib.Path("pyxany/data/tables").glob("*.json"))
+          if tables != expected:
+              sys.exit(f"wheel tables differ from the source tree:\n"
+                       f"  missing: {sorted(set(expected) - set(tables))}\n"
+                       f"  extra:   {sorted(set(tables) - set(expected))}")
           PY
       - name: Install the built wheel and smoke-test the CLI
         run: |

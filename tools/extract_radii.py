@@ -37,7 +37,8 @@ def main() -> None:
 
     bad = {s: (table[s], v) for s, v in SPOT_CHECK.items()
            if abs(table[s] - v) > 5e-3}
-    print(f"extracted {len(table)} elements (Z = 1..{max(chemical_symbols.index(s) for s in table)})")
+    z_max = max(chemical_symbols.index(s) for s in table)
+    print(f"extracted {len(table)} elements (Z = 1..{z_max})")
     print(f"spot check against Cordero Table 2 ({len(SPOT_CHECK)} entries): "
           f"{'all match' if not bad else bad}")
     if bad:

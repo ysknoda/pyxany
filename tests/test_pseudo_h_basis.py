@@ -43,9 +43,9 @@ def test_every_vasp_charge_yields_a_usable_exponent(alpha):
 def test_exponent_increases_monotonically_with_charge():
     """A more highly charged terminator must be more compact, not less."""
     zetas = [pseudo_hydrogen_zeta(a) for a in VASP_ALPHAS]
-    assert all(b > a for a, b in zip(zetas, zetas[1:]))
+    assert all(b > a for a, b in zip(zetas, zetas[1:], strict=False))
     radii = [describe(a)["mean_radius_bohr"] for a in VASP_ALPHAS]
-    assert all(b < a for a, b in zip(radii, radii[1:]))
+    assert all(b < a for a, b in zip(radii, radii[1:], strict=False))
 
 
 def test_raw_exponent_approaches_the_charge_in_the_weak_screening_limit():
@@ -72,7 +72,6 @@ def test_unit_charge_pseudo_hydrogen_is_exactly_hydrogen_in_every_basis(basis_se
     inner Si charge 0.4 e away from the real-hydrogen value.
     """
     from conftest import make_config
-
     from pyxany.basis import build_basis
     from pyxany.molecule import Atom, Molecule
     from pyxany.scf import run_scf
@@ -95,7 +94,6 @@ def test_unit_charge_pseudo_hydrogen_is_exactly_hydrogen_in_every_basis(basis_se
 
 def test_fractional_terminator_scales_every_hydrogen_function_by_one_ratio():
     from conftest import make_config
-
     from pyxany.basis import build_basis
     from pyxany.basis.pseudo_h import length_scale_ratio, pseudo_hydrogen_zeta
     from pyxany.molecule import Atom, Molecule

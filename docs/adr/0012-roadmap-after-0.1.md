@@ -1,0 +1,123 @@
+# 0012. Roadmap after 0.1: fixes, features and the first GitHub release
+
+- Status: Accepted (roadmap); each item below carries its own status
+- Date: 2026-11-13
+- Decisions: Q65-Q81
+- Supersedes: ADR 0008 (backlog); the "nothing is pushed to GitHub" rule of ADR 0007
+
+## Context
+
+Since 0.1.0 the forces, the Hartree solver, the grids and the X-alpha
+parameter were reworked (ADRs 0007, 0009, 0011), but the last systematic code
+review (`/code-check`) dates from 2026-08-27; about 80 files under `pyxany/`
+have changed since. An inventory on 2026-11-13 found, besides the ADR 0008
+backlog, the defects listed as F1-F6 below. State at that date: fast suite 335
+passed, slow suite 48 passed, `ruff check pyxany tests tools` 68 errors.
+
+The timing of each item is left to the maintainer; this ADR records what is to
+be done, why, how large it is, what it depends on, and a recommended order.
+An item moves from `Proposed` to `Accepted` when it is scheduled and to `Done`
+(with the commit) when it lands.
+
+## Intended use (Q65)
+
+Primary: electronic structure of semiconductor and ionic cluster models
+(pseudo-hydrogen passivation, point-charge embedding): gaps, frontier
+character, bonding. Secondary: core-level spectroscopy built on the Slater
+transition state (ADR 0006). Priorities below follow from this.
+
+## Gate rule for review findings (Q69, Q70)
+
+P0 re-reviews the changed files. Its findings are triaged by severity:
+
+- **Critical / High: must be fixed before any feature item (A*) is started.**
+  Each is appended to the table below as `F<n>` when found.
+- Medium: added to the fix list.
+- Low / Suggestion: batched.
+
+All five Critical findings of the 2026-08-27 review are fixed and carry
+regression tests (Poisson partial-sum quadrature; pseudo-hydrogen exponents in
+`build_basis`, `opt` and finite-difference forces; the unbuildable wheel). Of
+that review only the plotting MEDIUM (F5) and the single spin guess (A5)
+remain open.
+
+## Items
+
+Size: S <= 1 day, M a few days, L a week or more.
+
+### Review and fixes
+
+| id | item | size | depends on | status |
+|---|---|---|---|---|
+| P0 | Re-review (`/code-check`) of every file changed since 2026-08-27, split as before between a general and a quantum-chemistry reviewer; refresh `.code-check/history.md` | M | -- | Proposed |
+| F1 | CI: `ruff check src tests` points at the `src/` removed by ADR 0001 (E902), and the package job expects 12 data tables while 14 ship. Lint the real paths; compare the wheel against the tables in the source tree instead of a fixed count | S | -- | Done in 0.2.0a1 |
+| F2 | 68 ruff findings (ruff 0.16.6); dead code `max_occ` (`scf/driver.py`) and an unused `S @ C` product (`properties/population.py`, an n^3 matrix product per call). Pin the ruff version in the `dev` extra so a new release cannot turn CI red | S | -- | Done in 0.2.0a1 |
+| F3 | Seven configuration keys are validated but read nowhere (same class as the `checkpoint_every` HIGH of 2026-08-27): `runtime.numba`, `runtime.mpi`, `runtime.verbosity`, `passivation.scheme`, `passivation.basis`, `properties.bde`, `properties.esp`; `--numba` has no effect. Design in ADR 0013 | S | -- | Proposed |
+| F4 | `--log`: input and runtime errors go to stderr only, so the log of a failed run is empty (measured: 0 bytes); every MPI rank opens the log with mode `w`. Route error messages into the log and open it on rank 0 only | S | -- | Proposed |
+| F5 | The summary figure (`<prefix>_results.png`) of a UKS run draws the alpha levels only while its HOMO/LUMO span both channels (`plotting.summary_figure`); the bonding figures were already fixed | S | -- | Proposed |
+| F6 | Documentation drift: README (SciPy floor, `embed`, transition state, embedding, `alpha_hf`, restart) -- done in 0.2.0a1; ADR 0005 still says `--set` cannot reach nested keys (fixed by ADR 0009) | S | -- | README done in 0.2.0a1; ADR 0005 note Proposed |
+| F7 | Without matplotlib, `pyxany run` failed with exit code 3 after a converged SCF: the guard imported `pyxany.plotting`, which imports matplotlib only inside its functions. Found by the wheel smoke test while preparing 0.2.0a1; the CI package job (bare wheel, `pyxany run h2o.yaml`) would have failed on it. Guard on matplotlib itself; regression test | S | -- | Done in 0.2.0a1 |
+| R0 | The code is non-relativistic, which nothing said. README statement (done in 0.2.0a1); a run-time warning, once per run, when an element with Z > 36 is present; for a core-ionization transition state an unconditional note plus, for a 1s hole, the hydrogen-like estimate of the missing correction (Zalpha)^2/4 x abs(E) (Q79) | S | -- | README done in 0.2.0a1; warnings Proposed |
+
+R0 numbers: the Dirac 1s level of a one-electron atom is
+`E = -Z^2/2 [1 + (Z alpha)^2/4 + O((Z alpha)^4)]` Ha, so the leading relative
+correction is `(Z alpha)^2/4` (confidence: high). It gives ~5 eV for Si 1s and
+~130 eV for Ga 1s, i.e. absolute core energies are affected even for light
+elements; chemical shifts largely cancel. Z > 36 (fifth period on) as the
+point where valence properties need relativity follows the usual rule of thumb
+(Pyykko, Chem. Rev. 88, 563 (1988)); confidence: medium -- it is a convention,
+not a measured threshold for this code.
+
+### Release (Q66, Q74, Q75-Q78, Q81)
+
+| id | item | status |
+|---|---|---|
+| G1 | GitHub repository `ysknoda/pyxany`, created private; made public once CI is green. Alpha release `0.2.0a1` (tag `v0.2.0a1`, `Development Status :: 3 - Alpha`, README alpha notice, GitHub pre-release), following the user's published packages (akitsushima, mizuho, amaterasu). Build backend stays hatchling with an SPDX license declaration (Q77). Author name only in LICENSE, pyproject and CITATION.cff (Q78) | In progress |
+| G2 | PyPI. The name `pyxany` was unregistered on 2026-11-13 (HTTP 404). Prerequisites: P0 and its gate, A1 (a stable Python API) | Proposed |
+
+### Features
+
+| id | item | size | depends on | status |
+|---|---|---|---|---|
+| A1 | Python API: `pyxany.run(config) -> Result` (and `opt`, `forces`), the CLI becoming a thin layer over it; for scripted sweeps, notebooks and a stable surface before PyPI | M | P0 gate | Proposed |
+| A2 | Volumetric output (Gaussian cube): selected MOs, total and spin density, difference density against the SAD guess, electrostatic potential (realizes `properties.esp`, ADR 0013). For looking at gap and terminator states | M | P0 gate | Proposed |
+| A3 | SCF performance: two-thirds of a 107-atom SCF + forces is the SCF, with chi recomputed every iteration because it exceeds the memory budget (ADRs 0007, 0009). Options to be chosen by profiling, as in step 8 | L | P0 gate | Proposed |
+| A4 | Cluster-size convergence of the example gaps (Si, GaAs, CdSe at 17/29/47/87 core atoms; from ADR 0008). A study, not code; the small examples have terminator-dominated LUMOs | L | A3 (cost), A1 (scripting) | Proposed |
+| A5 | Several initial spin guesses tried automatically, reporting the lowest (ADR 0008; code-check MEDIUM on `scf/guess.py`). Open-shell defects in clusters | M | P0 gate | Proposed |
+| A6 | Irreducible-representation labels for MOs: point-group detection and projection of the converged orbitals (a1, t2, ...), without a symmetry-adapted basis | M | P0 gate | Proposed |
+| A7 | XANES / XES from transition-state dipole intensities (ADR 0006 (d)) | M-L | R0; A8 for heavy absorbers | Proposed |
+| A8 | Scalar-relativistic ZORA (atomic solver, molecular Hamiltonian, force terms). Variant and gauge treatment to be decided in its own ADR when scheduled. Spin-orbit coupling stays out of scope (no L2/L3 splitting) | L | R0 | Proposed |
+
+### Kept in the backlog (from ADR 0008)
+
+- Effective core potentials on boundary cations of embedded clusters
+  (Mg19O6 works around it; ECP parameters need a source).
+- A correlation functional (e.g. VWN5): changes what the code is.
+- Full point-group symmetry in the SCF (A6 takes the labeling part).
+- Vibrational frequencies (finite-difference Hessian of the analytic forces).
+
+### Rejected
+
+- System-tuned alpha (ADR 0011: energies of different systems or geometries
+  would not be comparable; the energy has no minimum in alpha).
+- `properties.bde`: separate runs or `pyxany scan` give it (ADR 0013).
+- Molden output: it cannot represent the numerical (NAO) basis; cube files
+  (A2) are basis-independent.
+
+## Recommended order
+
+1. **P0** and every Critical/High it finds.
+2. F1, F2, F7, the README part of F6 and of R0, G1 -- done with 0.2.0a1.
+3. F3, F4, F5, the rest of F6 and R0 (all S, independent of each other).
+4. A1 (small enough to come first; unblocks A4 scripting and G2).
+5. A2.
+6. A3, then A4.
+7. A5, A6.
+8. A7, then A8 (or A8 first if the absorbers of interest are heavy).
+
+## Consequences
+
+- ADR 0008 is superseded; its open items are A4, A5, A7 and the backlog list
+  above, its rejected item is listed under Rejected.
+- Pushing to GitHub is now intended (ADR 0007 said otherwise); remote actions
+  are still taken one by one with explicit confirmation.

@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..constants import ANG_TO_BOHR, BOHR_TO_ANG
-from ..data.radii import covalent_radius, source as radii_source
+from ..data.radii import covalent_radius
+from ..data.radii import source as radii_source
 from ..molecule import Atom, Molecule
 from .counting import assign_roles, terminator_charge_for
 from .detect import (

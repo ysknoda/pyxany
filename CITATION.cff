@@ -5,9 +5,9 @@ type: software
 authors:
   - family-names: Noda
     given-names: Yusuke
-version: 0.1.0
+version: 0.2.0a1
 license: MIT
-repository-code: "https://github.com/yusuke/pyxany"
+repository-code: "https://github.com/ysknoda/pyxany"
 keywords:
   - DV-Xalpha
   - electronic structure

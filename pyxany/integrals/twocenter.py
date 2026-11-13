@@ -39,7 +39,7 @@ def pair_grid(pos_a, pos_b, radius_a: float, radius_b: float, n_r: int, n_a: int
     radii = np.array([radius_a, radius_b])
 
     pts_all, wts_all, owner_all = [], [], []
-    for i, (center, radius) in enumerate(zip(centers, radii)):
+    for i, (center, radius) in enumerate(zip(centers, radii, strict=True)):
         r, w_r = treutler_ahlrichs_m4(n_r, radius)
         pts = (r[:, None, None] * dirs[None, :, :]).reshape(-1, 3) + center
         wts = (w_r[:, None] * r[:, None] ** 2 * w_ang[None, :]).reshape(-1)

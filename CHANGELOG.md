@@ -1,6 +1,31 @@
 # Changelog
 
-## Unreleased
+## 0.2.0a1 (2026-11-13)
+
+First release published on GitHub (`ysknoda/pyxany`), as an alpha.
+
+### Packaging and CI
+
+- Version `0.2.0a1`; SPDX license declaration (`license = "MIT"`,
+  `license-files`), `hatchling>=1.27`, Python 3.10-3.13 classifiers,
+  project URLs under `github.com/ysknoda/pyxany`.
+- **CI could not have passed**: its lint step still pointed at the `src/`
+  directory removed by the flat-layout move (ruff E902), and the wheel check
+  expected 12 data tables where 14 ship. It now lints `pyxany`, `tests` and
+  `tools` and compares the wheel against the tables in the source tree.
+- ruff is pinned to the 0.16 series in the `dev` extra, and the 68 findings
+  of ruff 0.16.6 are fixed (two dead assignments, among them an unused
+  `S @ C` product in `mo_overlap_population`; no numerical change).
+- **`pyxany run` failed without matplotlib** (exit code 3, after the SCF had
+  converged and the results were written): the guard imported
+  `pyxany.plotting`, which imports matplotlib only inside its functions, so
+  the documented "figures are skipped" path was never taken. Found by the
+  wheel smoke test; regression test added.
+- README: Features, Installation, Limitations (the code is non-relativistic)
+  and Testing sections; the `embed` command; SciPy >= 1.15.
+- Roadmap and the decisions behind it recorded as ADR 0012 (superseding the
+  ADR 0008 backlog) and ADR 0013 (configuration keys that are validated but
+  never read -- listed there, not yet changed).
 
 ### Added
 

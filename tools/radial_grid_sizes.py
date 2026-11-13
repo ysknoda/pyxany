@@ -171,10 +171,12 @@ def main() -> None:
     args.out.write_text(
         json.dumps(
             {
-                "_source": "Measured with tools/radial_grid_sizes.py on pyxany's own DV radial grid "
+                "_source": "Measured with tools/radial_grid_sizes.py on pyxany's own DV "
+                "radial grid "
                 "(Treutler-Ahlrichs M4, Bragg-Slater scaling, production Hartree solver) "
                 "against the near-exact spherical X-alpha atom and cation (alpha = 0.7).",
-                "_criterion": f"n_r: smallest n_r whose grid error in the ionization energy stays <= "
+                "_criterion": "n_r: smallest n_r whose grid error in the ionization energy "
+                f"stays <= "
                 f"{t_ip:.3e} Ha for 11 consecutive n_r; n_r_total: same for the "
                 f"total-energy error per electron <= {t_tot:.3e} Ha. Targets = worst of "
                 f"{list(SECOND_ROW)} at n_r = {args.baseline}. ratio_to_second_row = "

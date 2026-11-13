@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import make_config, make_molecule
+from conftest import make_config
 from pyxany.basis import build_basis
 from pyxany.parallel import PARALLEL, SIZE, local_slice, round_robin
 from pyxany.scf import run_scf

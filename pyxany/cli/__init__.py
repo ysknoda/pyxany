@@ -151,8 +151,8 @@ def main(argv: list[str] | None = None) -> int:
 
     from ..config import ConfigError
     from . import basis as basis_cmd
-    from . import forces as forces_cmd
     from . import embed as embed_cmd
+    from . import forces as forces_cmd
     from . import gridcheck as gridcheck_cmd
     from . import info as info_cmd
     from . import init as init_cmd
@@ -166,7 +166,8 @@ def main(argv: list[str] | None = None) -> int:
         "run": run_cmd.execute, "opt": opt_cmd.execute, "forces": forces_cmd.execute,
         "scan": scan_cmd.execute, "gridcheck": gridcheck_cmd.execute,
         "validate": validate_cmd.execute, "passivate": passivate_cmd.execute,
-        "embed": embed_cmd.execute, "init": init_cmd.execute, "basis": basis_cmd.execute, "info": info_cmd.execute,
+        "embed": embed_cmd.execute, "init": init_cmd.execute, "basis": basis_cmd.execute,
+        "info": info_cmd.execute,
     }
     tee = _Tee(getattr(args, "log", None))
     try:

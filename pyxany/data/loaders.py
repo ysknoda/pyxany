@@ -8,13 +8,13 @@ asserts every key and value survived the conversion.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 _TABLES = Path(__file__).resolve().parent / "tables"
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load(name: str) -> dict:
     path = _TABLES / f"{name}.json"
     if not path.exists():  # pragma: no cover - packaging error
@@ -23,13 +23,13 @@ def _load(name: str) -> dict:
         return json.load(fh)
 
 
-@lru_cache(maxsize=None)
+@cache
 def element_table() -> dict:
     """{symbol: {"Z": int, "occ": {label: float}, "bragg_slater_bohr": float}}"""
     return _load("elements")
 
 
-@lru_cache(maxsize=None)
+@cache
 def sto_table(name: str) -> dict:
     """STO exponents. ``name`` in {sz, dz, tz, pol_d, pol_f}.
 
@@ -41,7 +41,7 @@ def sto_table(name: str) -> dict:
             for sym, funcs in _load(key).items()}
 
 
-@lru_cache(maxsize=None)
+@cache
 def gto_table(name: str) -> dict:
     """Contracted GTO table. ``name`` in {sto3g, 631g}.
 
@@ -52,13 +52,13 @@ def gto_table(name: str) -> dict:
             for sym, shells in _load(key).items()}
 
 
-@lru_cache(maxsize=None)
+@cache
 def gto_polarization_exponents() -> dict:
     """6-31G(d) d-polarization exponents, Hariharan & Pople (1973)."""
     return {k: float(v) for k, v in _load("gto_631gd_pol").items()}
 
 
-@lru_cache(maxsize=None)
+@cache
 def radial_point_ratios() -> dict[str, float]:
     """``{element: n_r(element) / n_r(second row)}`` measured by tools/radial_grid_sizes.py.
 
@@ -70,7 +70,7 @@ def radial_point_ratios() -> dict[str, float]:
             for s, v in _load("radial_points")["elements"].items()}
 
 
-@lru_cache(maxsize=None)
+@cache
 def schwarz_alpha() -> dict[str, dict]:
     """Schwarz's alpha_HF for H-Rn: ``{symbol: {"alpha_hf", "origin"}}`` (ADR 0011).
 
@@ -101,19 +101,19 @@ def schwarz_alpha() -> dict[str, dict]:
     return out
 
 
-@lru_cache(maxsize=None)
+@cache
 def alpha_hf_table() -> dict[str, float]:
     """Schwarz's alpha_HF by element (see :func:`schwarz_alpha`)."""
     return {s: v["alpha_hf"] for s, v in schwarz_alpha().items()}
 
 
-@lru_cache(maxsize=None)
+@cache
 def alpha_hf_polarized_table() -> dict[str, float]:
     """Spin-polarized alpha_HF recomputed by tools/alpha_hf.py (ADR 0011)."""
     return {s: float(v) for s, v in _load("alpha_hf_polarized")["alpha_hf_polarized"].items()}
 
 
-@lru_cache(maxsize=None)
+@cache
 def orbital_labels() -> dict:
     """{(n, l, m): "2pz"} short orbital labels."""
     out = {}

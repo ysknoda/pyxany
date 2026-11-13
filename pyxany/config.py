@@ -194,8 +194,9 @@ class GridConfig:
         for symbol, value in self.n_r_by_element.items():
             try:
                 elem.atomic_number(str(symbol))
-            except (KeyError, ValueError):
-                raise ConfigError(f"{ctx}: grid.n_r_by_element: unknown element {symbol!r}")
+            except (KeyError, ValueError) as exc:
+                raise ConfigError(
+                    f"{ctx}: grid.n_r_by_element: unknown element {symbol!r}") from exc
             if isinstance(value, bool) or not isinstance(value, int) or value < 5:
                 raise ConfigError(f"{ctx}: grid.n_r_by_element.{symbol} must be an integer "
                                   f">= 5; got {value!r}")
@@ -499,7 +500,8 @@ class TransitionStateConfig:
 
     def validate(self, ctx: str) -> None:
         if self.remove is not None and self.excite is not None:
-            raise ConfigError(f"{ctx}: transition_state takes either 'remove' or 'excite', not both")
+            raise ConfigError(
+                f"{ctx}: transition_state takes either 'remove' or 'excite', not both")
         if self.excite is not None and (not isinstance(self.excite, dict)
                                         or set(self.excite) != {"from", "to"}):
             raise ConfigError(f"{ctx}: transition_state.excite needs exactly 'from' and 'to'")

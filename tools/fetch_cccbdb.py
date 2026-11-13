@@ -164,9 +164,10 @@ def main() -> None:
         entry["cas"] = cas
         entry["url"] = URL.format(cas=cas)
         result[name] = entry
+        internal = [(c['name'], c['value'], c['comment']) for c in entry['internal_coordinates']]
         print(
             f"{name:5s} {len(entry['geometry_angstrom'])} atoms  "
-            f"internal={[(c['name'], c['value'], c['comment']) for c in entry['internal_coordinates']]}"
+            f"internal={internal}"
             f"  mu={entry['dipole_debye']}  IE={entry['ionization_energy_ev']}"
         )
     DEST.parent.mkdir(parents=True, exist_ok=True)

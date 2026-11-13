@@ -5,7 +5,9 @@ Run once during the packaging migration.  The companion test
 (tests/test_data.py) re-imports the original script and asserts that every key
 and every value survived the conversion bit-for-bit.
 """
-import importlib.util, json, sys
+import importlib.util
+import json
+import sys
 from pathlib import Path
 
 SRC = Path("/Users/yusuke/Claude_Code/dv-xa/dv-xa.py")
@@ -40,7 +42,8 @@ def main():
             "bragg_slater_bohr": float(L._BRAGG[sym]) if sym in L._BRAGG else None,
         }
     missing_bragg = [s for s, r in elements.items() if r["bragg_slater_bohr"] is None]
-    report.append(("elements.json", len(elements), f"missing Bragg radius: {missing_bragg or 'none'}"))
+    report.append(("elements.json", len(elements),
+                   f"missing Bragg radius: {missing_bragg or 'none'}"))
     dump("elements", elements)
 
     # --- STO exponent tables -------------------------------------------------

@@ -77,7 +77,8 @@ def remove_cluster_sites(positions, charges, labels, cluster, tol: float = 0.1):
             )
         keep[hit] = False
         removed += float(charges[hit].sum())
-    return positions[keep], charges[keep], [lab for lab, k in zip(labels, keep) if k], removed
+    kept_labels = [lab for lab, k in zip(labels, keep, strict=True) if k]
+    return positions[keep], charges[keep], kept_labels, removed
 
 
 def execute(args) -> int:

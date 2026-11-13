@@ -183,3 +183,20 @@ def test_no_figure_flag_overrides_the_input(project):
     (project / "co.yaml").write_text(yaml)
     assert main(["run", str(project / "co.yaml"), "--no-figure", "-q"]) == EXIT_OK
     assert not list((project / "results").glob("*.png"))
+
+
+def test_run_without_matplotlib_skips_the_figure(project, monkeypatch, capsys):
+    """A missing matplotlib must skip the figures, not fail a converged run.
+
+    pyxany.plotting imports matplotlib inside its functions, so the old guard
+    (importing pyxany.plotting) passed and the run ended with exit code 3 after
+    the SCF had converged -- found by installing the bare wheel.
+    """
+    import sys
+
+    monkeypatch.setitem(sys.modules, "matplotlib", None)  # import now raises ImportError
+    yaml = (project / "co.yaml").read_text().replace("figure: false", "figure: true")
+    (project / "co.yaml").write_text(yaml)
+    assert main(["run", str(project / "co.yaml")]) == EXIT_OK
+    assert "matplotlib is not installed" in capsys.readouterr().out
+    assert not list((project / "results").glob("*.png"))

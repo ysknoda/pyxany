@@ -180,7 +180,6 @@ def mo_overlap_population(C: np.ndarray, S: np.ndarray, basis, pairs) -> np.ndar
     :func:`overlap_population` -- the input for COOP-type plots.
     """
     atom_of = np.array([f.atom_idx for f in basis])
-    SC = S @ C
     out = np.zeros((C.shape[1], len(pairs)))
     for k, (a, b) in enumerate(pairs):
         ma, mb = atom_of == a, atom_of == b

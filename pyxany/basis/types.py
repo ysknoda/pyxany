@@ -147,7 +147,7 @@ class GTO(BasisFunction):
         return 1.0 / math.sqrt(_gamma(l + 1.5) / (2.0 * (2.0 * alpha) ** (l + 1.5)))
 
     @classmethod
-    def contracted(cls, l: int, m: int, prims, atom_idx: int, label: str = "") -> "GTO":
+    def contracted(cls, l: int, m: int, prims, atom_idx: int, label: str = "") -> GTO:
         """Build from tabulated (alpha, coefficient) pairs on normalized primitives."""
         prims = tuple((float(a), float(d)) for a, d in prims)
         scaled = [(a, d * cls.primitive_norm(l, a)) for a, d in prims]

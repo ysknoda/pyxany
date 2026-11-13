@@ -7,7 +7,7 @@ group boundaries, so there is nothing to mistype for 86 elements.
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache
 
 from .loaders import element_table
 
@@ -28,7 +28,7 @@ _GROUP_RUNS: list[tuple[int, int, int]] = [
 ]
 
 
-@lru_cache(maxsize=None)
+@cache
 def _z_to_group() -> dict[int, int]:
     g: dict[int, int] = {}
     for z0, z1, fixed in _GROUP_RUNS:
@@ -46,7 +46,7 @@ def _z_to_group() -> dict[int, int]:
     return g
 
 
-@lru_cache(maxsize=None)
+@cache
 def _symbol_by_z() -> dict[int, str]:
     return {rec["Z"]: sym for sym, rec in element_table().items()}
 
@@ -133,7 +133,7 @@ def _subshell_l(label: str) -> int:
     return 0
 
 
-@lru_cache(maxsize=None)
+@cache
 def _subshell_totals(symbol: str) -> dict[tuple[int, int], float]:
     """{(n, l): total electrons} collapsed from the per-m occupation labels."""
     totals: dict[tuple[int, int], float] = {}

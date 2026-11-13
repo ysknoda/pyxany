@@ -12,7 +12,9 @@ consequences. Status is one of `Proposed`, `Accepted`, `Superseded by NNNN`.
 | [0005](0005-bond-overlap-population.md) | Bond overlap population and its plots | Accepted |
 | [0006](0006-slater-transition-state.md) | Slater transition-state method | Accepted |
 | [0007](0007-implementation-order.md) | Implementation order | Accepted |
-| [0008](0008-future-work.md) | Deferred work (backlog) | Accepted |
+| [0008](0008-future-work.md) | Deferred work (backlog) | Superseded by 0012 |
 | [0009](0009-grid-settings-pruning-sparsity.md) | All grids in the input; angular pruning; block-sparse basis | Accepted |
 | [0010](0010-point-charge-embedding.md) | Point-charge (Madelung) embedding | Accepted |
 | [0011](0011-element-specific-alpha.md) | Element-specific X-alpha parameter | Accepted (table open) |
+| [0012](0012-roadmap-after-0.1.md) | Roadmap after 0.1: fixes, features, first GitHub release | Accepted (items Proposed) |
+| [0013](0013-inert-configuration-keys.md) | Configuration keys that are validated but never read | Accepted (not implemented) |

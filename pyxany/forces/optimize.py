@@ -200,7 +200,7 @@ def _report_geometry(molecule, verbose: int) -> None:
     D = molecule.distance_matrix() * BOHR_TO_ANG
     mpi_print("")
     mpi_print("  Final geometry (Angstrom)")
-    for i, atom in enumerate(molecule):
+    for atom in molecule:
         x, y, z = atom.pos_angstrom
         mpi_print(f"    {atom.symbol:<6s} {x:>12.6f} {y:>12.6f} {z:>12.6f}")
     pairs = [(i, j) for i in range(n) for j in range(i + 1, n) if D[i, j] < 3.0]

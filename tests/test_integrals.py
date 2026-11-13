@@ -89,7 +89,6 @@ def test_gradient_form_kinetic_energy_reduces_to_one_center():
 def test_overlap_kinetic_gradient_matches_finite_differences():
     """d/dR [tr(P T) - tr(W S)] for the S and T the SCF uses, incl. d functions."""
     from conftest import make_config, make_molecule
-
     from pyxany.basis import build_basis
     from pyxany.integrals.overlap import build_overlap_kinetic, overlap_kinetic_gradient
 

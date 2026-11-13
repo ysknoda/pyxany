@@ -44,12 +44,12 @@ class Atom:
     basis: list = field(default_factory=list, repr=False)
 
     @classmethod
-    def from_element(cls, symbol: str, pos_bohr) -> "Atom":
+    def from_element(cls, symbol: str, pos_bohr) -> Atom:
         return cls(symbol=symbol, element=symbol, Z=float(elem.atomic_number(symbol)),
                    pos=np.asarray(pos_bohr, dtype=float))
 
     @classmethod
-    def pseudo_hydrogen(cls, label: str, alpha: float, pos_bohr) -> "Atom":
+    def pseudo_hydrogen(cls, label: str, alpha: float, pos_bohr) -> Atom:
         return cls(symbol=label, element="H", Z=float(alpha),
                    pos=np.asarray(pos_bohr, dtype=float), is_pseudo=True)
 
@@ -97,7 +97,7 @@ class Molecule:
     @positions.setter
     def positions(self, new: np.ndarray) -> None:
         new = np.asarray(new, dtype=float).reshape(len(self.atoms), 3)
-        for a, p in zip(self.atoms, new):
+        for a, p in zip(self.atoms, new, strict=True):
             a.pos = p.copy()
 
     @property
@@ -137,7 +137,7 @@ class Molecule:
         Z = self.charges
         return (self.positions * Z[:, None]).sum(axis=0) / Z.sum()
 
-    def copy(self) -> "Molecule":
+    def copy(self) -> Molecule:
         return Molecule(
             atoms=[Atom(a.symbol, a.element, a.Z, a.pos.copy(), a.is_pseudo) for a in self.atoms],
             charge=self.charge, multiplicity=self.multiplicity, name=self.name,

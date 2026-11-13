@@ -112,7 +112,8 @@ def numerov_inward(g, h, r, kappa, m, out):
     return numpy_impl.numerov_inward(g, h, r, kappa, m, out)
 
 
-__all__ = ["backend_name", "chi_block_kernel", "chi_grad_block_kernel", "chi_hess_block_kernel", "poisson_radial", "density_from_chi",
+__all__ = ["backend_name", "chi_block_kernel", "chi_grad_block_kernel", "chi_hess_block_kernel",
+           "poisson_radial", "density_from_chi",
            "numerov_outward", "numerov_inward"]
 
 
