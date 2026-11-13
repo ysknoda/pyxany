@@ -73,7 +73,14 @@ def test_energy_and_forces_match_serial(tmp_path):
     def run(n):
         cmd = ([sys.executable, str(script)] if n == 1
                else ["mpirun", "-n", str(n), sys.executable, str(script)])
-        out = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        out = subprocess.run(cmd, capture_output=True, text=True)
+        # Show what the child said: with check=True a failing mpirun left only
+        # "exit status 1" in the CI log, and the MPI error itself was lost.
+        assert out.returncode == 0, (
+            f"{' '.join(cmd[:3])} ... exited with {out.returncode}\n"
+            f"--- stderr (last 3000 chars) ---\n{out.stderr[-3000:]}\n"
+            f"--- stdout (last 1000 chars) ---\n{out.stdout[-1000:]}"
+        )
         # Open MPI may prefix a line with a terminal escape (seen: "\x1b[0mRESULT ..."),
         # so look for the marker anywhere in the line rather than at its start.
         line = next(ln for ln in out.stdout.splitlines() if "RESULT " in ln)

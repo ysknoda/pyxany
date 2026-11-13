@@ -5,11 +5,20 @@ on:
     branches: [main]
   pull_request:
   # The slow tests + MPI job runs only when started by hand (Actions tab, or
-  # `gh workflow run ci.yml`): ~20 minutes, too costly for every push (ADR 0014).
+  # `gh workflow run ci.yml`): ~30 minutes on a runner, too costly for every
+  # push (ADR 0014). `-f suite=mpi-only` runs just the MPI tests, for a few
+  # minutes instead of ~90 job-minutes for everything.
   workflow_dispatch:
+    inputs:
+      suite:
+        description: "all: every job; mpi-only: only the MPI tests"
+        type: choice
+        options: [all, mpi-only]
+        default: all
 
 jobs:
   test:
+    if: github.event_name != 'workflow_dispatch' || inputs.suite == 'all'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -54,11 +63,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,fast,mpi,plot]"
       - name: Slow tests
+        if: inputs.suite == 'all'
         run: pytest -q -m slow
       - name: MPI tests
         run: pytest -q -m mpi
 
   package:
+    if: github.event_name != 'workflow_dispatch' || inputs.suite == 'all'
     runs-on: ubuntu-latest
     name: build + install wheel
     # The test jobs above install with `-e`, which never exercises the wheel
