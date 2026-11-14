@@ -123,6 +123,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_e = sub.add_parser("embed", help="point charges of the surrounding crystal")
     p_e.add_argument("input", help="crystal description YAML (lattice, sites, cells, cluster)")
     p_e.add_argument("-o", "--output", default="charges.xyz", help="point-charge file to write")
+    p_e.add_argument("--allow-dipole", action="store_true",
+                     help="write the charges even if the block has a dipole (polar cell)")
 
     p_init = sub.add_parser("init", help="write a template input pair")
     p_init.add_argument("name")
@@ -175,20 +177,36 @@ def main(argv: list[str] | None = None) -> int:
             return handlers[args.command](args)
     except ConfigError as exc:
         print(f"\n  [input error] {exc}\n", file=sys.stderr)
-        return EXIT_INPUT
+        return _abort_if_parallel(EXIT_INPUT)
     except FileNotFoundError as exc:
         print(f"\n  [input error] {exc}\n", file=sys.stderr)
-        return EXIT_INPUT
+        return _abort_if_parallel(EXIT_INPUT)
     except KeyboardInterrupt:  # pragma: no cover
         print("\n  interrupted\n", file=sys.stderr)
-        return EXIT_RUNTIME
+        return _abort_if_parallel(EXIT_RUNTIME)
     except Exception as exc:  # pragma: no cover - unexpected
         import traceback
 
         if getattr(args, "verbose", 0):
             traceback.print_exc()
         print(f"\n  [error] {type(exc).__name__}: {exc}\n", file=sys.stderr)
-        return EXIT_RUNTIME
+        return _abort_if_parallel(EXIT_RUNTIME)
+
+
+def _abort_if_parallel(code: int) -> int:
+    """End every rank when one fails, instead of returning on that rank only.
+
+    Rank-0-only work (output directory, result and figure files, checkpoints)
+    can fail on rank 0 alone; returning there left the other ranks waiting in
+    the next collective until the wall-time limit (ADR 0012, F14).
+    """
+    from ..parallel import COMM, PARALLEL
+
+    if PARALLEL:  # pragma: no cover - needs mpirun
+        sys.stderr.flush()
+        sys.stdout.flush()
+        COMM.Abort(code)
+    return code
 
 
 class _Tee:

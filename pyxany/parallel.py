@@ -109,8 +109,11 @@ def round_robin(items, rank: int | None = None, size: int | None = None) -> list
 def mpi_version() -> str:
     if not _HAVE_MPI4PY:  # pragma: no cover
         return "not installed"
+    import mpi4py
+
     major, minor = _MPI.Get_version()
-    return f"MPI {major}.{minor} via mpi4py {_MPI.__doc__ and ''}".strip() or f"MPI {major}.{minor}"
+    # was f"... mpi4py {_MPI.__doc__ and ''}", which always rendered empty
+    return f"MPI {major}.{minor} via mpi4py {mpi4py.__version__}"
 
 
 # --------------------------------------------------------------------------
@@ -130,13 +133,40 @@ except ImportError:  # pragma: no cover
     _NUMBA_INSTALLED = False
     NUMBA_VERSION = None
 
-#: True when numba is installed *and* not disabled through the environment.
+#: numba installed and not disabled through the environment *at import*. The
+#: backend actually used is decided at call time by :func:`numba_enabled`, so
+#: that ``runtime.numba`` and ``--numba``/``--no-numba`` can still change it
+#: after this module was imported (ADR 0013; they had no effect, F18).
 HAVE_NUMBA = _NUMBA_INSTALLED and _numba_requested()
+
+_NUMBA_MODE = "auto"
+
+
+def set_numba_mode(mode: str) -> None:
+    """``auto`` (installed and not disabled by PYXANY_DISABLE_NUMBA), ``on`` or ``off``.
+
+    ``on`` raises RuntimeError when numba cannot be imported.
+    """
+    global _NUMBA_MODE
+    if mode not in ("auto", "on", "off"):
+        raise ValueError(f"numba mode must be auto, on or off; got {mode!r}")
+    if mode == "on" and not _NUMBA_INSTALLED:
+        raise RuntimeError("runtime.numba is 'on' but numba is not installed "
+                           "(pip install 'pyxany[fast]')")
+    _NUMBA_MODE = mode
+
+
+def numba_enabled() -> bool:
+    if _NUMBA_MODE == "off" or not _NUMBA_INSTALLED:
+        return False
+    return _NUMBA_MODE == "on" or _numba_requested()
 
 
 def numba_status() -> str:
     if not _NUMBA_INSTALLED:
         return "not installed"
-    if not _numba_requested():
+    if _NUMBA_MODE == "off":
+        return f"{NUMBA_VERSION} (disabled: runtime.numba off / --no-numba)"
+    if not numba_enabled():
         return f"{NUMBA_VERSION} (disabled via PYXANY_DISABLE_NUMBA)"
     return NUMBA_VERSION

@@ -6,9 +6,9 @@ import numpy as np
 
 from ..constants import BOHR_TO_ANG, HARTREE_TO_EV
 from ..properties import (
+    bond_orders,
     mulliken,
     mulliken_orbital_populations,
-    wiberg_bond_orders,
 )
 
 
@@ -85,7 +85,7 @@ def format_results(result, config, forces=None, dipole=None) -> str:
 
     if config.properties.population:
         pop = mulliken(result.P, result.S, basis, mol)
-        bo = wiberg_bond_orders(result.P, result.S, basis, mol)
+        bo = bond_orders(result)
         w("  MULLIKEN POPULATION ANALYSIS")
         w("  " + "-" * 62)
         w(f"  {'atom':>8}  {'Z':>7}  {'gross':>10}  {'charge':>9}   position (Ang)")
@@ -100,7 +100,8 @@ def format_results(result, config, forces=None, dipole=None) -> str:
             f"{pop['charges'].sum():>+9.4f}"
         )
         w("")
-        w("  WIBERG BOND ORDERS  (pairs closer than 3.0 A)")
+        w("  MAYER BOND ORDERS  (pairs closer than 3.0 A"
+          + ("; open-shell form)" if result.unrestricted else ")"))
         w("  " + "-" * 62)
         D = mol.distance_matrix() * BOHR_TO_ANG
         for i in range(len(mol)):

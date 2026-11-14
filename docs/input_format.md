@@ -38,9 +38,8 @@ molecule:
   units:     angstrom       # angstrom | bohr
 
 passivation:                # only for structures containing terminators
-  scheme:  none             # none | pseudo_hydrogen | hydrogen
-  species: {}               # written by 'pyxany passivate --emit-yaml'
-  basis:   derived          # derive the 1s exponent from the fractional charge
+  species: {}               # written by 'pyxany passivate --emit-yaml'; the 1s
+                            # exponents are always derived from the charge
 
 basis:
   set:     dz               # sz szp dz dzp tz tzp tzpp | sto3g 631g 631gd | nao
@@ -109,8 +108,7 @@ properties:
   population: true
   dipole:     true
   dos: {sigma: 0.3, n_points: 600}
-  bde: {enabled: false}
-  esp: {enabled: false, n_pts: 20, margin: 3.0}
+  esp: {enabled: false, n_pts: 20, margin: 3.0}   # not implemented yet (ADR 0012 A2)
   overlap_population:              # bond overlap population (ADR 0005)
     pairs: []                      # [[0, 1], ...] 0-based; empty: Mayer B.O. >= min_bond_order
     min_bond_order: 0.2
@@ -127,9 +125,12 @@ output:
   timing: true
 
 runtime:
-  numba:     auto         # auto | on | off
-  mpi:       auto
-  verbosity: 1
+  numba:     auto         # auto | on | off; --numba / --no-numba win
+  verbosity: 1            # used when neither -v nor -q is given
+
+# Removed keys (ADR 0013; they were accepted but did nothing, and are now
+# errors that say so): runtime.mpi, passivation.scheme, passivation.basis,
+# properties.bde.
 ```
 
 ### Notes on a few settings

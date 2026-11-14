@@ -14,6 +14,39 @@
   iterations, H2O O1s transition state 37, N2 1s transition state 321 to a
   commutator of 1e-6; with one DIIS over both channels 15 / 14 / 20, final
   energies equal to 1e-8 Ha. This was the slow mode of ADR 0014.
+- `--set A.B.C=v` dropped `.C` when `A.B` was not a mapping, so
+  `--set scf.alpha.O=0.73` changed alpha for every element (F13). A uniform
+  alpha is now promoted to `{default: old, O: 0.73}`; any other case is an
+  error. `--set` accepts dataclass fields only, and values of new mapping
+  keys are read as YAML.
+- Under MPI, an error on rank 0 alone (output directory, result files,
+  checkpoint) left the other ranks waiting until wall time; every rank is now
+  ended with `MPI_Abort` (F14).
+- UKS bond orders in the report, the JSON and the summary figure used the
+  closed-shell formula (O2 triplet 1.13 instead of 1.62; F15). The table is
+  now titled Mayer, and the JSON has `mayer_bond_orders` (the old
+  `wiberg_bond_orders` key is kept with the same values).
+- `pyxany embed` refuses a cell whose Evjen block has a dipole (wurtzite: a
+  spurious ~1.7 V/A field on the cluster), unless `--allow-dipole` (F16).
+- `passivate --reference` matched existing bonds by exact equality of
+  rounded vectors and, with 0.001 A of noise, put terminators 0.85 A from
+  other Si atoms (F17). Bonds now match within 30 deg; a terminator closer
+  than 0.8 x the covalent-radius sum to another atom is warned about; the
+  reference neighbor list is built once (17.7 s -> fast for 512 atoms).
+- S/T pair screening dropped NAO pairs that overlap (Si-Si at 5.45 A, |S| up
+  to 0.07); pairs are now screened on the sampled reach of each atom (F12).
+- `parallel.mpi_version()` always printed an empty mpi4py version.
+
+### Changed
+
+- **Configuration keys that did nothing** (ADR 0013): `runtime.numba`
+  (auto/on/off) and `--numba`/`--no-numba` now choose the backend (both had
+  no effect); `runtime.verbosity` is the default when neither `-v` nor `-q`
+  is given. `runtime.mpi`, `passivation.scheme`, `passivation.basis` and
+  `properties.bde` are removed and are errors that say why;
+  `properties.esp: {enabled: true}` is an error until it is implemented.
+  The four passivated examples and `passivate --emit-yaml` no longer write
+  the removed keys.
 
 - CI: a manual run takes `suite=all` or `suite=mpi-only`; the MPI test shows
   mpirun's stderr when it fails; the runner's MPI job allows oversubscription

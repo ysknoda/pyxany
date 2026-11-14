@@ -6,10 +6,10 @@ import numpy as np
 
 from .constants import HARTREE_TO_EV
 from .properties import (
+    bond_orders,
     density_of_states,
     mulliken,
     mulliken_orbital_populations,
-    wiberg_bond_orders,
 )
 
 _BG = "#0d1117"
@@ -131,11 +131,11 @@ def summary_figure(result, config, path, forces=None) -> None:
     ax_q.set_ylabel("net charge (e)")
     ax_q.set_title("Mulliken charges")
 
-    # -- Wiberg bond orders ------------------------------------------------
+    # -- Mayer bond orders -------------------------------------------------
     # The diagonal is an atom's self-term, not a bond order, and is one to two
     # orders of magnitude larger; leaving it in flattens every real bond to the
     # bottom of the color scale.
-    bo = wiberg_bond_orders(result.P, result.S, basis, mol)
+    bo = bond_orders(result)
     off_diagonal = bo.copy().astype(float)
     np.fill_diagonal(off_diagonal, np.nan)
     cmap = plt.get_cmap("YlOrRd").copy()
@@ -155,7 +155,7 @@ def summary_figure(result, config, path, forces=None) -> None:
                     continue
                 ax_bo.text(j, i, f"{bo[i, j]:.2f}", ha="center", va="center",
                            fontsize=fs, color="black")
-    ax_bo.set_title("Wiberg bond orders (diagonal omitted)", fontsize=10)
+    ax_bo.set_title("Mayer bond orders (diagonal omitted)", fontsize=10)
     plt.colorbar(im, ax=ax_bo, fraction=0.046, pad=0.04)
 
     # -- SCF convergence ---------------------------------------------------

@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from ..constants import HARTREE_TO_EV
-from ..properties import core_gap, loewdin, loewdin_orbital_weights, mulliken, wiberg_bond_orders
+from ..properties import bond_orders, core_gap, loewdin, loewdin_orbital_weights, mulliken
 from ..timing import REGISTRY
 
 
@@ -16,7 +16,7 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
     """A JSON-serialisable summary of a calculation."""
     mol, basis = result.molecule, result.basis
     pop = mulliken(result.P, result.S, basis, mol)
-    bo = wiberg_bond_orders(result.P, result.S, basis, mol)
+    bo = bond_orders(result)
     homo, lumo = result.homo_lumo()
     out = {
         "code": {"name": "pyxany", "version": _version()},
@@ -71,6 +71,8 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
             "loewdin_charges": [
                 float(x) for x in loewdin(result.P, result.S, basis, mol)["charges"]
             ],
+            "mayer_bond_orders": [[float(x) for x in row] for row in bo],
+            # same values; old key kept for existing readers (ADR 0012, F15)
             "wiberg_bond_orders": [[float(x) for x in row] for row in bo],
         },
         "units": {

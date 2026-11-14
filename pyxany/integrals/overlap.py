@@ -19,23 +19,32 @@ import numpy as np
 from ..parallel import allreduce_array, round_robin
 from ..timing import timer
 from .onecenter import RADIAL_POINTS, kinetic_1c, overlap_1c
-from .twocenter import overlap_kinetic_2c, overlap_kinetic_2c_gradient, pair_is_negligible
+from .twocenter import overlap_kinetic_2c, overlap_kinetic_2c_gradient
 
 DEFAULT_SCREENING_TOL = 1e-10
 
 
 def surviving_pairs(molecule, basis, screening_tol: float = DEFAULT_SCREENING_TOL):
-    """Cross-atom pairs whose overlap can exceed ``screening_tol``."""
-    groups = _groups(molecule, basis)
+    """Cross-atom pairs whose overlap can exceed ``screening_tol``.
+
+    A pair is dropped only when the atoms are farther apart than the sum of
+    their reaches -- the distance beyond which every function of the atom is
+    below ``screening_tol``, sampled on a lone atom (``basis_reach``) -- so at
+    every point at least one factor of each product is below the tolerance.
+    The analytic bound used before, exp(-min zeta R), ignored the r^(n-1)
+    prefactors and, for NAOs, took the decay of the wrong shell: Si-Si pairs
+    were dropped at 10.3 Bohr with |S| up to 6.9e-2 (ADR 0012, F12).
+    ``screening_tol <= 0`` keeps every pair.
+    """
+    n = len(molecule)
+    if screening_tol <= 0:
+        return [(ai, aj) for ai in range(n) for aj in range(ai + 1, n)]
+    from ..scf.grid_terms import basis_reach
+
+    reach = basis_reach(basis, molecule, screening_tol)
     D = molecule.distance_matrix()
-    pairs = []
-    for ai in range(len(molecule)):
-        for aj in range(ai + 1, len(molecule)):
-            fa = [basis[mu] for mu in groups[ai]]
-            fb = [basis[mu] for mu in groups[aj]]
-            if not pair_is_negligible(fa, fb, float(D[ai, aj]), screening_tol):
-                pairs.append((ai, aj))
-    return pairs
+    return [(ai, aj) for ai in range(n) for aj in range(ai + 1, n)
+            if D[ai, aj] < reach[ai] + reach[aj]]
 
 
 def _groups(molecule, basis) -> list[list[int]]:

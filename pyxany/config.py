@@ -55,16 +55,10 @@ class MoleculeConfig:
 
 @dataclass
 class PassivationConfig:
-    scheme: str = "none"  # none | pseudo_hydrogen | hydrogen
+    #: pseudo-hydrogen species written by 'pyxany passivate --emit-yaml'
     species: dict = field(default_factory=dict)
-    basis: str = "derived"
 
     def validate(self, ctx: str) -> None:
-        if self.scheme not in ("none", "pseudo_hydrogen", "hydrogen"):
-            raise ConfigError(
-                f"{ctx}: passivation.scheme must be none, "
-                f"pseudo_hydrogen or hydrogen; got {self.scheme!r}"
-            )
         for label, spec in self.species.items():
             if "alpha" not in spec and "Z" not in spec:
                 raise ConfigError(
@@ -405,7 +399,7 @@ class PropertiesConfig:
     population: bool = True
     dipole: bool = True
     dos: dict = field(default_factory=lambda: {"sigma": 0.3, "n_points": 600})
-    bde: dict = field(default_factory=lambda: {"enabled": False})
+    #: electrostatic potential; implemented with the cube output (ADR 0012 A2)
     esp: dict = field(default_factory=lambda: {"enabled": False, "n_pts": 20, "margin": 3.0})
     #: Bond overlap population (ADR 0005): pairs to analyze (default: Mayer bond
     #: order >= min_bond_order) and whether to draw the atom-pair heatmap.
@@ -419,7 +413,6 @@ class PropertiesConfig:
     #: allowed keys of each sub-dict, so a typo is an error here too
     _SUBKEYS = {
         "dos": {"sigma", "n_points"},
-        "bde": {"enabled"},
         "esp": {"enabled", "n_pts", "margin"},
         "overlap_population": {"pairs", "min_bond_order", "heatmap", "sigma"},
     }
@@ -439,6 +432,9 @@ class PropertiesConfig:
                     f"{ctx}: properties.{name} has unknown key(s) "
                     f"{sorted(unknown)}. Valid keys: {sorted(allowed)}"
                 )
+        if self.esp.get("enabled"):
+            raise ConfigError(f"{ctx}: properties.esp is not implemented yet; it comes with "
+                              f"the cube output (ADR 0012, A2). Set enabled: false.")
         if not (0.0 < self.terminator_weight_max <= 1.0):
             raise ConfigError(f"{ctx}: properties.terminator_weight_max must be in (0, 1]")
         sigma = self.dos.get("sigma", 0.3)
@@ -461,15 +457,20 @@ class OutputConfig:
 
 @dataclass
 class RuntimeConfig:
+    #: auto | on | off; --numba / --no-numba win over it (ADR 0013)
     numba: str = "auto"
-    mpi: str = "auto"
+    #: output level when neither -v nor -q is given (0 quiet, 1 normal, 2+ verbose)
     verbosity: int = 1
 
     def validate(self, ctx: str) -> None:
-        for name in ("numba", "mpi"):
-            v = getattr(self, name)
-            if v not in ("auto", "on", "off"):
-                raise ConfigError(f"{ctx}: runtime.{name} must be auto, on or off")
+        # YAML 1.1 reads a bare on/off as a boolean: 'numba: off' arrives as False
+        if isinstance(self.numba, bool):
+            self.numba = "on" if self.numba else "off"
+        if self.numba not in ("auto", "on", "off"):
+            raise ConfigError(f"{ctx}: runtime.numba must be auto, on or off")
+        if isinstance(self.verbosity, bool) or not isinstance(self.verbosity, int) \
+                or self.verbosity < 0:
+            raise ConfigError(f"{ctx}: runtime.verbosity must be an integer >= 0")
 
 
 @dataclass
@@ -546,6 +547,18 @@ _MOVED = {
     ("grid", "one_centre"): "grid: {one_center: {n_r: ...}} (American spelling)",
 }
 
+#: keys removed because they were validated but never read (ADR 0013)
+_REMOVED = {
+    ("runtime", "mpi"): "MPI is chosen by the launcher: run under mpirun/mpiexec for "
+                        "MPI; a run without it is serial. Delete the key.",
+    ("passivation", "scheme"): "terminators are recognized from the .xyz labels and "
+                               "passivation.species; the key did nothing. Delete it.",
+    ("passivation", "basis"): "pseudo-hydrogen exponents are always derived from their "
+                              "charge; the key did nothing. Delete it.",
+    ("properties", "bde"): "no bond-dissociation code exists; compute it from separate "
+                           "runs or with 'pyxany scan'. Delete the key.",
+}
+
 #: sections renamed to American spelling
 _RENAMED_SECTIONS = {"optimise": "optimize"}
 
@@ -601,6 +614,9 @@ class Config:
             if not isinstance(section, dict):
                 raise ConfigError(f"{ctx}: section '{name}' must be a mapping")
             for key in section:
+                if (name, key) in _REMOVED:
+                    raise ConfigError(f"{ctx}: '{name}.{key}' has been removed: "
+                                      f"{_REMOVED[(name, key)]}")
                 if (name, key) in _MOVED:
                     raise ConfigError(f"{ctx}: '{name}.{key}' has moved: write "
                                       f"{_MOVED[(name, key)]} instead")
@@ -647,17 +663,39 @@ class Config:
                 )
             obj = getattr(self, section)
             key, _, sub = key.partition(".")
-            if sub and isinstance(getattr(obj, key, None), dict):
-                block = dict(getattr(obj, key))
-                block[sub] = _coerce(block.get(sub, value), value, dotted)
+            # Only dataclass fields: hasattr() also let --set replace methods
+            # such as scf.alpha_for (ADR 0012, P0).
+            names = {f.name for f in fields(obj)}
+            if key not in names:
+                raise ConfigError(
+                    f"--set {dotted}: '{section}' has no key '{key}'. "
+                    f"Valid keys: {', '.join(sorted(names))}"
+                )
+            current = getattr(obj, key)
+            if sub:
+                if section == "scf" and key == "alpha" and isinstance(current, (int, float)) \
+                        and not isinstance(current, bool):
+                    # a uniform alpha becomes {default: old, element: new} (ADR 0011)
+                    current = {"default": current}
+                if not isinstance(current, dict):
+                    # Silently dropping '.sub' made --set scf.alpha.O=0.73 change
+                    # alpha for every element once alpha was a table name
+                    # (ADR 0012, F13).
+                    raise ConfigError(
+                        f"--set {dotted}: {section}.{key} is {current!r}, not a mapping, "
+                        f"so it has no sub-key '{sub}'"
+                    )
+                block = dict(current)
+                if sub in block:
+                    block[sub] = _coerce(block[sub], value, dotted)
+                else:
+                    # a new key has no type to coerce to: read it as YAML would
+                    import yaml
+
+                    block[sub] = yaml.safe_load(value) if isinstance(value, str) else value
                 setattr(obj, key, block)
                 continue
-            if not hasattr(obj, key):
-                valid = ", ".join(sorted(f.name for f in fields(obj)))
-                raise ConfigError(
-                    f"--set {dotted}: '{section}' has no key '{key}'. Valid keys: {valid}"
-                )
-            setattr(obj, key, _coerce(getattr(obj, key), value, dotted))
+            setattr(obj, key, _coerce(current, value, dotted))
         self.validate("<overrides>")
 
 

@@ -72,11 +72,7 @@ def _write_yaml(args, result, structure_path: Path) -> None:
             "mult": 1,
             "units": "angstrom",
         },
-        "passivation": {
-            "scheme": args.scheme,
-            "species": result.species_yaml(),
-            "basis": "derived",
-        },
+        "passivation": {"species": result.species_yaml()},
         "basis": {"set": "dz"},
         "grid": {"n_r": 30, "n_a": 12, "poisson_l_max": "auto"},
         "scf": {"max_iter": 150, "e_tol": 1.0e-6, "d_tol": 1.0e-5, "alpha": 0.7},

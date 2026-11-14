@@ -52,3 +52,19 @@ def test_nao_sih4_is_close_to_dz_and_integrates_consistently():
     assert abs(nao.total_energy - dz.total_energy) < 2.0
     e = nao.energies
     assert abs(e["n_electrons_integrated"] - e["trace_PS"]) < 1e-3
+
+
+def test_pair_screening_keeps_pairs_that_overlap():
+    """The old exp(-min zeta R) bound dropped NAO Si-Si at 5.45 A, where |S|
+    reaches 6.9e-2 (ADR 0012, F12); far-apart pairs must still be dropped."""
+    from pyxany.integrals.overlap import build_overlap_kinetic, surviving_pairs
+
+    mol = make_molecule("si2", [("Si", 0, 0, 0), ("Si", 0, 0, 5.45)])
+    basis = build_basis(mol, make_config(basis={"set": "nao"}))
+    assert surviving_pairs(mol, basis) == [(0, 1)]
+    S, _ = build_overlap_kinetic(mol, basis)
+    S0, _ = build_overlap_kinetic(mol, basis, screening_tol=0.0)
+    assert np.abs(S - S0).max() == 0.0
+
+    far = make_molecule("si2", [("Si", 0, 0, 0), ("Si", 0, 0, 60.0)])
+    assert surviving_pairs(far, build_basis(far, make_config(basis={"set": "dz"}))) == []

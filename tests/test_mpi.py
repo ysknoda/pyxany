@@ -102,3 +102,23 @@ def test_serial_run_is_reproducible(h2o):
     energies = [run_scf(h2o.copy(), build_basis(h2o, cfg), cfg, verbose=0).total_energy
                 for _ in range(2)]
     assert abs(energies[0] - energies[1]) < 1e-12
+
+
+@pytest.mark.mpi
+def test_a_failure_on_rank_0_ends_every_rank(tmp_path):
+    """An error on rank 0 only (here: the output directory cannot be created)
+    used to leave rank 1 waiting in the next collective for ever (ADR 0012, F14)."""
+    import shutil
+
+    examples = Path(__file__).resolve().parent.parent / "examples"
+    for name in ("h2o.yaml", "h2o.xyz"):
+        shutil.copy(examples / name, tmp_path / name)
+    (tmp_path / "blocker").write_text("a file, not a directory")
+    cmd = ["mpirun", "-n", "2", sys.executable, "-m", "pyxany", "run", "h2o.yaml",
+           "-o", "blocker/sub", "-q"]
+    try:
+        out = subprocess.run(cmd, cwd=tmp_path, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:  # pragma: no cover - the defect itself
+        pytest.fail("mpirun did not return: the other rank was left waiting")
+    assert out.returncode != 0
+    assert "Not a directory" in out.stderr

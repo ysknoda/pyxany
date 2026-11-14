@@ -7,7 +7,7 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
-from pyxany.constants import ANG_TO_BOHR
+from pyxany.constants import ANG_TO_BOHR, BOHR_TO_ANG
 from pyxany.molecule import Atom, Molecule
 from pyxany.passivation import (
     ANION,
@@ -256,3 +256,42 @@ def test_the_two_counting_rules_coincide_only_at_tetrahedral_coordination():
             else:
                 assert as_anion != as_cation, (n, z)
     assert compared >= 6, "too few valid combinations to make this meaningful"
+
+
+def _diamond_si(n_cells: int = 3, a: float = 5.431):
+    """Bulk Si (diamond, a = 5.431 A), n_cells^3 conventional cells, centred."""
+    base = np.array([[0, 0, 0], [0, .5, .5], [.5, 0, .5], [.5, .5, 0]], dtype=float)
+    basis = np.vstack([base, base + 0.25])
+    pts = [(np.array([i, j, k]) + b) * a for i in range(n_cells) for j in range(n_cells)
+           for k in range(n_cells) for b in basis]
+    pts = np.array(pts)
+    return pts - pts.mean(axis=0)
+
+
+def test_reference_directions_tolerate_slightly_moved_coordinates():
+    """--reference used exact equality of rounded bond vectors: 0.001 A of
+    noise put 9 of 36 terminators on existing Si atoms (ADR 0012, F17)."""
+    from pyxany.molecule import Atom, Molecule
+    from pyxany.passivation import passivate
+
+    bulk = _diamond_si()
+    centre = int(np.argmin(np.linalg.norm(bulk, axis=1)))
+    d = np.linalg.norm(bulk - bulk[centre], axis=1)
+    core = bulk[d < 4.0]                                    # Si17: centre + 4 + 12
+    assert len(core) == 17
+    rng = np.random.default_rng(0)
+    noisy = core + rng.normal(scale=0.001, size=core.shape)
+    to_mol = lambda xyz: Molecule([Atom.from_element("Si", p * ANG_TO_BOHR) for p in xyz])  # noqa: E731
+    res = passivate(to_mol(noisy), coordination=4, reference=to_mol(bulk))
+    assert res.n_added == 36
+    pos = res.molecule.positions * BOHR_TO_ANG
+    si = pos[:17]
+    hosts = [p["host_index"] for p in res.placements]
+    closest = min(
+        float(np.linalg.norm(np.delete(si, h, axis=0) - pos[k], axis=1).min())
+        for k, h in zip(range(17, len(pos)), hosts, strict=True)
+    )
+    # A terminator sits ~1.5 A from its host; the old matching put some
+    # 0.85 A from another Si. Measured here: ~2.4 A or more.
+    assert closest > 2.0, closest
+    assert not any("closer than" in w for w in res.warnings)

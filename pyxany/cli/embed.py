@@ -17,8 +17,13 @@ Reads a small YAML description of the crystal::
 and writes ``label x y z q`` lines for ``embedding.charges``. The block is
 neutral by Evjen's construction (Phys. Rev. 39, 675 (1932)): sites on a face
 of the block carry 1/2 of their charge, on an edge 1/4, on a corner 1/8, so a
-neutral conventional cell gives a neutral, dipole-free block whose Madelung
-potential converges quickly with ``cells``.
+neutral conventional cell gives a neutral block whose Madelung potential
+converges quickly with ``cells``.
+
+The block is dipole-free only when the cell is: rock salt and zinc blende are,
+a polar cell such as wurtzite is not (ZnO: 0.058 e/A^2 at every block size, a
+spurious ~1.7 V/A field on the cluster; ADR 0012, F16). The block dipole is
+therefore computed and a dipolar block is refused unless ``--allow-dipole``.
 """
 
 from __future__ import annotations
@@ -55,6 +60,16 @@ def evjen_charges(lattice, sites, cells: int, origin=(0.0, 0.0, 0.0), tol: float
                     q.append(weight * float(charge))
                     lab.append(str(label))
     return np.asarray(pos), np.asarray(q), lab
+
+
+#: |block dipole| (e A) above which the block is refused. Rock salt and zinc
+#: blende give ~1e-11; wurtzite ZnO 74 at cells = 1.
+DIPOLE_TOL = 1e-3
+
+
+def block_dipole(positions, charges) -> np.ndarray:
+    """Dipole of the point charges, e A (origin-independent for a neutral block)."""
+    return np.asarray(charges, dtype=float) @ np.asarray(positions, dtype=float)
 
 
 def remove_cluster_sites(positions, charges, labels, cluster, tol: float = 0.1):
@@ -94,6 +109,18 @@ def execute(args) -> int:
 
     pos, q, lab = evjen_charges(lattice, sites, cells, origin)
     cell_charge = sum(float(s[4]) for s in sites)
+    dip = block_dipole(pos, q)
+    if np.linalg.norm(dip) > DIPOLE_TOL:
+        message = (
+            f"the Evjen block has a dipole of {np.linalg.norm(dip):.3g} e A "
+            f"({dip[0]:+.3g}, {dip[1]:+.3g}, {dip[2]:+.3g}): the cell is polar (e.g. "
+            f"wurtzite), so the block puts a spurious uniform field on the cluster "
+            f"that does not vanish with more cells. Use a dipole-free cell"
+        )
+        if not getattr(args, "allow_dipole", False):
+            mpi_print(f"  [error] {message}, or pass --allow-dipole to write it anyway.")
+            return EXIT_INPUT
+        mpi_print(f"  [warning] {message}; written anyway (--allow-dipole).")
     removed = 0.0
     if spec.get("cluster"):
         path = Path(spec["cluster"])

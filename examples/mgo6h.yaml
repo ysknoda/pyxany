@@ -29,7 +29,6 @@ output:
   figure: true
   json: true
 passivation:
-  scheme: pseudo_hydrogen
   species:
     HO:
       passivates: O
@@ -37,7 +36,6 @@ passivation:
       Z_val: 6
       coordination: 6
       alpha: 0.33333333
-  basis: derived
 optimize:
   enabled: false
   freeze: core

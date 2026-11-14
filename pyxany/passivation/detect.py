@@ -178,22 +178,44 @@ def _spread_directions(have: np.ndarray, n_missing: int) -> np.ndarray:
     return np.array(out)
 
 
-def directions_from_reference(molecule, reference, index: int, tolerance: float = 1.20):
+#: A reference bond counts as present in the cluster when a cluster bond of the
+#: same atom lies within this angle of it. Distinct bonds of one atom are at
+#: least 60 deg apart in any common coordination (tetrahedral 109.5, octahedral
+#: and square-planar 90, trigonal 120; linear 180), so 30 deg separates them
+#: while tolerating relaxed or rounded coordinates (ADR 0012, F17).
+SAME_BOND_ANGLE_DEG = 30.0
+
+
+def directions_from_reference(molecule, reference, index: int, tolerance: float = 1.20,
+                              ref_neighbors: dict | None = None,
+                              cluster_neighbors: dict | None = None):
     """Missing bond directions recovered from a bulk reference structure.
 
     The cluster atom is matched to its counterpart in ``reference`` by position;
-    neighbors present in the bulk but absent from the cluster give the exact
-    directions of the cut bonds.
+    neighbors present in the bulk but absent from the cluster give the
+    directions of the cut bonds. A bulk bond is "present" when a cluster bond
+    lies within SAME_BOND_ANGLE_DEG of it. Exact equality of rounded
+    displacement vectors, used before, failed for coordinates that were
+    relaxed or reformatted by 0.001 A and put terminators on existing bonds.
+
+    ``ref_neighbors`` / ``cluster_neighbors`` are the neighbor lists of the two
+    structures; pass them when calling this for many atoms, since building
+    them is O(N^2).
     """
     ref_pos = reference.positions
     cluster_pos = molecule.positions
     site = int(np.argmin(np.linalg.norm(ref_pos - cluster_pos[index], axis=1)))
-    ref_neigh = neighbor_lists(reference, tolerance)[site]
-    kept = {tuple(np.round(cluster_pos[j] - cluster_pos[index], 4))
-            for j in neighbor_lists(molecule, tolerance)[index]}
+    if ref_neighbors is None:
+        ref_neighbors = neighbor_lists(reference, tolerance)
+    if cluster_neighbors is None:
+        cluster_neighbors = neighbor_lists(molecule, tolerance)
+    kept = [cluster_pos[j] - cluster_pos[index] for j in cluster_neighbors[index]]
+    kept = [v / np.linalg.norm(v) for v in kept]
+    cos_same = np.cos(np.radians(SAME_BOND_ANGLE_DEG))
     out = []
-    for j in ref_neigh:
+    for j in ref_neighbors[site]:
         d = ref_pos[j] - ref_pos[site]
-        if tuple(np.round(d, 4)) not in kept:
-            out.append(d / np.linalg.norm(d))
+        u = d / np.linalg.norm(d)
+        if not any(float(np.dot(u, k)) > cos_same for k in kept):
+            out.append(u)
     return np.array(out) if out else np.zeros((0, 3))

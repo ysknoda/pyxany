@@ -1,4 +1,4 @@
-"""Mulliken populations and Wiberg bond orders (vectorized)."""
+"""Mulliken populations and Mayer bond orders (vectorized)."""
 
 from __future__ import annotations
 
@@ -205,3 +205,14 @@ def loewdin_orbital_groups(C: np.ndarray, S: np.ndarray, labels) -> dict:
     sq = LC**2
     labels = np.asarray(labels)
     return {lab: sq[labels == lab].sum(axis=0) for lab in dict.fromkeys(labels)}
+
+def bond_orders(result):
+    """Mayer bond orders of a converged SCF, with the open-shell form for UKS.
+
+    The report, the JSON and the summary figure called the closed-shell form
+    for UKS too (O2 triplet: 1.13 against 1.62; ADR 0012, F15).
+    """
+    if result.unrestricted:
+        return mayer_bond_orders(result.P, result.S, result.basis, result.molecule,
+                                 result.P_a, result.P_b)
+    return mayer_bond_orders(result.P, result.S, result.basis, result.molecule)

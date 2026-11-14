@@ -1,22 +1,27 @@
 """Dispatch between the numba and numpy implementations of the hot loops.
 
-``HAVE_NUMBA`` in :mod:`pyxany.parallel` decides which backend is live; setting
-``PYXANY_DISABLE_NUMBA=1`` forces the numpy path, which is how the two are
-compared in tests.
+:func:`pyxany.parallel.numba_enabled` decides, at every call, which backend is
+live: ``runtime.numba`` / ``--numba`` / ``--no-numba`` set it, and
+``PYXANY_DISABLE_NUMBA=1`` forces the numpy path under ``auto``, which is how
+the two are compared in tests.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
 
-from ..parallel import HAVE_NUMBA
+from ..parallel import numba_enabled
 from . import numpy_impl
 
 
-@lru_cache(maxsize=1)
 def _numba():
-    if not HAVE_NUMBA:
+    if not numba_enabled():
         return None
+    return _load_numba()
+
+
+@lru_cache(maxsize=1)
+def _load_numba():
     try:  # pragma: no cover - exercised only where numba is installed
         from . import numba_impl
 

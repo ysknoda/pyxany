@@ -1,6 +1,6 @@
 # 0013. Configuration keys that are validated but never read
 
-- Status: Accepted (not yet implemented; roadmap item F3, ADR 0012)
+- Status: Accepted; implemented 2026-11-14 (roadmap items F3, F18)
 - Date: 2026-11-13
 - Decisions: Q67, Q73
 
@@ -43,3 +43,14 @@ A test pins each case: every removed key is rejected with its message, and
   `properties.bde` stop loading, with a message that says what to delete. The
   shipped examples are updated in the same change.
 - CHANGELOG entry under "Changed", listing the removed keys.
+
+## Implementation notes (2026-11-14)
+
+- The premise above was wrong in one respect: `--no-numba` had no effect
+  either. It set `PYXANY_DISABLE_NUMBA` after `pyxany.parallel` had bound
+  `HAVE_NUMBA` at import (P0 re-review, F18). The backend is now chosen at
+  every kernel call by `parallel.numba_enabled()`, set from `runtime.numba`
+  and the CLI flags by `parallel.set_numba_mode()`.
+- YAML 1.1 reads a bare `numba: off` as the boolean false; booleans are
+  accepted as on/off.
+- `--set` now accepts only dataclass fields (it could replace methods).

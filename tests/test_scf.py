@@ -369,3 +369,23 @@ def test_negative_overlap_population_on_a_real_bond_gets_a_note():
 
     assert "[note]" in lines(-0.88)
     assert "[note]" not in lines(+0.51)
+
+
+def test_reported_bond_orders_use_the_open_shell_form_for_uks():
+    """Report, JSON and figure used the closed-shell Mayer form for UKS too:
+    O2 triplet 1.13 against the open-shell 1.62 (ADR 0012, F15)."""
+    from conftest import make_config, make_molecule
+    from pyxany.basis import build_basis
+    from pyxany.io.results import result_dict
+    from pyxany.properties import bond_orders, mayer_bond_orders
+    from pyxany.scf import run_scf
+
+    mol = make_molecule("o2", [("O", 0, 0, 0), ("O", 0, 0, 1.208)], multiplicity=3)
+    cfg = make_config(basis={"set": "dz"}, grid={"n_r": 30, "n_a": 12}, scf={"max_iter": 60})
+    r = run_scf(mol, build_basis(mol, cfg), cfg, verbose=0)
+    open_shell = mayer_bond_orders(r.P, r.S, r.basis, r.molecule, r.P_a, r.P_b)
+    closed = mayer_bond_orders(r.P, r.S, r.basis, r.molecule)
+    assert bond_orders(r)[0, 1] == pytest.approx(open_shell[0, 1], abs=1e-12)
+    assert abs(open_shell[0, 1] - closed[0, 1]) > 0.3
+    reported = result_dict(r, cfg)["population"]["mayer_bond_orders"][0][1]
+    assert reported == pytest.approx(open_shell[0, 1], abs=1e-12)

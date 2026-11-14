@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import numpy as np
 
-from ..config import Config
+from ..config import Config, ConfigError
 from ..io.yaml_input import load_config, load_molecule
-from ..parallel import is_root, mpi_print
+from ..parallel import is_root, mpi_print, set_numba_mode
 from ..timing import REGISTRY
 from .overrides import parse_overrides
 
@@ -19,9 +18,15 @@ def prepare(args) -> tuple[Config, object]:
     overrides = parse_overrides(getattr(args, "overrides", None))
     if getattr(args, "basis", None):
         overrides["basis.set"] = args.basis
-    if getattr(args, "numba", None) is False:
-        os.environ["PYXANY_DISABLE_NUMBA"] = "1"
     cfg = load_config(args.input, overrides)
+    # --numba / --no-numba win over runtime.numba (ADR 0013); applied at run
+    # time, since the backend used to be fixed when pyxany.parallel was imported
+    cli_numba = getattr(args, "numba", None)
+    mode = cfg.runtime.numba if cli_numba is None else ("on" if cli_numba else "off")
+    try:
+        set_numba_mode(mode)
+    except RuntimeError as exc:
+        raise ConfigError(str(exc)) from None
     if getattr(args, "outdir", None):
         cfg.output.dir = args.outdir
     if getattr(args, "no_figure", False):
@@ -29,7 +34,7 @@ def prepare(args) -> tuple[Config, object]:
     if getattr(args, "timing", None) is not None:
         cfg.output.timing = args.timing
     REGISTRY.enabled = cfg.output.timing
-    cfg.runtime.verbosity = verbosity(args)
+    cfg.runtime.verbosity = verbosity(args, cfg.runtime.verbosity)
 
     molecule = load_molecule(cfg)
     _apply_passivation_basis(cfg, molecule)
@@ -51,10 +56,12 @@ def build_molecule_basis(cfg, molecule):
     return build_basis(molecule, cfg, getattr(cfg, "_pseudo_zeta", None))
 
 
-def verbosity(args) -> int:
+def verbosity(args, default: int = 1) -> int:
+    """-q -> 0, -v... -> 1 + count; neither -> runtime.verbosity (ADR 0013)."""
     if getattr(args, "quiet", False):
         return 0
-    return 1 + int(getattr(args, "verbose", 0))
+    n = int(getattr(args, "verbose", 0) or 0)
+    return 1 + n if n else default
 
 
 def output_dir(cfg) -> Path:

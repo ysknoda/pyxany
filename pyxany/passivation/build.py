@@ -91,6 +91,8 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
 
     pos_ang = molecule.positions * BOHR_TO_ANG
     new_atoms = list(molecule.atoms)
+    # built once, not per surface atom (O(N^2) each; ADR 0012 P0)
+    ref_neighbors = neighbor_lists(reference, tolerance) if reference is not None else None
     species: dict[str, PseudoSpecies] = {}
     placements: list[dict] = []
     warnings: list[str] = list(coord_warnings)
@@ -111,7 +113,8 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
 
         dirs = None
         if reference is not None:
-            dirs = directions_from_reference(molecule, reference, i, tolerance)
+            dirs = directions_from_reference(molecule, reference, i, tolerance,
+                                             ref_neighbors, neighbors)
             if len(dirs) < n_missing:
                 dirs = None
         if dirs is None:
@@ -152,6 +155,25 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
                 "r_cov_sum_XH": covalent_radius(atom.element) + covalent_radius("H"),
                 "r_cov_sum_XY": covalent_radius(atom.element) + covalent_radius(nn[1]),
             })
+
+    # A terminator on top of another atom means a bond direction was wrong
+    # (F17 put 9 of 36 within 0.85 A of a Si); say so instead of reporting a
+    # closed shell as if nothing happened.
+    n_old = len(molecule)
+    for k in range(n_old, len(new_atoms)):
+        host = placements[k - n_old]["host_index"]
+        for j, other in enumerate(new_atoms):
+            if j in (k, host):
+                continue
+            d = float(np.linalg.norm(new_atoms[k].pos - other.pos)) * BOHR_TO_ANG
+            limit = 0.8 * (covalent_radius("H") + covalent_radius(
+                "H" if other.is_pseudo else other.element))
+            if d < limit:
+                warnings.append(
+                    f"terminator {k + 1} on {placements[k - n_old]['host']} is "
+                    f"{d:.3f} A from atom {j + 1} ({other.symbol}), closer than "
+                    f"{limit:.3f} A: a bond direction is probably wrong."
+                )
 
     result_mol = Molecule(atoms=new_atoms, charge=molecule.charge,
                           multiplicity=molecule.multiplicity,

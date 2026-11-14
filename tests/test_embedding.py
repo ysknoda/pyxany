@@ -9,7 +9,7 @@ import pytest
 
 from conftest import make_config, make_molecule
 from pyxany.basis import build_basis
-from pyxany.cli import EXIT_OK, main
+from pyxany.cli import EXIT_INPUT, EXIT_OK, main
 from pyxany.cli.embed import evjen_charges, remove_cluster_sites
 from pyxany.config import ConfigError
 from pyxany.embedding import PointCharges, read_charges
@@ -187,3 +187,37 @@ def test_checkpoint_fingerprint_depends_on_the_charges(charge_file, tmp_path):
 def test_bad_embedding_settings_are_rejected(bad):
     with pytest.raises(ConfigError, match="embedding"):
         make_config(embedding=bad)
+
+
+WURTZITE_ZNO = """\
+lattice:
+  - [3.2496, 0, 0]
+  - [-1.6248, 2.814237, 0]
+  - [0, 0, 5.2042]
+sites:
+  - [Zn, 0.333333, 0.666667, 0.0, 2]
+  - [Zn, 0.666667, 0.333333, 0.5, 2]
+  - [O, 0.333333, 0.666667, 0.3819, -2]
+  - [O, 0.666667, 0.333333, 0.8819, -2]
+cells: 1
+"""
+
+
+def test_polar_cell_is_refused_unless_allowed(tmp_path, capsys):
+    """Wurtzite's Evjen block carries a dipole that does not converge away
+    (ADR 0012, F16); rock salt's does not."""
+    from pyxany.cli.embed import block_dipole
+
+    spec = tmp_path / "zno.yaml"
+    spec.write_text(WURTZITE_ZNO)
+    out = tmp_path / "zno_charges.xyz"
+    assert main(["embed", str(spec), "-o", str(out)]) == EXIT_INPUT
+    assert "dipole" in capsys.readouterr().out and not out.exists()
+    assert main(["embed", str(spec), "-o", str(out), "--allow-dipole"]) == EXIT_OK
+    assert out.exists()
+
+    lattice = 4.21 * np.eye(3)
+    sites = [["Mg", 0, 0, 0, 2], ["Mg", 0, .5, .5, 2], ["Mg", .5, 0, .5, 2], ["Mg", .5, .5, 0, 2],
+             ["O", .5, 0, 0, -2], ["O", 0, .5, 0, -2], ["O", 0, 0, .5, -2], ["O", .5, .5, .5, -2]]
+    pos, q, _ = evjen_charges(lattice, sites, 2)
+    assert np.linalg.norm(block_dipole(pos, q)) < 1e-9
