@@ -108,3 +108,11 @@ def test_fractional_terminator_scales_every_hydrogen_function_by_one_ratio():
     assert len(z_ps) == len(z_h) == 2
     assert np.allclose(z_ps, np.array(z_h) * ratio, rtol=1e-14)
     assert 0.5 < ratio < 0.7       # a half-charge terminator is more diffuse
+
+
+def test_describe_uses_the_requested_atom_grid():
+    """describe() solved the atom on a fixed 2000-point grid (ADR 0012 P0)."""
+    from pyxany.basis.pseudo_h import describe, pseudo_hydrogen_zeta
+
+    d = describe(0.75, n_points=1200)
+    assert d["zeta"] == pseudo_hydrogen_zeta(0.75, n_points=1200)

@@ -94,8 +94,12 @@ Medium and Low: fixed 2026-11-14 together with F4, F5 and F9 (commits after
 0253f66), each with a regression test, except the Bragg-Slater attribution
 (Low, UNCERTAIN): the values are kept (the radial-grid table was measured with
 them) and their source needs the Slater (1964) table to be checked; the
-suggestions (Mulliken spin populations, `embed` on every rank, the cube-path
-hint) are left for later. EDIIS now follows Kudin-Scuseria-Cances with the
+six reviewer suggestions were done afterwards: Mulliken and Loewdin spin
+populations for UKS (report and JSON), `embed` writes on rank 0 only, its
+input-file hint gives the path relative to the input file and absolute, the
+kcal/mol literal in `scan` replaced by the constants, `pseudo_h.describe`
+takes the atom grid, and `compute_forces` reuses alpha(r) and the full
+density instead of computing them twice. EDIIS now follows Kudin-Scuseria-Cances with the
 coefficient 1/4 that F = dE/dP requires (the paper's 1/2 is for dE/dD = 2F),
 checked against brute force on an exact quadratic model. Found on the way:
 at the default grid (n_r 30) the H2O force error is 2.2e-3 Ha/Bohr, above the

@@ -475,3 +475,24 @@ def test_checkpoint_fingerprint_sees_alpha_values_and_nao_shapes():
     f1 = system_fingerprint(mol, build_basis(mol, n1), n1, False)
     f2 = system_fingerprint(mol, build_basis(mol, n2), n2, False)
     assert f1 != f2
+
+
+def test_spin_populations_locate_the_unpaired_electron():
+    """CH3: the unpaired electron on C, a small negative spin on each H (spin
+    polarization), and both analyses summing to N_alpha - N_beta = 1."""
+    from conftest import make_config, make_molecule
+    from pyxany.basis import build_basis
+    from pyxany.io.results import result_dict
+    from pyxany.properties import spin_populations
+    from pyxany.scf import run_scf
+
+    mol = make_molecule("ch3", [("C", 0, 0, 0), ("H", 1.079, 0, 0), ("H", -0.5395, 0.9344, 0),
+                                ("H", -0.5395, -0.9344, 0)], multiplicity=2)
+    cfg = make_config(basis={"set": "dz"}, grid={"n_r": 30, "n_a": 12}, scf={"max_iter": 60})
+    r = run_scf(mol, build_basis(mol, cfg), cfg, verbose=0)
+    sp = spin_populations(r.P_a, r.P_b, r.S, r.basis, mol)
+    for kind in ("mulliken", "loewdin"):
+        assert sp[kind].sum() == pytest.approx(1.0, abs=1e-8)
+        assert sp[kind][0] > 1.0 and np.all(sp[kind][1:] < 0)
+    block = result_dict(r, cfg)["population"]["spin_populations"]
+    assert block["mulliken"][0] == pytest.approx(sp["mulliken"][0])

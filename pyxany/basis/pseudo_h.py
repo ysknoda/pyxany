@@ -123,16 +123,20 @@ def derive_exponents(molecule, xc_alpha: float = DEFAULT_ALPHA,
     return out
 
 
-def describe(alpha: float, xc_alpha: float = DEFAULT_ALPHA) -> dict:
-    """Diagnostics for one pseudo-hydrogen species, used by ``pyxany passivate``."""
-    sol = pseudo_hydrogen_solution(alpha, xc_alpha)
+def describe(alpha: float, xc_alpha: float = DEFAULT_ALPHA, n_points: int = 2000) -> dict:
+    """Diagnostics for one pseudo-hydrogen species.
+
+    ``n_points`` is the atom solver's grid (``grid.atom.n_points``), as for the
+    exponents the SCF uses; it was fixed at 2000 here (ADR 0012 P0).
+    """
+    sol = pseudo_hydrogen_solution(alpha, xc_alpha, n_points)
     orb = sol.orbitals[(1, 0)]
     r, R = orb.r, orb.radial
     w = np.log(r[1] / r[0]) * r
     return {
         "alpha": float(alpha),
-        "zeta": pseudo_hydrogen_zeta(alpha, xc_alpha),
-        "zeta_raw": _raw_zeta(float(alpha), xc_alpha),
+        "zeta": pseudo_hydrogen_zeta(alpha, xc_alpha, n_points=n_points),
+        "zeta_raw": _raw_zeta(float(alpha), xc_alpha, n_points),
         "eigenvalue_hartree": float(orb.eigenvalue),
         "mean_radius_bohr": float(np.dot(w, R * R * r**3)),
         "electrons": float(np.dot(w, sol.density * 4.0 * np.pi * r * r)),

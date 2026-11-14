@@ -72,6 +72,7 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
             "mayer_bond_orders": [[float(x) for x in row] for row in bo],
             # same values; old key kept for existing readers (ADR 0012, F15)
             "wiberg_bond_orders": [[float(x) for x in row] for row in bo],
+            "spin_populations": _spin_block(result, basis, mol),
         },
         "units": {
             "energy": "hartree",
@@ -145,6 +146,17 @@ def _grids(result, config) -> dict:
     from ..grid.summary import grid_summary
 
     return grid_summary(config, result.grid, result.molecule, result.terms)
+
+
+def _spin_block(result, basis, mol):
+    """Per-atom n_alpha - n_beta for UKS (null for a restricted run)."""
+    if not result.unrestricted:
+        return None
+    from ..properties import spin_populations
+
+    sp = spin_populations(result.P_a, result.P_b, result.S, basis, mol)
+    return {"mulliken": [float(x) for x in sp["mulliken"]],
+            "loewdin": [float(x) for x in sp["loewdin"]]}
 
 
 #: entries of SCFResult.energies that count electrons rather than Hartree

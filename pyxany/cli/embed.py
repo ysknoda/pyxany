@@ -28,6 +28,7 @@ therefore computed and a dipolar block is refused unless ``--allow-dipole``.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -36,7 +37,7 @@ import yaml
 from ..config import ConfigError
 from ..embedding import write_charges
 from ..io.xyz import read_xyz
-from ..parallel import mpi_print
+from ..parallel import is_root, mpi_print
 from . import EXIT_INPUT, EXIT_OK
 
 
@@ -167,7 +168,8 @@ def execute(args) -> int:
         f"Evjen block of {2 * cells + 1}^3 cells (+ faces) from {args.input}; "
         f"cluster sites removed carry {removed:+g}"
     )
-    write_charges(args.output, pos, q, lab, header)
+    if is_root():   # every rank used to write the same file under mpirun
+        write_charges(args.output, pos, q, lab, header)
     mpi_print(f"  {len(q)} point charges written to {args.output}")
     mpi_print(
         f"  net charge of the point charges {q.sum():+.6f}; "
@@ -178,6 +180,12 @@ def execute(args) -> int:
             f"  the lattice sites replaced by the cluster carry {removed:+g}: give the "
             f"cluster molecule.charge = {removed:+g} for overall neutrality"
         )
-    mpi_print("  in the input file:")
-    mpi_print(f"    embedding: {{charges: {args.output}, units: angstrom}}")
+    # embedding.charges is resolved relative to the *input file*, not to the
+    # directory pyxany runs in: give the path both ways (ADR 0012 P0)
+    out = Path(args.output).resolve()
+    rel = os.path.relpath(out, base)
+    mpi_print(f"  in an input file next to {Path(args.input).name}:")
+    mpi_print(f"    embedding: {{charges: {rel}, units: angstrom}}")
+    mpi_print("  (embedding.charges is relative to the input file's directory;")
+    mpi_print(f"   from anywhere else use the absolute path {out})")
     return EXIT_OK

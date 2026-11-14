@@ -191,6 +191,8 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
                 V_H,
                 v_nuc,
                 None if ext is None else ext.gradient(pts),
+                alpha=alpha,
+                rho_full=rho_full,
             )
 
         allreduce_array(grad)
@@ -226,7 +228,8 @@ def compute_forces(result, config, project: bool | None = None) -> np.ndarray:
 
 
 def _grid_motion_gradient(
-    result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc, grad_v_ext=None
+    result, config, grad_rho_s, rho, rho_a, rho_b, V_H, v_nuc, grad_v_ext=None,
+    alpha=None, rho_full=None,
 ):
     """Derivative of the quadrature itself: ``sum_k d(w_k G(r_k)) / d R_B``.
 
@@ -258,7 +261,10 @@ def _grid_motion_gradient(
     sl = grid.local_slice
     pts, wts = grid.local_points, grid.local_weights
     owner = grid.owner[sl]
-    alpha = alpha_on_points(pts, molecule, config.scf)
+    # alpha(r) and the full density are passed in by compute_forces, which has
+    # them already; recomputing both doubled their cost (ADR 0012 P0)
+    if alpha is None:
+        alpha = alpha_on_points(pts, molecule, config.scf)
 
     # energy density and its gradient on the grid (grad rho per spin from the caller)
     if result.unrestricted:
@@ -287,7 +293,8 @@ def _grid_motion_gradient(
 
     # grad V_H: exact derivative of the interpolated multipole potential when
     # the compiled kernel is available, else central differences of it
-    rho_full = _full_density(grid, rho)
+    if rho_full is None:
+        rho_full = _full_density(grid, rho)
     grad_V_H = hartree_potential(
         grid,
         rho_full,

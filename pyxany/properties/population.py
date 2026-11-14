@@ -23,6 +23,28 @@ def mulliken(P: np.ndarray, S: np.ndarray, basis, molecule) -> dict:
     }
 
 
+def spin_populations(P_alpha: np.ndarray, P_beta: np.ndarray, S: np.ndarray, basis,
+                     molecule) -> dict:
+    """Mulliken and Loewdin spin populations ``n_alpha - n_beta`` per atom.
+
+    Mulliken: ``sum_{mu in A} ((P_a - P_b) S)_{mu mu}``; Loewdin:
+    ``sum_{mu in A} (S^1/2 (P_a - P_b) S^1/2)_{mu mu}``. Both sum to
+    N_alpha - N_beta. Where the unpaired electrons sit is the first thing to
+    know about a radical or a defect, and the report did not say (ADR 0012 P0).
+    Loewdin is given too because diffuse functions make Mulliken values leave
+    any physical range, as they do for the charges.
+    """
+    D = P_alpha - P_beta
+    atom_of = np.array([f.atom_idx for f in basis])
+    mull = np.zeros(len(molecule))
+    np.add.at(mull, atom_of, np.diag(D @ S))
+    w, U = np.linalg.eigh(S)
+    half = (U * np.sqrt(np.maximum(w, 0.0))) @ U.T
+    loew = np.zeros(len(molecule))
+    np.add.at(loew, atom_of, np.diag(half @ D @ half))
+    return {"mulliken": mull, "loewdin": loew}
+
+
 def mulliken_orbital_populations(C: np.ndarray, S: np.ndarray, occ: np.ndarray,
                                  basis, molecule) -> np.ndarray:
     """(n_occupied, n_atoms) per-MO atomic populations.

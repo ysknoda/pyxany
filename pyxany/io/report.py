@@ -9,6 +9,7 @@ from ..properties import (
     bond_orders,
     mulliken,
     mulliken_orbital_populations,
+    spin_populations,
 )
 
 
@@ -100,6 +101,16 @@ def format_results(result, config, forces=None, dipole=None) -> str:
             f"{pop['charges'].sum():>+9.4f}"
         )
         w("")
+        if result.unrestricted:
+            sp = spin_populations(result.P_a, result.P_b, result.S, basis, mol)
+            w("  SPIN POPULATIONS  (n_alpha - n_beta per atom)")
+            w("  " + "-" * 62)
+            w(f"  {'atom':>8}  {'Mulliken':>10}  {'Loewdin':>10}")
+            for i, atom in enumerate(mol):
+                w(f"  {atom.symbol + str(i + 1):>8}  {sp['mulliken'][i]:>+10.4f}  "
+                  f"{sp['loewdin'][i]:>+10.4f}")
+            w(f"  {'sum':>8}  {sp['mulliken'].sum():>+10.4f}  {sp['loewdin'].sum():>+10.4f}")
+            w("")
         w("  MAYER BOND ORDERS  (pairs closer than 3.0 A"
           + ("; open-shell form)" if result.unrestricted else ")"))
         w("  " + "-" * 62)

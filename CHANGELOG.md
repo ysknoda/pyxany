@@ -71,8 +71,17 @@
   `electron_counts`).
 - The UKS summary figure draws both spin channels and a +/- DOS (F5).
 
+- **Spin populations** (UKS): Mulliken and Loewdin n_alpha - n_beta per
+  atom in the report and in the JSON (`population.spin_populations`); CH3 puts
+  +1.26 (Mulliken) on C and a small negative spin on each H.
+- `pyxany embed` writes the charge file on rank 0 only and prints the
+  `embedding.charges` path relative to the input file as well as absolute.
+- `pseudo_h.describe` takes the atom-solver grid size.
+
 ### Performance
 
+- `compute_forces` reuses alpha(r) and the full density in the grid-motion
+  term instead of recomputing them.
 - The element-specific alpha field and its force term are compiled (numba):
   27 atoms / 50k points 1.6 s -> 0.08 s and 12.7 s -> 0.27 s, numpy path
   unchanged and equal to 5e-14.
