@@ -66,9 +66,9 @@ def test_ionization_energy_agrees_with_delta_scf():
 # N2 1s hole on atom 1, this grid: converged eigenvalue from 500 iterations with
 # the convergence test disabled (commutator rms 7e-8; ADR 0014).
 N2_1S_EPS = -14.997803748
-# Equivalent-atom core holes converge along a slow mode: ~315 iterations to a
-# commutator of 1e-6 (|d eps| 0.25 meV), so this test needs more than the TS
-# default of 300.
+# Equivalent-atom core holes converged along a slow mode with per-spin DIIS
+# (~315 iterations to a commutator of 1e-6); with one DIIS for both channels
+# (ADR 0012, F11) ~20. The limit stays generous.
 N2_SCF = {"max_iter": 400, "e_tol": 1e-11, "d_tol": 1e-9, "c_tol": 1e-6}
 
 
@@ -110,14 +110,13 @@ def test_equivalent_atom_core_hole_is_self_consistent_at_the_default_tolerances(
     """With the default scf settings the result must not stop short (ADR 0014).
 
     Before scf.c_tol the energy and density tests stopped this run after 30
-    iterations with -eps 65 meV too large. The default
-    c_tol (1e-5) bounds that at ~2.4 meV, and the transition-state default of 300
-    iterations leaves room for the ~200 it needs.
+    iterations with -eps 65 meV too large. The default c_tol (1e-5) bounds that
+    at ~2.4 meV; with one DIIS for both spin channels (F11) the run takes ~20
+    iterations instead of ~200.
     """
     # conftest.make_config sets test tolerances; put back the shipped defaults
     defaults = {"max_iter": None, "e_tol": 1e-6, "d_tol": 1e-5}
     res, _ = _run(N2, {"remove": {"atom": 1, "shell": "1s"}}, scf=defaults)
-    assert res.n_iterations > 100      # the TS default of 300 is what made room
     assert res.history[-1]["commutator"] < 1e-5
     assert abs(res.transition_state["eps_source"] - N2_1S_EPS) * HARTREE_TO_EV < 5e-3
 

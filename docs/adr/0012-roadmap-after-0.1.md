@@ -49,7 +49,7 @@ Size: S <= 1 day, M a few days, L a week or more.
 
 | id | item | size | depends on | status |
 |---|---|---|---|---|
-| P0 | Re-review (`/code-check`) of every file changed since 2026-08-27, split as before between a general and a quantum-chemistry reviewer; refresh `.code-check/history.md` | M | -- | Proposed |
+| P0 | Re-review (`/code-check`) of every file changed since 2026-08-27, split as before between a general and a quantum-chemistry reviewer; refresh `.code-check/history.md` | M | -- | Done 2026-11-14 (findings below) |
 | F1 | CI: `ruff check src tests` points at the `src/` removed by ADR 0001 (E902), and the package job expects 12 data tables while 14 ship. Lint the real paths; compare the wheel against the tables in the source tree instead of a fixed count | S | -- | Done in 0.2.0a1 |
 | F2 | 68 ruff findings (ruff 0.16.6); dead code `max_occ` (`scf/driver.py`) and an unused `S @ C` product (`properties/population.py`, an n^3 matrix product per call). Pin the ruff version in the `dev` extra so a new release cannot turn CI red | S | -- | Done in 0.2.0a1 |
 | F3 | Seven configuration keys are validated but read nowhere (same class as the `checkpoint_every` HIGH of 2026-08-27): `runtime.numba`, `runtime.mpi`, `runtime.verbosity`, `passivation.scheme`, `passivation.basis`, `properties.bde`, `properties.esp`; `--numba` has no effect. Design in ADR 0013 | S | -- | Proposed |
@@ -70,6 +70,53 @@ point where valence properties need relativity follows the usual rule of thumb
 (Pyykko, Chem. Rev. 88, 563 (1988)); confidence: medium -- it is a convention,
 not a measured threshold for this code.
 
+### P0 findings (re-review 2026-11-14)
+
+Two reviewers (quantum-chemistry: basis, grid, integrals, scf, kernels,
+forces, molecule, embedding; general: cli, io, config, passivation,
+properties, plotting, parallel, timing, data). 1 Critical, 9 High,
+about 20 Medium, 12 Low. Items marked (v) were reproduced independently
+before being recorded. Gate: F10-F18 come before any A item.
+
+| id | sev. | item | status |
+|---|---|---|---|
+| F10 | Critical | (v) NAO radial splines are extrapolated with `ext=3` (`basis/types.py`, `NAO._R`): a constant tail to infinity, so one-center S/T are wrong (Si 3p S = 4.09, T = 6.6e4 Ha) and NAO SCFs converge to nonsense (SiH4 -38.40 Ha vs DZ -289.47; Si atom +31872 Ha), flagged only by the grid/overlap electron-count warning. Since 9eddee4; no NAO SCF test exists. Fix: zero (`ext=1`) or exponential tail; tests: unit self-overlap for every NAO, NAO SiH4 near DZ | Done (ext=1; tests/test_nao.py) |
+| F11 | High | UKS runs two independent Pulay DIIS (one per spin) although F_a depends on P_b: O2 triplet 134 iterations (not converged at the defaults), CH3 40, H2O O1s TS 72, N2 1s TS 321; with one DIIS over the stacked error 17 / 16 / 18 / 20, energies equal to 4e-9 Ha. Very likely the cause of the ADR 0014 slow mode (A9). Re-measure A9/A10 after | Done (SpinPulayDIIS; O2 82->15, N2 1s TS 321->20 iterations, energies equal to 1e-8 Ha) |
+| F12 | High | S/T pair screening bound is not conservative (`integrals/twocenter.py` `pair_is_negligible`, `NAO.exponent_scale`): NAO Si-Si pairs dropped at 10.3 Bohr with abs(S) up to 6.9e-2 (dimer energy off by 1.3e-3 Ha, non-variational); STO/GTO negligible. Screen on the sampled reach (`basis_reach`) | Proposed |
+| F13 | High | (v) `--set A.B.C=v` drops `.C` when `A.B` is not a mapping: `--set scf.alpha.O=0.73` sets alpha = 0.73 for every element, validated as fine | Proposed |
+| F14 | High | Under MPI an exception on rank 0 only (mkdir, result/figure write, checkpoint) hangs the other ranks in the next collective until wall time (reproduced: `mpirun -n 2` with an unwritable outdir never exits). `COMM.Abort` on any caught exception when parallel | Proposed |
+| F15 | High | (v) Every UKS report, JSON and summary panel uses the closed-shell bond-order formula (`wiberg_bond_orders(P, S)` in io/report.py, io/results.py, plotting.py): O2 triplet 1.13 vs open-shell Mayer 1.62 in the same report. Pass P_a/P_b; rename to Mayer | Proposed |
+| F16 | High | `pyxany embed` on a polar (wurtzite) cell yields a block with a macroscopic dipole: ZnO polarization 0.058 e/A^2 at every block size, ~1.7 V/A spurious field (rock salt, zinc blende fine). Compute and refuse/warn on the block dipole; document; later a dipole-compensated scheme | Proposed |
+| F17 | High | (v) `passivate --reference` decides "bond present" by exact equality of displacement vectors rounded to 1e-4 (`passivation/detect.py`): with 0.001 A noise 9 of 36 terminators land on existing Si (0.85 A away) while the report says closed shell. Match by angle/length tolerance; check terminator-atom distances | Proposed |
+| F18 | Medium->gate | (v) `--no-numba` has no effect either: the environment variable is set after `HAVE_NUMBA` is bound at import. ADR 0013's premise for `runtime.numba` needs a lazy backend choice; folded into F3 | Proposed |
+
+Medium (fix list): EDIIS ignores the energies (`scf/diis.py`; not KSC 2002);
+UKS guess puts 2S surplus electrons and an over-occupied alpha core into P_a;
+a transition-state restart rescales the hole channel to an integer count (122
+extra iterations); the force docstring and `forces --compare` miss the
+dominant radial-quadrature error (default f_max 1e-3 below it); alpha-field
+mixing and its force term are O(N_pts N_at^2) NumPy (~20 min per call
+projected for Si47H60 with `alpha_hf`); exit code 3 for many input errors
+(XYZError, TypeErrors, scan coords); `--set` values not YAML-parsed and not
+limited to fields; derived defaults (prefix, TS max_iter) resolved before
+overrides; `overlap_population.pairs` unvalidated (crash after SCF); `scan`
+and `opt` exit 0 with unconverged SCFs; bending scan from a linear molecule
+along z does nothing; `--restart` at `max_iter` crashes; `gridcheck` under MPI
+reports rank 0's share; `passivate` cannot set role overrides (MnO, FeO, TiC
+fail); `passivate --reference` rebuilds neighbor lists per atom (17.7 s vs
+0.03 s); smeared HOMO/LUMO taken at occupancy 1e-8; `embed` does not check
+site element vs cluster atom (sign of the suggested charge flips);
+`parallel.mpi_version` still broken although recorded as fixed.
+
+Low (batch): MPI broadcasts P but not P_a/P_b; checkpoint fingerprint gaps
+(alpha mapping order, NAO parameters); excite-mode capacity check missing for
+an unlocalized core hole; JSON `Infinity` and float `iter`; xyz truncation
+off-by-one; `--emit-yaml` structure path; unvalidated numeric settings;
+`pyxany basis KEY` ignores KEY; `scan` writes no checkpoint (docs say it
+does); doc drift; Bragg-Slater radii attributed to Slater 1964 do not match
+it (UNCERTAIN; values themselves fine); `projected_dos(e_min=None)`; `-q
+--json` stdout mixing; unlabelled per-channel passivation gap.
+
 ### Release (Q66, Q74, Q75-Q78, Q81)
 
 | id | item | status |
@@ -88,7 +135,7 @@ not a measured threshold for this code.
 | A5 | Several initial spin guesses tried automatically, reporting the lowest (ADR 0008; code-check MEDIUM on `scf/guess.py`). Open-shell defects in clusters | M | P0 gate | Proposed |
 | A6 | Irreducible-representation labels for MOs: point-group detection and projection of the converged orbitals (a1, t2, ...), without a symmetry-adapted basis | M | P0 gate | Proposed |
 | A7 | XANES / XES from transition-state dipole intensities (ADR 0006 (d)) | M-L | R0; A8 for heavy absorbers | Proposed |
-| A9 | Faster convergence of equivalent-atom core holes: the slow mode of ADR 0014 halves the commutator only every ~50 iterations (~200 to 1e-5). Candidates: a second-order step in the occupied-occupied rotation between the localized core orbitals, or a damped/level-shifted treatment of that block. Research; measure on N2 and a symmetric cluster first | M-L | F8 | Proposed |
+| A9 | Faster convergence of equivalent-atom core holes: the slow mode of ADR 0014 halves the commutator only every ~50 iterations (~200 to 1e-5). Candidates: a second-order step in the occupied-occupied rotation between the localized core orbitals, or a damped/level-shifted treatment of that block. Research; measure on N2 and a symmetric cluster first | M-L | F8 | Resolved by F11 (N2 1s TS: 20 iterations to a commutator of 1e-6) |
 | A10 | Project the Pulay DIIS error vector onto the retained (non-linearly-dependent) space, as the convergence test now does (ADR 0014). With dropped directions the unprojected error carries a constant component (MgO6H: 1.4e-4); may help DIIS on diffuse bases. Changes every SCF trajectory, so measure first | S-M | F8 | Proposed |
 | A8 | Scalar-relativistic ZORA (atomic solver, molecular Hamiltonian, force terms). Variant and gauge treatment to be decided in its own ADR when scheduled. Spin-orbit coupling stays out of scope (no L2/L3 splitting) | L | R0 | Proposed |
 
@@ -110,7 +157,9 @@ not a measured threshold for this code.
 
 ## Recommended order
 
-1. **P0** and every Critical/High it finds.
+1. **P0** (done 2026-11-14) and every Critical/High it found: F10 first
+   (NAO results are wrong today), then F11 (changes every UKS trajectory;
+   re-measure A9/A10 after), F12-F17, F18 with F3.
 2. F1, F2, F7, the README part of F6 and of R0, G1 -- done with 0.2.0a1;
    F8 (High, found by the first CI run) -- done with 0.2.0a2.
 3. F3, F4, F5, F9, the rest of F6 and R0 (all S, independent of each other).

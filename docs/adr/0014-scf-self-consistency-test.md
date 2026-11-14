@@ -80,8 +80,10 @@ to the same energy: H2O 7.8e-7, CO 2.3e-6, N2 4.6e-8, CH3 (UKS) 8.6e-6.
 
 ## Consequences
 
-- Transition-state runs on equivalent atoms take ~200 iterations; speeding up
-  the slow mode is roadmap item A9.
+- Transition-state runs on equivalent atoms took ~200 iterations; the slow
+  mode turned out to be the per-spin Pulay DIIS (ADR 0012, F11). With one DIIS
+  for both channels the N2 1s run converges to 1e-6 in 20 iterations, so A9 is
+  resolved; the TS default of 300 iterations is kept as headroom.
 - Results of earlier transition-state runs with a core hole on one of several
   equivalent atoms may be off by tens of meV and should be repeated.
 - The Pulay DIIS error vector is still the unprojected commutator, so with

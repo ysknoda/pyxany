@@ -19,7 +19,7 @@ from ..integrals.coulomb import hartree_potential, nuclear_potential
 from ..integrals.overlap import build_overlap_kinetic, condition_number
 from ..parallel import allreduce_array, allreduce_scalar, bcast_array, mpi_print
 from ..timing import timer
-from .diis import EDIIS, PulayDIIS
+from .diis import EDIIS, PulayDIIS, SpinPulayDIIS
 from .grid_terms import GridTerms, choose_strategy
 from .guess import rescale_to_electron_count, sad_density, spin_split
 from .linalg import canonical_orthogonalizer, solve_generalized
@@ -249,7 +249,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
             P_a, P_b = spin_split(P, molecule, basis, n_alpha, n_beta)
         P = P_a + P_b
         accel = {
-            "diis_a": PulayDIIS(), "diis_b": PulayDIIS(),
+            "diis_ab": SpinPulayDIIS(),
             "ediis_a": EDIIS(), "ediis_b": EDIIS(),
         }
     else:
@@ -505,13 +505,14 @@ def _accelerate_uks(accel, F_a, F_b, P_a, P_b, S, energy, it, cfg, dE):
         b = accel["ediis_b"].extrapolate()
         return (a if a is not None else F_a), (b if b is not None else F_b), \
             "EDIIS", dE, cfg.mix_ediis
-    accel["diis_a"].push(F_a, P_a, S)
-    accel["diis_b"].push(F_b, P_b, S)
-    a = accel["diis_a"].extrapolate()
-    b = accel["diis_b"].extrapolate()
-    err = max(accel["diis_a"].error, accel["diis_b"].error)
-    mix = _diis_mixing(cfg, a is not None and b is not None, err)
-    return (a if a is not None else F_a), (b if b is not None else F_b), "DIIS", err, mix
+    # one coefficient set for both channels (ADR 0012, F11)
+    accel["diis_ab"].push(F_a, F_b, P_a, P_b, S)
+    ab = accel["diis_ab"].extrapolate()
+    err = accel["diis_ab"].error
+    mix = _diis_mixing(cfg, ab is not None, err)
+    if ab is None:
+        return F_a, F_b, "DIIS", err, mix
+    return ab[0], ab[1], "DIIS", err, mix
 
 
 def _diagonalize_uks(F_a, F_b, S, n_basis):

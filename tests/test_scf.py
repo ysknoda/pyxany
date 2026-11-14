@@ -120,6 +120,20 @@ def test_converged_means_f_and_p_commute(h2o):
     assert result.history[-1]["commutator"] < 1e-7
 
 
+def test_uks_converges_with_one_diis_for_both_spins():
+    """O2 triplet: 134 iterations (not converged at max_iter 100) with a DIIS
+    per spin channel; ~15 with one stacked DIIS (ADR 0012, F11)."""
+    from conftest import make_config, make_molecule
+    from pyxany.basis import build_basis
+    from pyxany.scf import run_scf
+
+    mol = make_molecule("o2", [("O", 0, 0, 0), ("O", 0, 0, 1.208)], multiplicity=3)
+    cfg = make_config(basis={"set": "dz"}, grid={"n_r": 30, "n_a": 12},
+                      scf={"max_iter": 40, "e_tol": 1e-6, "d_tol": 1e-5})
+    res = run_scf(mol, build_basis(mol, cfg), cfg, verbose=0)
+    assert res.converged and res.n_iterations < 30
+
+
 def test_scf_tolerances_are_validated():
     from pyxany.config import Config, ConfigError
 

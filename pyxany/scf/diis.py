@@ -74,6 +74,27 @@ class PulayDIIS:
         return len(self._F)
 
 
+class SpinPulayDIIS(PulayDIIS):
+    """Pulay DIIS for UKS: one coefficient set for both spin channels.
+
+    F_alpha depends on P_beta through the Coulomb term, so the two channels are
+    one fixed-point problem. Extrapolating them with independent coefficient
+    sets, as two PulayDIIS objects did, converged UKS runs slowly or not at
+    all: O2 triplet 134 iterations against 17 with the stacked error, the N2 1s
+    transition state 321 against 20 (ADR 0012, F11). The error vector is the
+    two commutators stacked; F is stored as the (2, n, n) pair.
+    """
+
+    def push(self, F_a, F_b, P_a, P_b, S) -> None:  # noqa: D102
+        e_a = (F_a @ P_a @ S - S @ P_a @ F_a).ravel()
+        e_b = (F_b @ P_b @ S - S @ P_b @ F_b).ravel()
+        self._F.append(np.stack([F_a, F_b]))
+        self._e.append(np.concatenate([e_a, e_b]))
+        if len(self._F) > self.max_vectors:
+            self._F.pop(0)
+            self._e.pop(0)
+
+
 class EDIIS:
     """Energy-DIIS: minimize a quadratic model of E over density mixings."""
 

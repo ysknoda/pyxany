@@ -204,10 +204,18 @@ class NAO(BasisFunction):
     kind: str = field(default="nao", init=False)
 
     def _R(self, r, der: int = 0):
+        """R(r) and its derivatives; zero beyond the tabulated grid.
+
+        ext=1 (zero outside) and not ext=3 (hold the end value): a constant
+        tail to infinity made every one-center S/T integral wrong (Si 3p:
+        S 4.09, T 6.6e4 Ha) and NAO SCFs converge to nonsense (ADR 0012, F10).
+        At the grid end (~30 Bohr) R is exponentially small, so the step is
+        negligible.
+        """
         from scipy.interpolate import splev
 
         return splev(np.maximum(np.asarray(r, dtype=float), _SMALL_R),
-                     self.spline_tck, der=der, ext=3)
+                     self.spline_tck, der=der, ext=1)
 
     def g(self, r):
         r = np.maximum(np.asarray(r, dtype=float), _SMALL_R)

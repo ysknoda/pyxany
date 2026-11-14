@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Fixed
+
+- **NAO basis results were wrong** (ADR 0012, F10, Critical): the radial
+  splines were extrapolated with a constant tail to infinity, so one-center
+  S/T integrals were wrong (Si 3p self-overlap 4.09) and NAO SCFs converged to
+  nonsense (SiH4 -38.40 Ha against -290.17 Ha now, DZ -289.47). Every NAO
+  result since 9eddee4 must be repeated. The splines are now zero beyond
+  their grid (|R| < 3e-8 there); `tests/test_nao.py` runs NAO SCFs.
+- **UKS used a separate Pulay DIIS per spin channel** (F11): O2 triplet 82
+  iterations, H2O O1s transition state 37, N2 1s transition state 321 to a
+  commutator of 1e-6; with one DIIS over both channels 15 / 14 / 20, final
+  energies equal to 1e-8 Ha. This was the slow mode of ADR 0014.
+
 - CI: a manual run takes `suite=all` or `suite=mpi-only`; the MPI test shows
   mpirun's stderr when it fails; the runner's MPI job allows oversubscription
   (Open MPI 5 refused 2 ranks with prte-rmaps-base:alloc-error).
