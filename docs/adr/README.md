@@ -19,3 +19,4 @@ consequences. Status is one of `Proposed`, `Accepted`, `Superseded by NNNN`.
 | [0012](0012-roadmap-after-0.1.md) | Roadmap after 0.1: fixes, features, first GitHub release | Accepted (items Proposed) |
 | [0013](0013-inert-configuration-keys.md) | Configuration keys that are validated but never read | Accepted (not implemented) |
 | [0014](0014-scf-self-consistency-test.md) | SCF convergence requires self-consistency (commutator test) | Accepted |
+| [0015](0015-default-radial-grid.md) | Default radial grid n_r = 45 | Accepted |

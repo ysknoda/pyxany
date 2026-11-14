@@ -9,7 +9,7 @@ molecule:
 basis:
   set: dz
 grid:
-  n_r: 30
+  n_r: 45
   n_a: 12
   poisson_l_max: auto
 scf:

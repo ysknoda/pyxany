@@ -66,7 +66,7 @@ molecule:
 basis:
   set: dz
 grid:
-  n_r: 30
+  n_r: 45
   n_a: 12
 scf:
   alpha: 0.7

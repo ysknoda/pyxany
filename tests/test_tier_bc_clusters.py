@@ -18,12 +18,12 @@ Tier B (physics, X-alpha-robust):
 
 Deliberately *not* tested: the HOMO-LUMO gap ordering of the cluster series
 against bulk band gaps. These 5-7 heavy-atom clusters are dominated by quantum
-confinement and differ in size; measured gaps are MgO 5.87 > Si 5.80 >
-GaAs 5.31 > CdSe 2.54 eV, nothing like the bulk order, and there is no
+confinement and differ in size; measured gaps (n_r 45) are MgO 5.89 > Si 5.80 >
+GaAs 5.31 > CdSe 2.55 eV, nothing like the bulk order, and there is no
 physical reason they should be.
 
 Tier C (regression): total energy and gap of each pseudo-passivated example at
-its own input settings, pinned to the values measured on 2026-10-03. A change
+its own input settings, pinned to the values measured on 2026-11-14. A change
 here is not necessarily wrong, but it must be explained.
 """
 
@@ -47,14 +47,16 @@ pytestmark = pytest.mark.slow
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
 # (total energy / Ha, HOMO-LUMO gap / eV) at each example's own settings.
-# Re-pinned 2026-10-03 for angular pruning (ADR 0009); changes from the
-# 2026-10-01 values: si5h12 -1.1e-6, ga4ash -1.8e-5, cdse4h -3.3e-6,
-# mgo6h +9.1e-5 Ha; gaps within 1e-3 eV.
+# Re-pinned 2026-11-14 for the default n_r 45 (ADR 0015). The n_r 30 values
+# were reproduced first, to 3e-8 Ha, after the P0 fixes of ADR 0012; 30 -> 45
+# moved the energies by -0.093 (si5h12), -0.129 (ga4ash), -0.144 (cdse4h),
+# +0.003 Ha (mgo6h), radial quadrature error of the heavy atoms, and the gaps
+# by -0.0004, +0.0013, +0.0024, +0.0204 eV.
 PINNED = {
-    "si5h12": (-1443.3008581379, 5.7987),
-    "ga4ash": (-10853.6931292017, 5.3111),
-    "cdse4h": (-15045.8373710704, 2.5433),
-    "mgo6h": (-646.5985608779, 5.8669),
+    "si5h12": (-1443.3934305764, 5.7983),
+    "ga4ash": (-10853.8224996065, 5.3124),
+    "cdse4h": (-15045.9811701265, 2.5455),
+    "mgo6h": (-646.5957621410, 5.8872),
 }
 
 

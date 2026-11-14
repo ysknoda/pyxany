@@ -79,6 +79,10 @@
 
 ### Changed
 
+- **Default `grid.n_r` is 45** (was 30; ADR 0015): at 30 the H2O force error,
+  2.2e-3 Ha/Bohr, exceeded `optimize.f_max` (1e-3); at 45 it is 1.7e-4. Total
+  energies of the heavy-atom examples move by ~0.1 Ha (gaps <= 0.02 eV), runs
+  take 14-32 % longer; examples, templates and Tier C pins updated.
 - `pyxany forces --compare` also prints a grid-error estimate (forces at
   n_r + 15) and warns when `optimize.f_max` is below it; docs/forces.md
   separates the implementation check (analytic vs FD, 1.3e-4 Ha/Bohr for H2O)

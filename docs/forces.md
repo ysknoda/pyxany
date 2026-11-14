@@ -52,13 +52,14 @@ H₂O (DZ) against n_r 80 / n_a 26 (max |F| there 2.3e-2 Ha/Bohr; measured 2026-
 
 | grid (n_r, n_a) | \|ΔE\| (Ha) | max \|ΔF\| (Ha/Bohr) |
 |---|---|---|
-| 30, 12 (default) | 2.0e-3 | 2.2e-3 |
-| 45, 12 | 3.4e-4 | 1.7e-4 |
+| 30, 12 (default before 0.2.0a3) | 2.0e-3 | 2.2e-3 |
+| 45, 12 (default since ADR 0015) | 3.4e-4 | 1.7e-4 |
 | 60, 12 | 8.7e-5 | 2.3e-5 |
 | 30, 18 | 2.0e-3 | 2.1e-3 |
 
-More angular points change nothing; more radial points do. At the default grid
-the force error (2e-3) exceeds the default `optimize.f_max` (1e-3).
+More angular points change nothing; more radial points do. At n_r 30 the force
+error (2e-3) exceeded the default `optimize.f_max` (1e-3), which is why the
+default is n_r 45 since ADR 0015 (1.7e-4, a factor 6 below f_max).
 `pyxany forces --compare` prints both numbers: the FD difference and a grid
 error estimate from n_r + 15, with a warning when `f_max` is below the latter.
 

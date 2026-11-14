@@ -45,7 +45,7 @@ basis:
   set: dz                # sz szp dz dzp tz tzp tzpp | sto3g 631g 631gd | nao
 
 grid:
-  n_r:           30      # radial points for C-F; scaled per element (ADR 0009)
+  n_r:           45      # radial points for C-F; scaled per element (ADR 0009, 0015)
   n_a:           12      # polar points per atom (2*n_a azimuthal)
   poisson_l_max: auto    # multipole cut-off of the Hartree expansion (n_a - 1)
   screening_tol: 1.0e-10

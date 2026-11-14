@@ -90,7 +90,9 @@ class BasisConfig:
 
 @dataclass
 class GridConfig:
-    n_r: int = 30
+    #: radial points for C-F, scaled per element. 45 rather than 30 (ADR 0015):
+    #: at 30 the H2O force error, 2.2e-3 Ha/Bohr, exceeds optimize.f_max (1e-3)
+    n_r: int = 45
     n_a: int = 12
     partition: str = "becke"
     #: Angular rule of the molecular grid: "product" (n_a x 2 n_a Gauss-Legendre

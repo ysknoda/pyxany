@@ -96,7 +96,7 @@ def _write_yaml(args, result, structure_path: Path) -> None:
         },
         "passivation": {"species": result.species_yaml()},
         "basis": {"set": "dz"},
-        "grid": {"n_r": 30, "n_a": 12, "poisson_l_max": "auto"},
+        "grid": {"n_r": 45, "n_a": 12, "poisson_l_max": "auto"},
         "scf": {"max_iter": 150, "e_tol": 1.0e-6, "d_tol": 1.0e-5, "alpha": 0.7},
         "forces": {"enabled": True, "method": "analytic"},
         "optimize": {"enabled": False, "freeze": "core", "f_max": 1.0e-3},

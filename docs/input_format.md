@@ -45,7 +45,7 @@ basis:
   set:     dz               # sz szp dz dzp tz tzp tzpp | sto3g 631g 631gd | nao
 
 grid:
-  n_r:              30      # radial points for second-row atoms (scaled per element)
+  n_r:              45      # radial points for second-row atoms (scaled per element; ADR 0015)
   n_a:              12      # polar points per atom (2*n_a azimuthal)
   partition:        becke   # Becke fuzzy cells; 'none' is rejected, see below
   angular:          product # product (n_a x 2n_a) | lebedev (same degree, ~2/3 the points)
@@ -145,8 +145,9 @@ rejected by the input validator.
 `radial_by_element: true` (the default) each atom gets `ceil(n_r × ratio)`
 points, the ratio *measured* per element by `tools/radial_grid_sizes.py`: the
 grid error in the ionization energy of the near-exact X-alpha atom is brought
-to the level C, N, O and F reach at `n_r`. At `n_r = 30`: H 36, C 25, O 29,
-Si 33, Ga/As 47, Cd 60, Pb 71. Without it, a Ga or Cd atom at `n_r = 30` carries
+to the level C, N, O and F reach at `n_r`. At the default `n_r = 45`: H 54, C 38,
+O 44, Si 50, Ga/As 71, Cd 90, Pb 107 (at 30: H 36, C 25, O 29, Si 33, Ga/As 47,
+Cd 60, Pb 71). Without it, a Ga or Cd atom at `n_r = 30` carries
 ~0.5 Ha of radial quadrature error in its total energy (energy *differences*
 are affected far less: 6 meV for the Ga ionization energy).
 
