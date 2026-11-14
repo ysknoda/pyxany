@@ -174,31 +174,43 @@ def test_esp_is_refused_until_implemented():
         Config.from_dict({**base, "properties": {"esp": {"enabled": True}}})
 
 
-def test_runtime_numba_and_cli_flags_choose_the_backend(tmp_path):
-    """runtime.numba and --numba/--no-numba had no effect (ADR 0013, F18)."""
+@pytest.mark.parametrize("installed", [True, False])
+def test_runtime_numba_and_cli_flags_choose_the_backend(tmp_path, monkeypatch, installed):
+    """runtime.numba and --numba/--no-numba had no effect (ADR 0013, F18).
+
+    Both installations are exercised here: the CI numpy jobs have no numba, and
+    the first version of this test only ever ran where numba was installed.
+    """
     import argparse
 
     import pyxany.kernels as kernels
+    import pyxany.parallel as par
     from pyxany.cli._shared import prepare
-    from pyxany.parallel import numba_enabled, set_numba_mode
 
+    if installed and not par._NUMBA_INSTALLED:
+        pytest.skip("numba not installed")
+    monkeypatch.setattr(par, "_NUMBA_INSTALLED", installed)
     (tmp_path / "w.xyz").write_text("1\n\nH 0 0 0\n")
-    yaml_text = "molecule: {structure: w.xyz, mult: 2}\nruntime: {numba: off}\n"
-    (tmp_path / "w.yaml").write_text(yaml_text)
+    (tmp_path / "w.yaml").write_text("molecule: {structure: w.xyz, mult: 2}\n"
+                                     "runtime: {numba: off}\n")
 
     def args(numba):
         return argparse.Namespace(input=str(tmp_path / "w.yaml"), overrides=None, basis=None,
                                   numba=numba, outdir=None, no_figure=True, timing=None,
                                   verbose=0, quiet=False)
     try:
-        prepare(args(None))
-        assert not numba_enabled() and kernels.backend_name() == "numpy"
-        prepare(args(True))      # the flag wins over the file
-        assert numba_enabled() == (kernels._load_numba() is not None)
+        prepare(args(None))                      # runtime.numba: off
+        assert not par.numba_enabled() and kernels.backend_name() == "numpy"
+        if installed:
+            prepare(args(True))                  # the flag wins over the file
+            assert par.numba_enabled()
+        else:
+            with pytest.raises(ConfigError, match="not installed"):
+                prepare(args(True))              # asking for numba without it
         prepare(args(False))
         assert kernels.backend_name() == "numpy"
     finally:
-        set_numba_mode("auto")
+        par.set_numba_mode("auto")
 
 
 def test_runtime_verbosity_is_the_default_without_v_or_q():
