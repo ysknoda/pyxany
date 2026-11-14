@@ -285,7 +285,7 @@ def _passivation_check(result, max_weight: float = 0.5) -> list[str]:
         )
         if np.isfinite(g["core_gap"]):
             w(
-                f"  gap {g['gap'] * HARTREE_TO_EV:.3f} eV   core gap{label} "
+                f"  gap{label} {g['gap'] * HARTREE_TO_EV:.3f} eV   core gap{label} "
                 f"{g['core_gap'] * HARTREE_TO_EV:.3f} eV   "
                 f"({g['n_terminator_states_below_core_lumo']} terminator state(s) "
                 f"below the core LUMO)"

@@ -44,6 +44,7 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+from ..config import ConfigError
 from ..data import elements as elem
 
 ANION = "anion"
@@ -58,16 +59,16 @@ MAX_TERMINATOR_CHARGE = 2.0
 def terminator_charge(role: str, valence_electrons: int, coordination: int) -> float:
     """Fractional nuclear charge of the pseudo-hydrogen terminating one bond."""
     if coordination <= 0:
-        raise ValueError(f"coordination number must be positive, got {coordination}")
+        raise ConfigError(f"coordination number must be positive, got {coordination}")
     z = int(valence_electrons)
     if role == ANION:
         alpha = (8 - z) / coordination
     elif role == CATION:
         alpha = (2 * coordination - z) / coordination
     else:
-        raise ValueError(f"role must be '{ANION}' or '{CATION}', got {role!r}")
+        raise ConfigError(f"role must be '{ANION}' or '{CATION}', got {role!r}")
     if alpha <= 0:
-        raise ValueError(
+        raise ConfigError(
             f"electron counting gives a non-positive charge (alpha = {alpha:g}) for a "
             f"{role} with {z} valence electrons and coordination {coordination}; "
             f"check the role assignment and the coordination number"
@@ -76,7 +77,7 @@ def terminator_charge(role: str, valence_electrons: int, coordination: int) -> f
     # any more; the largest value in the VASP set is 7/4.  Reaching this almost
     # always means the role or the coordination number is wrong.
     if alpha > MAX_TERMINATOR_CHARGE:
-        raise ValueError(
+        raise ConfigError(
             f"electron counting gives alpha = {alpha:g} for a {role} with {z} "
             f"valence electrons and coordination {coordination}, above the "
             f"{MAX_TERMINATOR_CHARGE:g} ceiling: that is no longer a pseudo-hydrogen. "
@@ -154,7 +155,7 @@ def assign_roles(molecule, neighbors: dict[int, list[int]],
         elemental = all(molecule[j].element == atom.element for j in partners)
         n_ideal = (ideal or {}).get(atom.element, len(partners))
         if own == average and not elemental and n_ideal != 4:
-            raise ValueError(
+            raise ConfigError(
                 f"cannot tell whether {atom.element} (site {i}) is the anion or the "
                 f"cation: it has the same valence-electron count as its neighbors "
                 f"({own}), at coordination {n_ideal}. The two counting rules only "
@@ -169,7 +170,7 @@ def assign_roles(molecule, neighbors: dict[int, list[int]],
             main_group = [molecule[j].element for j in partners
                           if not 3 <= elem.group(molecule[j].element) <= 12]
             if main_group:
-                raise ValueError(
+                raise ConfigError(
                     f"{atom.element} (site {i}) came out as the anion against "
                     f"{sorted(set(main_group))}, which cannot be right: a d-block "
                     f"element is not the anion against a main-group partner. The "

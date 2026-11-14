@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from ..config import ConfigError
 from ..constants import ANG_TO_BOHR, BOHR_TO_ANG
 from ..data.radii import covalent_radius
 from ..data.radii import source as radii_source
@@ -80,7 +81,7 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
     Phys. Rev. B **85**, 195328 (2012) is about.
     """
     if scheme not in ("pseudo_hydrogen", "hydrogen"):
-        raise ValueError(f"unknown passivation scheme {scheme!r}")
+        raise ConfigError(f"unknown passivation scheme {scheme!r}")
 
     neighbors = neighbor_lists(molecule, tolerance)
     bonds = bond_report(molecule, neighbors, tolerance)
@@ -108,7 +109,7 @@ def passivate(molecule, scheme: str = "pseudo_hydrogen", tolerance: float = 1.20
         if have == 0:
             warnings.append(
                 f"{atom.symbol}{i + 1} has no detected neighbors; the terminator "
-                f"directions are arbitrary. Check grid.tolerance ({tolerance})."
+                f"directions are arbitrary. Check --tolerance ({tolerance})."
             )
 
         dirs = None

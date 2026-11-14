@@ -11,7 +11,14 @@ def execute(args) -> int:
     if args.element and not elem.is_supported(args.element):
         print(f"  unknown element {args.element!r}")
         return EXIT_INPUT
-
+    key = (getattr(args, "key", None) or "").lower() or None
+    if key is not None and key not in _all_keys():
+        # the key used to be ignored: 'pyxany basis nonsense' printed the
+        # overview and exited 0 (ADR 0012 P0)
+        print(f"  unknown basis key {args.key!r}; choose from {', '.join(_all_keys())}")
+        return EXIT_INPUT
+    if key is not None:
+        return _key_report(key, args.element)
     if args.element:
         return _element_report(args.element)
 
@@ -48,4 +55,39 @@ def _element_report(symbol: str) -> int:
         funcs = sto_exponents(key).get(symbol, [])
         zetas = sorted({round(z, 4) for _n, _l, _m, z in funcs}, reverse=True)
         print(f"  {key:<8} {len(funcs):>10}   {zetas[:9]}")
+    return EXIT_OK
+
+
+def _all_keys() -> list[str]:
+    from ..basis.gto import GTO_KEYS
+    from ..basis.sto import STO_KEYS
+
+    return [*STO_KEYS, *GTO_KEYS, "nao"]
+
+
+def _key_covers(key: str) -> list[str]:
+    """Elements the key has functions for, in order of Z."""
+    from ..basis.gto import GTO_KEYS
+    from ..basis.sto import STO_KEYS, sto_exponents
+    from ..data.loaders import gto_table
+
+    if key in STO_KEYS:
+        have = set(sto_exponents(key))
+    elif key in GTO_KEYS:
+        have = set(gto_table(GTO_KEYS[key][0]))
+    else:  # nao: solved for every element
+        have = set(elem.symbols())
+    return sorted(have, key=elem.atomic_number)
+
+
+def _key_report(key: str, element: str | None) -> int:
+    covers = _key_covers(key)
+    if element:
+        ok = element in covers
+        if ok:
+            _element_report(element)
+        print(f"  basis {key}: {element} {'is' if ok else 'is NOT'} covered")
+        return EXIT_OK if ok else EXIT_INPUT
+    print(f"  {key}: {len(covers)} elements")
+    print("  " + " ".join(covers))
     return EXIT_OK

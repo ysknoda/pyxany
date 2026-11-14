@@ -114,6 +114,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="ideal coordination number (default: detected)")
     p_p.add_argument("--tolerance", type=float, default=1.20,
                      help="bond cutoff as a multiple of the summed covalent radii")
+    p_p.add_argument("--role", action="append", metavar="EL=ROLE",
+                     help="force an element's role, e.g. --role Mn=cation (repeatable); "
+                          "needed where valence counts cannot tell anion from cation")
     p_p.add_argument("--bond-scale", type=float, default=None,
                      help="override the X-H* distance scale factor")
     p_p.add_argument("-q", "--quiet", action="store_true")
@@ -123,6 +126,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_e = sub.add_parser("embed", help="point charges of the surrounding crystal")
     p_e.add_argument("input", help="crystal description YAML (lattice, sites, cells, cluster)")
     p_e.add_argument("-o", "--output", default="charges.xyz", help="point-charge file to write")
+    p_e.add_argument("--allow-substitution", action="store_true",
+                     help="let a cluster atom sit on a site of another element")
     p_e.add_argument("--allow-dipole", action="store_true",
                      help="write the charges even if the block has a dipole (polar cell)")
 
@@ -171,26 +176,28 @@ def main(argv: list[str] | None = None) -> int:
         "embed": embed_cmd.execute, "init": init_cmd.execute, "basis": basis_cmd.execute,
         "info": info_cmd.execute,
     }
-    tee = _Tee(getattr(args, "log", None))
-    try:
-        with tee:
+    # The error messages are printed inside the tee, so that --log records why
+    # a run failed; they used to go to stderr after the log was closed, and the
+    # log of a failed run was empty (ADR 0012, F4).
+    with _Tee(getattr(args, "log", None)):
+        try:
             return handlers[args.command](args)
-    except ConfigError as exc:
-        print(f"\n  [input error] {exc}\n", file=sys.stderr)
-        return _abort_if_parallel(EXIT_INPUT)
-    except FileNotFoundError as exc:
-        print(f"\n  [input error] {exc}\n", file=sys.stderr)
-        return _abort_if_parallel(EXIT_INPUT)
-    except KeyboardInterrupt:  # pragma: no cover
-        print("\n  interrupted\n", file=sys.stderr)
-        return _abort_if_parallel(EXIT_RUNTIME)
-    except Exception as exc:  # pragma: no cover - unexpected
-        import traceback
+        except ConfigError as exc:
+            print(f"\n  [input error] {exc}\n", file=sys.stderr)
+            return _abort_if_parallel(EXIT_INPUT)
+        except FileNotFoundError as exc:
+            print(f"\n  [input error] {exc}\n", file=sys.stderr)
+            return _abort_if_parallel(EXIT_INPUT)
+        except KeyboardInterrupt:  # pragma: no cover
+            print("\n  interrupted\n", file=sys.stderr)
+            return _abort_if_parallel(EXIT_RUNTIME)
+        except Exception as exc:  # pragma: no cover - unexpected
+            import traceback
 
-        if getattr(args, "verbose", 0):
-            traceback.print_exc()
-        print(f"\n  [error] {type(exc).__name__}: {exc}\n", file=sys.stderr)
-        return _abort_if_parallel(EXIT_RUNTIME)
+            if getattr(args, "verbose", 0):
+                traceback.print_exc()
+            print(f"\n  [error] {type(exc).__name__}: {exc}\n", file=sys.stderr)
+            return _abort_if_parallel(EXIT_RUNTIME)
 
 
 def _abort_if_parallel(code: int) -> int:
@@ -210,7 +217,12 @@ def _abort_if_parallel(code: int) -> int:
 
 
 class _Tee:
-    """Mirror stdout to a log file, for long unattended runs."""
+    """Mirror stdout and stderr to a log file, for long unattended runs.
+
+    Only rank 0 opens the file: every rank opening it with mode 'w' let a late
+    rank truncate what rank 0 had already written (ADR 0012, F4). Other ranks
+    print nothing to stdout anyway (mpi_print); their stderr is not logged.
+    """
 
     def __init__(self, path):
         self.path = path
@@ -218,10 +230,12 @@ class _Tee:
         self._orig = None
 
     def __enter__(self):
-        if not self.path:
+        from ..parallel import is_root
+
+        if not self.path or not is_root():
             return self
         self._fh = open(self.path, "w")
-        self._orig = sys.stdout
+        self._orig = (sys.stdout, sys.stderr)
 
         class _Writer:
             def __init__(self, a, b):
@@ -235,12 +249,13 @@ class _Tee:
                 self.a.flush()
                 self.b.flush()
 
-        sys.stdout = _Writer(self._orig, self._fh)
+        sys.stdout = _Writer(self._orig[0], self._fh)
+        sys.stderr = _Writer(self._orig[1], self._fh)
         return self
 
     def __exit__(self, *exc):
         if self._fh:
-            sys.stdout = self._orig
+            sys.stdout, sys.stderr = self._orig
             self._fh.close()
         return False
 

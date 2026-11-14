@@ -62,3 +62,34 @@ def test_a_different_system_is_refused(tmp_path):
     _scf(WATER, path=path)
     with pytest.raises(ValueError, match="different system"):
         _scf(METHYL, mult=2, restart=path)
+
+
+def _ts_scf(path=None, restart=None, max_iter=100):
+    mol = make_molecule("m", WATER)
+    cfg = make_config(scf={"max_iter": max_iter, "e_tol": 1e-9, "d_tol": 1e-8},
+                      transition_state={"remove": "homo"})
+    return run_scf(mol, build_basis(mol, cfg), cfg, verbose=0, restart=restart,
+                   checkpoint_path=path)
+
+
+def test_transition_state_resume_keeps_the_half_hole(tmp_path):
+    """The resumed density was rescaled to the integer count, putting the
+    removed half electron back: 2.26 Ha off and 122 more iterations (ADR 0012 P0)."""
+    path = tmp_path / "ts.npz"
+    first = _ts_scf(path=path)
+    assert first.converged
+    again = _ts_scf(restart=path)
+    assert again.converged and again.n_iterations <= 6
+    assert again.total_energy == pytest.approx(first.total_energy, abs=1e-7)
+
+
+def test_restart_at_max_iter_is_an_input_error(tmp_path):
+    """Resuming a run that stopped at max_iter with the same max_iter used to
+    run zero iterations and crash in the report (ADR 0012 P0)."""
+    from pyxany.config import ConfigError
+
+    path = tmp_path / "s.npz"
+    cut = _scf(WATER, path=path, max_iter=4)
+    assert not cut.converged
+    with pytest.raises(ConfigError, match="raise scf.max_iter above 4"):
+        _scf(WATER, restart=path, max_iter=4)

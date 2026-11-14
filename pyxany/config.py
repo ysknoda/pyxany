@@ -65,6 +65,10 @@ class PassivationConfig:
                     f"{ctx}: passivation.species['{label}'] needs an "
                     f"'alpha' (fractional nuclear charge)"
                 )
+            a = spec.get("alpha", spec.get("Z"))
+            if isinstance(a, bool) or not isinstance(a, (int, float)) or not a > 0:
+                raise ConfigError(f"{ctx}: passivation.species['{label}'].alpha must be > 0; "
+                                  f"got {a!r}")
 
 
 @dataclass
@@ -153,6 +157,14 @@ class GridConfig:
             )
         if isinstance(self.chunk_size, str) and self.chunk_size != "auto":
             raise ConfigError(f"{ctx}: grid.chunk_size must be an integer or 'auto'")
+        if not isinstance(self.chunk_size, str) and (
+                isinstance(self.chunk_size, bool) or not isinstance(self.chunk_size, int)
+                or self.chunk_size < 1):
+            raise ConfigError(f"{ctx}: grid.chunk_size must be 'auto' or an integer >= 1")
+        if not self.memory_budget_mb > 0:
+            raise ConfigError(f"{ctx}: grid.memory_budget_mb must be > 0")
+        if self.screening_tol < 0:
+            raise ConfigError(f"{ctx}: grid.screening_tol must be >= 0")
         if self.angular not in ("product", "lebedev"):
             raise ConfigError(f"{ctx}: grid.angular must be 'product' or 'lebedev'; "
                               f"got {self.angular!r}")
@@ -310,6 +322,13 @@ class SCFConfig:
                 raise ConfigError(f"{ctx}: scf.{name} must be in (0, 1]; got {v}")
         if self.smearing < 0:
             raise ConfigError(f"{ctx}: scf.smearing must be >= 0")
+        if self.ediis_iters < 0:
+            raise ConfigError(f"{ctx}: scf.ediis_iters must be >= 0")
+        # canonical orthogonalization drops overlap eigenvalues below this; a
+        # value near 1 would drop real basis directions
+        if not 0.0 < self.s_threshold <= 0.1:
+            raise ConfigError(f"{ctx}: scf.s_threshold must be in (0, 0.1]; got "
+                              f"{self.s_threshold}")
         if self.checkpoint_every < 0:
             raise ConfigError(f"{ctx}: scf.checkpoint_every must be >= 0 (0 = only at the end)")
 
@@ -368,6 +387,8 @@ class ForcesConfig:
                 f"{ctx}: forces.method must be 'analytic' or "
                 f"'finite_difference'; got {self.method!r}"
             )
+        if not self.fd_step > 0:
+            raise ConfigError(f"{ctx}: forces.fd_step must be > 0 (Bohr)")
 
 
 @dataclass
@@ -388,6 +409,10 @@ class OptimizeConfig:
             )
         if self.method not in ("lbfgs", "cg"):
             raise ConfigError(f"{ctx}: optimize.method must be 'lbfgs' or 'cg'")
+        if not self.f_max > 0:
+            raise ConfigError(f"{ctx}: optimize.f_max must be > 0 (Ha/Bohr)")
+        if self.max_steps < 1:
+            raise ConfigError(f"{ctx}: optimize.max_steps must be >= 1")
         if isinstance(self.freeze, str) and self.freeze not in ("none", "core"):
             raise ConfigError(
                 f"{ctx}: optimize.freeze must be 'none', 'core' or a list of atom indices"
@@ -437,6 +462,22 @@ class PropertiesConfig:
                               f"the cube output (ADR 0012, A2). Set enabled: false.")
         if not (0.0 < self.terminator_weight_max <= 1.0):
             raise ConfigError(f"{ctx}: properties.terminator_weight_max must be in (0, 1]")
+        n_pts = self.dos.get("n_points", 600)
+        if isinstance(n_pts, bool) or not isinstance(n_pts, int) or n_pts < 2:
+            raise ConfigError(f"{ctx}: properties.dos.n_points must be an integer >= 2")
+        op = self.overlap_population
+        op_sigma = op.get("sigma", 0.3)
+        if isinstance(op_sigma, bool) or not isinstance(op_sigma, (int, float)) \
+                or not op_sigma > 0:
+            raise ConfigError(f"{ctx}: properties.overlap_population.sigma must be > 0")
+        pairs = op.get("pairs", [])
+        if not isinstance(pairs, list) or not all(
+                isinstance(p, (list, tuple)) and len(p) == 2
+                and all(isinstance(i, int) and not isinstance(i, bool) and i >= 0 for i in p)
+                for p in pairs):
+            # a bad pair used to fail with an IndexError after the SCF (ADR 0012 P0)
+            raise ConfigError(f"{ctx}: properties.overlap_population.pairs must be a list "
+                              f"of [i, j] pairs of 0-based atom indices; got {pairs!r}")
         sigma = self.dos.get("sigma", 0.3)
         if not (isinstance(sigma, (int, float)) and sigma > 0):
             raise ConfigError(f"{ctx}: properties.dos.sigma must be > 0; got {sigma}")
@@ -457,8 +498,9 @@ class OutputConfig:
 
 @dataclass
 class RuntimeConfig:
-    #: auto | on | off; --numba / --no-numba win over it (ADR 0013)
-    numba: str = "auto"
+    #: auto | on | off (a bare on/off arrives from YAML as a bool); --numba /
+    #: --no-numba win over it (ADR 0013)
+    numba: Any = "auto"
     #: output level when neither -v nor -q is given (0 quiet, 1 normal, 2+ verbose)
     verbosity: int = 1
 
@@ -491,8 +533,14 @@ class EmbeddingConfig:
     def validate(self, ctx: str) -> None:
         if self.charges is not None and not isinstance(self.charges, str):
             raise ConfigError(f"{ctx}: embedding.charges must be a file name")
-        if self.units not in ("angstrom", "bohr"):
-            raise ConfigError(f"{ctx}: embedding.units must be 'angstrom' or 'bohr'")
+        # same aliases as molecule.units
+        if str(self.units).lower() in _ANGSTROM:
+            self.units = "angstrom"
+        elif str(self.units).lower() in _BOHR:
+            self.units = "bohr"
+        else:
+            raise ConfigError(f"{ctx}: embedding.units must be angstrom or bohr; "
+                              f"got {self.units!r}")
         if not (isinstance(self.sigma, (int, float)) and self.sigma > 0):
             raise ConfigError(f"{ctx}: embedding.sigma must be > 0 (Bohr)")
         if not (self.spill_radius > 0 and self.spill_warn >= 0):
@@ -546,6 +594,36 @@ _MOVED = {
     ("basis", "nao_n_r"): "grid: {atom: {n_points: ...}}",
     ("grid", "one_centre"): "grid: {one_center: {n_r: ...}} (American spelling)",
 }
+
+def _check_field_types(section, name: str, ctx: str) -> None:
+    """Reject a value whose type does not match the field's annotation.
+
+    'smearing: abc' or 'mult: two' used to pass the validators and fail later
+    with a TypeError, reported as a runtime error (exit 3) after the setup work
+    (ADR 0012 P0). Fields annotated Any (modes such as 'auto') are left to
+    their section's own validate().
+    """
+    for f in fields(section):
+        value = getattr(section, f.name)
+        kind = f.type if isinstance(f.type, str) else getattr(f.type, "__name__", "")
+        if kind == "bool":
+            ok = isinstance(value, bool)
+        elif kind == "int":
+            ok = isinstance(value, int) and not isinstance(value, bool)
+        elif kind == "float":
+            ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif kind == "str":
+            ok = isinstance(value, str)
+        else:
+            continue
+        if not ok:
+            raise ConfigError(f"{ctx}: {name}.{f.name} must be {_KIND_NAMES[kind]}; "
+                              f"got {value!r}")
+
+
+_KIND_NAMES = {"bool": "true or false", "int": "an integer", "float": "a number",
+               "str": "a string"}
+
 
 #: keys removed because they were validated but never read (ADR 0013)
 _REMOVED = {
@@ -634,15 +712,21 @@ class Config:
 
     def validate(self, ctx: str = "<config>") -> None:
         for name in _SECTIONS:
+            _check_field_types(getattr(self, name), name, ctx)
             getattr(self, name).validate(ctx)
-        if self.scf.max_iter is None:
+        # Derived defaults are remembered as such, so that a later --set of
+        # what they derive from (transition_state, molecule.name) re-derives
+        # them instead of keeping the first value (ADR 0012 P0).
+        if self.scf.max_iter is None or getattr(self, "_derived_max_iter", False):
             self.scf.max_iter = (DEFAULT_MAX_ITER_TS if self.transition_state.enabled
                                  else DEFAULT_MAX_ITER)
+            self._derived_max_iter = True
         if self.transition_state.enabled and self.scf.smearing > 0:
             raise ConfigError(f"{ctx}: a transition state fixes occupations by hand; "
                               f"scf.smearing must be 0")
-        if not self.output.prefix:
+        if not self.output.prefix or getattr(self, "_derived_prefix", False):
             self.output.prefix = self.molecule.name
+            self._derived_prefix = True
 
     def structure_path(self) -> Path:
         p = Path(self.molecule.structure)
@@ -654,6 +738,10 @@ class Config:
 
     def apply_overrides(self, overrides: dict) -> None:
         """Apply ``{"scf.alpha": 0.75}`` style overrides in place."""
+        if "scf.max_iter" in overrides:
+            self._derived_max_iter = False
+        if "output.prefix" in overrides:
+            self._derived_prefix = False
         for dotted, value in overrides.items():
             section, _, key = dotted.partition(".")
             if section not in _SECTIONS or not key:
@@ -700,9 +788,23 @@ class Config:
 
 
 def _coerce(current, value, dotted: str):
-    """Convert a string override to the type of the existing value."""
+    """Convert a string override to the type of the existing value.
+
+    Values are read as YAML would read them in the file, then validated like
+    the file: ``--set grid.chunk_size=5000`` (default 'auto') and
+    ``--set properties.overlap_population.pairs=[[0,1]]`` used to stay strings
+    and failed, the latter only after the SCF (ADR 0012 P0). A setting whose
+    current value is a free string (a name, a basis key) keeps the string.
+    """
     if not isinstance(value, str):
         return value
+    if current is None or isinstance(current, (list, dict)) or current == "auto":
+        import yaml
+
+        try:
+            return yaml.safe_load(value)
+        except yaml.YAMLError:
+            return value
     if isinstance(current, bool):
         low = value.strip().lower()
         if low in ("true", "yes", "1", "on"):

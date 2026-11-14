@@ -1,8 +1,10 @@
 """Cached loaders for the JSON data tables shipped inside the package.
 
-The tables were extracted mechanically from the original single-file script by
-``tools/extract_tables.py``; ``tests/test_data.py`` re-imports that script and
-asserts every key and value survived the conversion.
+Most tables were extracted from the original single-file script by
+``tools/extract_tables.py``; the X-alpha tables come from ``tools/alpha_hf.py``
+and the radial-grid ratios from ``tools/radial_grid_sizes.py``.
+``tests/test_data.py`` checks physical invariants of every table and pins
+each file's SHA-256.
 """
 
 from __future__ import annotations

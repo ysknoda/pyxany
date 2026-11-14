@@ -9,7 +9,7 @@ import numpy as np
 from ..basis.evaluate import chi_matrix
 from ..grid.molecular import grid_from_config
 from ..integrals.overlap import build_overlap_kinetic
-from ..parallel import mpi_print
+from ..parallel import allreduce_scalar, mpi_print
 from ..scf.guess import atomic_superposition, rescale_to_electron_count
 from ..timing import REGISTRY, timer
 from . import EXIT_OK
@@ -55,7 +55,8 @@ def _gridcheck(args):
             chi = chi_matrix(basis, molecule.positions, grid.local_points)
         with timer(f"density {label}"):
             rho = np.einsum("km,mn,kn->k", chi, P, chi, optimize=True)
-            total = float(np.dot(grid.local_weights, rho))
+            # each rank holds its share of the grid (2 ranks gave 8.88 of 10)
+            total = allreduce_scalar(float(np.dot(grid.local_weights, rho)))
         elapsed = time.perf_counter() - elapsed
         err = total - molecule.n_electrons
         mpi_print(f"  {label:>12} {len(grid):>10,} {total:>14.8f} "

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..config import ConfigError
+
 _MAX_BISECTION = 200
 
 
@@ -30,7 +32,7 @@ def aufbau_occupations(eps: np.ndarray, n_electrons: float,
         occ[i] = take
         remaining -= take
     if remaining > 1e-8:
-        raise ValueError(
+        raise ConfigError(
             f"cannot place {n_electrons:g} electrons: only "
             f"{np.isfinite(eps).sum()} usable orbitals x max_occ {max_occ:g} available. "
             f"Use a larger basis set."
@@ -76,7 +78,7 @@ def fermi_occupations(eps: np.ndarray, n_electrons: float, sigma: float,
     # too, or the SCF converges tidily for the wrong number of electrons.
     placed = float(occ.sum())
     if abs(placed - n_electrons) > 1e-6 * max(1.0, abs(n_electrons)):
-        raise ValueError(
+        raise ConfigError(
             f"cannot place {n_electrons:g} electrons: only "
             f"{int(finite.sum())} usable orbitals x max_occ {max_occ:g} available "
             f"(placed {placed:g} at smearing {sigma:g}). Use a larger basis set."
@@ -109,7 +111,7 @@ def spin_electron_counts(n_electrons: float, multiplicity: int) -> tuple[float, 
     n_alpha = (n_electrons + n_unpaired) / 2.0
     n_beta = (n_electrons - n_unpaired) / 2.0
     if n_beta < -1e-9:
-        raise ValueError(
+        raise ConfigError(
             f"multiplicity {multiplicity} needs {n_unpaired} unpaired electrons "
             f"but the molecule only has {n_electrons:g}"
         )
@@ -123,7 +125,7 @@ def spin_electron_counts(n_electrons: float, multiplicity: int) -> tuple[float, 
     if abs(n_electrons - round(n_electrons)) < 1e-9:
         total = int(round(n_electrons))
         if (total - n_unpaired) % 2 != 0:
-            raise ValueError(
+            raise ConfigError(
                 f"multiplicity {multiplicity} is impossible for {total} electrons: "
                 f"the alpha/beta split would be {n_alpha:g}/{n_beta:g}, which is not "
                 f"a real spin state. An odd electron count needs an even "

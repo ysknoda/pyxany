@@ -37,7 +37,8 @@ populations.
   Clipped bars are marked.
 - Partial DOS uses Loewdin weights (bounded, sum to 1 per orbital), not
   Mulliken; species are ordered by nuclear charge.
-- `--set` cannot reach nested keys, so `overlap_population.*` is set in YAML.
+- `--set` could not reach nested keys then, so `overlap_population.*` was set in
+  YAML. (Since ADR 0009 it can: `--set properties.overlap_population.heatmap=true`.)
 - Possible follow-up: choose the pair type that colors the level diagram
   (today: the type with the largest total overlap population).
 

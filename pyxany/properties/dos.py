@@ -37,8 +37,12 @@ def projected_dos(eps: np.ndarray, weights: np.ndarray, sigma: float = 0.3,
     w = np.asarray(weights)[finite]
     if len(e) == 0:
         return np.zeros(0), np.zeros(0)
-    lo = kwargs.get("e_min", e.min() - kwargs.get("margin", 3.0))
-    hi = kwargs.get("e_max", e.max() + kwargs.get("margin", 3.0))
+    # an explicit None means "from the levels", like an omitted key (it raised)
+    margin = kwargs.get("margin", 3.0)
+    lo = kwargs.get("e_min")
+    hi = kwargs.get("e_max")
+    lo = e.min() - margin if lo is None else lo
+    hi = e.max() + margin if hi is None else hi
     grid = np.linspace(lo, hi, n_points)
     z = (grid[:, None] - e[None, :]) / sigma
     dos = (np.exp(-0.5 * z**2) * w[None, :]).sum(axis=1) / (sigma * np.sqrt(2.0 * np.pi))

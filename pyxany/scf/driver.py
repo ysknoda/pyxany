@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from ..config import ConfigError
 from ..constants import ANG_TO_BOHR, HARTREE_TO_EV
 from ..grid.molecular import grid_from_config
 from ..integrals import xc
@@ -234,8 +235,25 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
         initial, start_it = ckpt_mod.initial_density(
             ckpt_mod.read(restart), system_fp, geometry_fp, n_basis, path=restart,
             verbose=verbose)
+        if start_it >= scf_cfg.max_iter:
+            # the loop would run zero times and the report crash on missing
+            # orbitals (ADR 0012 P0); max_iter counts from the first iteration
+            raise ConfigError(
+                f"{restart} was written at iteration {start_it}, and scf.max_iter "
+                f"({scf_cfg.max_iter}) counts from the start of the SCF: raise "
+                f"scf.max_iter above {start_it} to continue")
+    # A removed transition-state electron is missing from its channel: rescaling
+    # a restart or a previous-geometry density to the integer count put it back
+    # (H2O HOMO TS resumed 2.26 Ha off and needed 122 more iterations).
+    hole_a = hole_b = 0.0
+    if ts_cfg.enabled and ts_cfg.remove is not None:
+        if ts_cfg.spin == "alpha":
+            hole_a = float(ts_cfg.electrons)
+        else:
+            hole_b = float(ts_cfg.electrons)
     if initial is not None and initial.get("P") is not None:
-        P = rescale_to_electron_count(np.array(initial["P"], dtype=float), S, n_electrons)
+        P = rescale_to_electron_count(np.array(initial["P"], dtype=float), S,
+                                      n_electrons - hole_a - hole_b)
     else:
         P = rescale_to_electron_count(
             sad_density(molecule, basis, scf_cfg.alpha_for, grid_cfg.atom["n_points"],
@@ -243,8 +261,10 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
             S, n_electrons)
     if unrestricted:
         if initial is not None and all(initial.get(k) is not None for k in ("P_a", "P_b")):
-            P_a = rescale_to_electron_count(np.array(initial["P_a"], dtype=float), S, n_alpha)
-            P_b = rescale_to_electron_count(np.array(initial["P_b"], dtype=float), S, n_beta)
+            P_a = rescale_to_electron_count(np.array(initial["P_a"], dtype=float), S,
+                                            n_alpha - hole_a)
+            P_b = rescale_to_electron_count(np.array(initial["P_b"], dtype=float), S,
+                                            n_beta - hole_b)
         else:
             P_a, P_b = spin_split(P, molecule, basis, n_alpha, n_beta)
         P = P_a + P_b

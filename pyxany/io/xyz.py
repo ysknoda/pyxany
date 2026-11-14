@@ -19,12 +19,13 @@ from pathlib import Path
 
 import numpy as np
 
+from ..config import ConfigError
 from ..constants import ANG_TO_BOHR, BOHR_TO_ANG
 from ..data import elements as elem
 from ..molecule import Atom, Molecule
 
 
-class XYZError(ValueError):
+class XYZError(ConfigError):
     """Raised for a malformed or inconsistent .xyz file."""
 
 
@@ -87,7 +88,8 @@ def _parse_frames(path: Path):
             raise XYZError(
                 f"{path}:{i + 1}: expected an atom count, got {lines[i]!r}"
             ) from None
-        if i + 1 + n >= len(lines) + 1 and i + 2 + n > len(lines):
+        # header line, comment line, then n atom lines
+        if i + 2 + n > len(lines):
             raise XYZError(f"{path}:{i + 1}: header says {n} atoms but the file ends early")
         comment = lines[i + 1] if i + 1 < len(lines) else ""
         rows = []

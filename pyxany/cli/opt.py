@@ -8,7 +8,7 @@ from ..io.results import result_dict, write_json, write_text
 from ..io.xyz import write_xyz
 from ..parallel import is_root, mpi_print
 from ..timing import REGISTRY, timer
-from . import EXIT_OK, EXIT_OPT
+from . import EXIT_OK, EXIT_OPT, EXIT_SCF
 from ._shared import (
     build_molecule_basis,
     out_path,
@@ -56,4 +56,8 @@ def execute(args) -> int:
     report_timing(cfg)
     if is_root() and cfg.runtime.verbosity:
         mpi_print(f"\n  output written to {out_path(cfg, '')}*\n")
+    # an unconverged final SCF is the more serious failure (ADR 0012 P0: it
+    # exited 0 when the forces happened to be small)
+    if not scf.converged:
+        return EXIT_SCF
     return EXIT_OK if result.converged else EXIT_OPT

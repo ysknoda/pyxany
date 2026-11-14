@@ -16,6 +16,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from ..basis import build_basis
+from ..config import ConfigError
 from ..constants import BOHR_TO_ANG
 from ..io.xyz import append_frame
 from ..parallel import is_root, mpi_print
@@ -60,14 +61,14 @@ def freeze_mask(molecule, freeze) -> np.ndarray:
         for i, atom in enumerate(molecule):
             mask[i] = not atom.is_pseudo
         if mask.all():
-            raise ValueError(
+            raise ConfigError(
                 "optimize.freeze='core' would freeze every atom: the structure has "
                 "no pseudo-hydrogen terminators to relax"
             )
         return mask
     for i in freeze:
         if not 0 <= i < n:
-            raise ValueError(f"optimize.freeze: atom index {i} out of range 0..{n - 1}")
+            raise ConfigError(f"optimize.freeze: atom index {i} out of range 0..{n - 1}")
         mask[i] = True
     return mask
 
@@ -79,7 +80,7 @@ def optimize_geometry(molecule, config, verbose: int = 1, restart=None,
     frozen = freeze_mask(molecule, opt_cfg.freeze)
     moving = np.where(~frozen)[0]
     if len(moving) == 0:
-        raise ValueError("optimize: every atom is frozen, nothing to do")
+        raise ConfigError("optimize: every atom is frozen, nothing to do")
 
     current = molecule.copy()
     state = {"n": 0, "best": None, "traj": [], "scf": None}
@@ -137,7 +138,7 @@ def optimize_geometry(molecule, config, verbose: int = 1, restart=None,
             mpi_print(f"  {state['n']:>4}  {result.total_energy:>17.9f}  {f_max:>11.3e}  "
                       f"{float(np.sqrt(np.mean(f_move**2))):>11.3e}")
         state["traj"].append({"step": state["n"], "E": result.total_energy,
-                              "f_max": f_max,
+                              "f_max": f_max, "scf_converged": bool(result.converged),
                               "positions": current.positions.copy()})
         if traj_path:
             append_frame(traj_path, current,
@@ -183,6 +184,11 @@ def optimize_geometry(molecule, config, verbose: int = 1, restart=None,
         status = "CONVERGED" if converged else "NOT CONVERGED"
         mpi_print(f"  [{status}] max|F| = {f_max:.3e} Ha/Bohr after {state['n']} "
                   f"energy/gradient evaluations")
+        n_bad = sum(not t["scf_converged"] for t in state["traj"])
+        if n_bad:
+            # their energies and forces steered the optimizer (ADR 0012 P0)
+            mpi_print(f"  [warning] the SCF did not converge in {n_bad} of {state['n']} "
+                      f"evaluations; raise scf.max_iter and check the result")
         if traj_path:
             mpi_print(f"  trajectory: {traj_path}")
         _report_geometry(current, verbose)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from ..io.report import format_results
-from ..io.results import result_dict, write_json, write_npz, write_text
+from ..io.results import _json_safe, result_dict, write_json, write_npz, write_text
 from ..io.xyz import write_xyz
 from ..parallel import is_root, mpi_print
 from ..properties import dipole_moment
@@ -72,7 +72,7 @@ def execute(args) -> int:
             if cfg.output.figure:
                 _figure(result, cfg, forces)
             if args.json:
-                print(json.dumps(payload, indent=2))
+                print(json.dumps(_json_safe(payload), indent=2, allow_nan=False))
 
     report_timing(cfg)
     if is_root() and cfg.output.timing:

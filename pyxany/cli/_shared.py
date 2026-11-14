@@ -37,6 +37,12 @@ def prepare(args) -> tuple[Config, object]:
     cfg.runtime.verbosity = verbosity(args, cfg.runtime.verbosity)
 
     molecule = load_molecule(cfg)
+    bad = [p for p in cfg.properties.overlap_population.get("pairs", [])
+           if max(p) >= len(molecule) or p[0] == p[1]]
+    if bad:
+        raise ConfigError(f"properties.overlap_population.pairs {bad}: atom indices are "
+                          f"0-based and must name two different atoms of the "
+                          f"{len(molecule)} in {cfg.molecule.structure}")
     _apply_passivation_basis(cfg, molecule)
     return cfg, molecule
 
@@ -157,7 +163,9 @@ def _n_pairs(cfg_molecule, basis, cfg) -> int:
 def report_timing(cfg) -> None:
     from ..parallel import PARALLEL
 
-    if not cfg.output.timing:
+    # -q prints nothing: the table used to follow the JSON of '-q --json' on
+    # stdout, so the output did not parse (<prefix>_timing.json is still written)
+    if not cfg.output.timing or cfg.runtime.verbosity == 0:
         return
     if PARALLEL:
         REGISTRY.report_mpi(printer=mpi_print)

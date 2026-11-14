@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml
 
+from ..config import ConfigError
 from ..io.xyz import read_xyz, write_xyz
 from ..parallel import is_root, mpi_print
 from ..passivation import format_report, passivate
@@ -33,6 +35,7 @@ def _passivate(args) -> int:
         result = passivate(
             molecule, scheme=args.scheme, tolerance=args.tolerance,
             coordination=args.coordination, reference=reference,
+            role_overrides=_role_overrides(getattr(args, "role", None)),
             bond_scale=args.bond_scale,
         )
 
@@ -57,6 +60,21 @@ def _passivate(args) -> int:
     return EXIT_OK
 
 
+def _role_overrides(items) -> dict | None:
+    """``--role Mn=cation`` (repeatable): the overrides the role check asks for,
+    which no CLI option could set (MnO, FeO, TiC always failed; ADR 0012 P0)."""
+    if not items:
+        return None
+    out = {}
+    for item in items:
+        element, _, role = item.partition("=")
+        role = role.strip().lower()
+        if not element.strip() or role not in ("anion", "cation"):
+            raise ConfigError(f"--role {item!r}: expected ELEMENT=anion or ELEMENT=cation")
+        out[element.strip()] = role
+    return out
+
+
 def _default_output(structure: str) -> str:
     p = Path(structure)
     return str(p.with_name(p.stem + "_passivated" + p.suffix))
@@ -67,7 +85,11 @@ def _write_yaml(args, result, structure_path: Path) -> None:
     doc = {
         "molecule": {
             "name": name,
-            "structure": structure_path.name,
+            # relative to the YAML file, which is how the structure is resolved
+            # (the bare file name failed whenever the two were in different
+            # directories)
+            "structure": os.path.relpath(structure_path.resolve(),
+                                         Path(args.emit_yaml).resolve().parent),
             "charge": 0,
             "mult": 1,
             "units": "angstrom",

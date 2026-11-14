@@ -29,6 +29,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..config import ConfigError
+
 
 @dataclass
 class Target:
@@ -48,22 +50,22 @@ def parse_target(spec) -> Target:
     if isinstance(spec, str) and spec.lower() in ("homo", "lumo"):
         return Target("frontier", spec.lower())
     if isinstance(spec, bool):
-        raise ValueError(f"transition_state: bad orbital {spec!r}")
+        raise ConfigError(f"transition_state: bad orbital {spec!r}")
     if isinstance(spec, int):
         if spec < 1:
-            raise ValueError("transition_state: MO numbers are 1-based")
+            raise ConfigError("transition_state: MO numbers are 1-based")
         return Target("index", spec - 1)
     if isinstance(spec, dict) and set(spec) == {"atom", "shell"}:
         shell = str(spec["shell"]).strip().lower()
         if len(shell) != 2 or not shell[0].isdigit() or shell[1] not in _L:
-            raise ValueError(f"transition_state: shell must look like '1s' or '2p', got {shell!r}")
+            raise ConfigError(f"transition_state: shell must look like '1s' or '2p', got {shell!r}")
         n, l = int(shell[0]), _L[shell[1]]
         if l >= n:
-            raise ValueError(f"transition_state: shell {shell} does not exist")
+            raise ConfigError(f"transition_state: shell {shell} does not exist")
         if int(spec["atom"]) < 1:
-            raise ValueError("transition_state: atom numbers are 1-based, as in the .xyz")
+            raise ConfigError("transition_state: atom numbers are 1-based, as in the .xyz")
         return Target("shell", (int(spec["atom"]) - 1, n, l))
-    raise ValueError(f"transition_state: cannot interpret orbital {spec!r}")
+    raise ConfigError(f"transition_state: cannot interpret orbital {spec!r}")
 
 
 def shell_mask(basis, atom: int, n: int, l: int) -> np.ndarray:
@@ -79,7 +81,7 @@ def shell_mask(basis, atom: int, n: int, l: int) -> np.ndarray:
             tail = f.label.split("_")[-1]
             fn = int(tail[0]) if tail[:1].isdigit() else None
         if fn is None:
-            raise ValueError(
+            raise ConfigError(
                 "transition_state: a core hole needs a basis with principal "
                 "quantum numbers (an STO set such as dz, or nao); Gaussian "
                 "sets do not identify shells"
@@ -87,7 +89,7 @@ def shell_mask(basis, atom: int, n: int, l: int) -> np.ndarray:
         mask.append(fn == n)
     mask = np.array(mask, dtype=bool)
     if not mask.any():
-        raise ValueError(f"transition_state: atom {atom + 1} has no {n}{'spdf'[l]} functions")
+        raise ConfigError(f"transition_state: atom {atom + 1} has no {n}{'spdf'[l]} functions")
     return mask
 
 
@@ -109,7 +111,7 @@ class HoleManager:
         if self.source.kind == "shell":
             atom, n, l = self.source.which
             if atom >= len(molecule):
-                raise ValueError(f"transition_state: atom {atom + 1} > {len(molecule)} atoms")
+                raise ConfigError(f"transition_state: atom {atom + 1} > {len(molecule)} atoms")
             w, U = np.linalg.eigh(S)
             self._sqrtS = (U * np.sqrt(np.maximum(w, 0.0))) @ U.T
             self._proj = shell_mask(basis, atom, n, l)
@@ -134,7 +136,7 @@ class HoleManager:
         if target.kind == "index":
             order = np.argsort(np.where(finite, eps, np.inf))
             if target.which >= len(order):
-                raise ValueError(f"transition_state: MO {target.which + 1} does not exist")
+                raise ConfigError(f"transition_state: MO {target.which + 1} does not exist")
             return int(order[target.which])
         weights = np.sum((self._sqrtS @ C)[self._proj] ** 2, axis=0)
         pool = np.where(finite & (occ > 1e-8))[0]
@@ -156,7 +158,7 @@ class HoleManager:
         on_element = np.sum(LC[self._elem_proj] ** 2, axis=0)
         sub = np.where(finite & (occ > 1e-8) & (on_element > 0.1))[0]
         if len(sub) == 0:
-            raise ValueError("transition_state: no occupied orbital carries the requested shell")
+            raise ConfigError("transition_state: no occupied orbital carries the requested shell")
         _, _, vt = np.linalg.svd(LC[np.ix_(self._proj, sub)], full_matrices=False)
         v = vt[0]
         c_h = C[:, sub] @ v
@@ -195,7 +197,7 @@ class HoleManager:
         else:
             i = self._pick(self.source, eps, occ, C, occupied=True)
         if occ[i] < self.electrons - 1e-9:
-            raise ValueError(
+            raise ConfigError(
                 f"transition_state: orbital {i + 1} holds {occ[i]:.3f} electrons, "
                 f"cannot remove {self.electrons}"
             )
@@ -204,7 +206,7 @@ class HoleManager:
         if self.dest is not None:
             j = self._pick(self.dest, eps, occ, C, occupied=False)
             if occ[j] + self.electrons > 1.0 + 1e-9:
-                raise ValueError(
+                raise ConfigError(
                     f"transition_state: orbital {j + 1} cannot take "
                     f"{self.electrons} more electrons in one spin channel"
                 )

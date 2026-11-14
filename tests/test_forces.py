@@ -288,6 +288,7 @@ def _fake_optimizer_backend(monkeypatch, energy_min_bohr, force_zero_bohr, k=0.5
     def fake_scf(mol, basis, config, verbose=0, **kwargs):
         r = float(np.linalg.norm(mol.positions[1] - mol.positions[0]))
         return SimpleNamespace(total_energy=k * (r - energy_min_bohr) ** 2, molecule=mol,
+                               converged=True,
                                P=None, P_a=None, P_b=None)
 
     def fake_forces(result, config, project=True):

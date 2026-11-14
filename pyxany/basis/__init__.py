@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..config import ConfigError
 from .evaluate import chi_grad_matrix, chi_matrix
 from .gto import GTO_KEYS, build_gto_basis
 from .harmonics import real_sph_harm, solid_harmonic, solid_harmonic_grad
@@ -36,7 +37,7 @@ def build_basis(molecule, config, pseudo_zeta=None) -> BasisSet:
 
         functions = build_nao_basis(molecule, config, pseudo_zeta)
     else:  # pragma: no cover - config.validate rejects this first
-        raise ValueError(f"unknown basis set '{config.basis.set}'")
+        raise ConfigError(f"unknown basis set '{config.basis.set}'")
 
     basis = BasisSet(functions, n_atoms=len(molecule))
     for ai, atom in enumerate(molecule):
@@ -48,7 +49,7 @@ def build_basis(molecule, config, pseudo_zeta=None) -> BasisSet:
 def _check_saturation(molecule, basis) -> None:
     n_occ = molecule.n_electrons / 2.0
     if len(basis) < n_occ:
-        raise ValueError(
+        raise ConfigError(
             f"basis too small: {len(basis)} functions cannot hold "
             f"{molecule.n_electrons:g} electrons. Use a larger basis set."
         )

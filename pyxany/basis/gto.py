@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..config import ConfigError
 from ..data.loaders import gto_polarization_exponents, gto_table
 from .harmonics import lm_pairs
 from .types import GTO
@@ -24,7 +25,7 @@ def _shell_angular_momentum(label: str) -> str:
     stem = label.split("_")[0].lower()
     letters = [c for c in stem if c in _SHELL_L]
     if not letters:
-        raise ValueError(f"cannot classify GTO shell label '{label}'")
+        raise ConfigError(f"cannot classify GTO shell label '{label}'")
     return "sp" if letters == ["s", "p"] else letters[-1]
 
 
@@ -57,7 +58,7 @@ def build_gto_basis(molecule, basis_key: str, pseudo_zeta=None) -> list:
     """Contracted GTOs for every atom; pseudo-hydrogens get scaled hydrogen shells."""
     key = basis_key.lower().strip()
     if key not in GTO_KEYS:
-        raise ValueError(f"unknown GTO basis '{basis_key}'; choose from {sorted(GTO_KEYS)}")
+        raise ConfigError(f"unknown GTO basis '{basis_key}'; choose from {sorted(GTO_KEYS)}")
     table_name, want_polarization = GTO_KEYS[key]
     table = gto_table(table_name)
     pol = gto_polarization_exponents()

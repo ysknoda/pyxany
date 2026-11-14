@@ -82,6 +82,7 @@ scf:
   e_tol:            1.0e-6  # total-energy convergence (Ha)
   d_tol:            1.0e-5  # density-matrix rms convergence
   c_tol:            1.0e-5  # self-consistency: rms of F P S - S P F (ADR 0014)
+  checkpoint_every: 0       # also write <prefix>_scf.npz every N iterations (ADR 0004)
   alpha:            0.7     # a number | alpha_hf (Schwarz) | alpha_hf_polarized | {default: 0.7, Si: 0.73}
   unrestricted:     false   # forced true for odd electrons or mult > 1
   smearing:         0.0     # Fermi smearing kT (Ha)
@@ -176,13 +177,14 @@ pyxany run water.yaml --set scf.alpha=0.75 --set grid.n_r=40 --basis dzp -o /scr
 | file | contents |
 |---|---|
 | `<prefix>_results.txt` | human-readable report |
-| `<prefix>_results.json` | energies, forces, eigenvalues, charges, timings |
+| `<prefix>_results.json` | energies, electron counts, forces, eigenvalues, charges (strict JSON: non-finite values are `null`) |
 | `<prefix>_final.xyz` | the geometry used (or reached) |
 | `<prefix>_traj.xyz` | optimization trajectory |
 | `<prefix>_results.png` | six-panel summary figure |
 | `<prefix>_timing.json` | per-section wall times |
 | `<prefix>_scan.csv` | `pyxany scan` output |
 | `<prefix>_matrices.npz` | P, C, S, T, eigenvalues (`output.npz: true`) |
+| `<prefix>_scf.npz` | SCF checkpoint for `--restart` (`run`, `opt`, `forces`, `scan`) |
 
 ## Bonding figures
 

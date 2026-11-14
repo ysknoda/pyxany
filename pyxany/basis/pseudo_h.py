@@ -39,6 +39,7 @@ from functools import lru_cache
 
 import numpy as np
 
+from ..config import ConfigError
 from ..constants import DEFAULT_ALPHA
 from .atomic_solver import solve_atom
 
@@ -51,7 +52,7 @@ def pseudo_hydrogen_solution(alpha: float, xc_alpha: float = DEFAULT_ALPHA,
     ``n_points`` is the logarithmic radial grid (``grid.atom.n_points``).
     """
     if alpha <= 0:
-        raise ValueError(f"pseudo-hydrogen charge must be positive, got {alpha}")
+        raise ConfigError(f"pseudo-hydrogen charge must be positive, got {alpha}")
     return solve_atom(Z=float(alpha), occupations={(1, 0): float(alpha)},
                       alpha=xc_alpha, n_points=n_points,
                       r_max=max(60.0, 60.0 / max(alpha, 0.2)))

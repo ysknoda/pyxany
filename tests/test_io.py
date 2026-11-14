@@ -210,3 +210,53 @@ def test_runtime_verbosity_is_the_default_without_v_or_q():
     assert verbosity(ns, default=0) == 0
     assert verbosity(argparse.Namespace(verbose=2, quiet=False), default=0) == 3
     assert verbosity(argparse.Namespace(verbose=0, quiet=True), default=2) == 0
+
+
+def test_set_values_are_read_as_yaml_and_validated_like_the_file():
+    """--set grid.chunk_size=5000 was rejected and pairs=[[0,1]] stayed a string
+    that crashed after the SCF (ADR 0012 P0)."""
+    c = Config.from_dict({"molecule": {"structure": "x.xyz"}})
+    c.apply_overrides({"grid.chunk_size": "5000",
+                       "properties.overlap_population.pairs": "[[0, 1]]"})
+    assert c.grid.chunk_size == 5000
+    assert c.properties.overlap_population["pairs"] == [[0, 1]]
+    with pytest.raises(ConfigError, match="pairs"):
+        c.apply_overrides({"properties.overlap_population.pairs": "[[0]]"})
+    c = Config.from_dict({"molecule": {"structure": "x.xyz"}})
+    c.apply_overrides({"molecule.name": "yes"})           # a free string stays a string
+    assert c.molecule.name == "yes"
+
+
+def test_derived_defaults_follow_overrides():
+    """prefix and the transition-state max_iter were fixed before --set ran."""
+    c = Config.from_dict({"molecule": {"structure": "x.xyz", "name": "a"}})
+    assert (c.output.prefix, c.scf.max_iter) == ("a", 100)
+    c.apply_overrides({"molecule.name": "run2", "transition_state.remove": "homo"})
+    assert (c.output.prefix, c.scf.max_iter) == ("run2", 300)
+    c.apply_overrides({"output.prefix": "keep", "scf.max_iter": "50"})
+    c.apply_overrides({"molecule.name": "other"})
+    assert (c.output.prefix, c.scf.max_iter) == ("keep", 50)
+
+
+@pytest.mark.parametrize("section,values", [
+    ("scf", {"smearing": "abc"}), ("molecule", {"structure": "x.xyz", "mult": "two"}),
+    ("forces", {"fd_step": 0}), ("optimize", {"f_max": -1e-3}),
+    ("optimize", {"max_steps": 0}), ("grid", {"memory_budget_mb": 0}),
+    ("grid", {"chunk_size": -5}), ("grid", {"screening_tol": -1}),
+    ("scf", {"ediis_iters": -1}), ("scf", {"s_threshold": 0.9}),
+    ("properties", {"dos": {"n_points": 0}}),
+    ("properties", {"overlap_population": {"sigma": 0}}),
+    ("passivation", {"species": {"HSi": {"alpha": 0}}}),
+])
+def test_bad_values_are_input_errors(section, values):
+    """These were accepted and failed later, or ran with a meaningless setting."""
+    raw = {"molecule": {"structure": "x.xyz"}}
+    raw[section] = {**raw.get(section, {}), **values}
+    with pytest.raises(ConfigError):
+        Config.from_dict(raw)
+
+
+def test_embedding_units_accept_the_molecule_aliases():
+    c = Config.from_dict({"molecule": {"structure": "x.xyz"},
+                          "embedding": {"charges": "q.xyz", "units": "au"}})
+    assert c.embedding.units == "bohr"

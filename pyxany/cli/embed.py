@@ -33,6 +33,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
+from ..config import ConfigError
 from ..embedding import write_charges
 from ..io.xyz import read_xyz
 from ..parallel import mpi_print
@@ -72,11 +73,17 @@ def block_dipole(positions, charges) -> np.ndarray:
     return np.asarray(charges, dtype=float) @ np.asarray(positions, dtype=float)
 
 
-def remove_cluster_sites(positions, charges, labels, cluster, tol: float = 0.1):
+def remove_cluster_sites(positions, charges, labels, cluster, tol: float = 0.1,
+                         check_elements: bool = True):
     """Drop lattice sites occupied by (non-terminator) cluster atoms.
 
     Returns the remaining charges and the formal charge of the removed sites,
     which the cluster must carry for the whole system to stay neutral.
+
+    A site's label must name the element of the cluster atom on it: with the
+    origin shifted by a/2 the MgO example put its central Mg on an O site, was
+    surrounded by +2 charges and was told to carry -26 instead of +26
+    (ADR 0012 P0). ``check_elements=False`` allows intended substitutions.
     """
     keep = np.ones(len(charges), dtype=bool)
     removed = 0.0
@@ -86,14 +93,37 @@ def remove_cluster_sites(positions, charges, labels, cluster, tol: float = 0.1):
         d = np.linalg.norm(positions - atom.pos_angstrom, axis=1)
         hit = np.where(keep & (d < tol))[0]
         if len(hit) == 0:
-            raise ValueError(
+            raise ConfigError(
                 f"cluster atom {atom.symbol} at {atom.pos_angstrom} is not on a "
                 f"lattice site (within {tol} A); check origin and lattice"
             )
+        if check_elements:
+            wrong = [labels[h] for h in hit if _label_element(labels[h]) != atom.element]
+            if wrong:
+                raise ConfigError(
+                    f"cluster atom {atom.symbol} at {np.round(atom.pos_angstrom, 4)} sits "
+                    f"on a lattice site labelled {wrong[0]!r}: check origin and sites, or "
+                    f"pass --allow-substitution for an intended substitution"
+                )
         keep[hit] = False
         removed += float(charges[hit].sum())
     kept_labels = [lab for lab, k in zip(labels, keep, strict=True) if k]
     return positions[keep], charges[keep], kept_labels, removed
+
+
+def _label_element(label: str) -> str:
+    """Element symbol at the start of a site label ('O', 'O1', 'Zn_2', 'MG' -> 'Mg')."""
+    from ..data import elements as elem
+
+    letters = ""
+    for ch in str(label):
+        if not ch.isalpha() or len(letters) == 2:
+            break
+        letters += ch
+    two = letters[:1].upper() + letters[1:2].lower()
+    if len(letters) == 2 and elem.is_supported(two):
+        return two
+    return letters[:1].upper()
 
 
 def execute(args) -> int:
@@ -126,7 +156,9 @@ def execute(args) -> int:
         path = Path(spec["cluster"])
         cluster = read_xyz(path if path.is_absolute() else base / path)
         try:
-            pos, q, lab, removed = remove_cluster_sites(pos, q, lab, cluster)
+            pos, q, lab, removed = remove_cluster_sites(
+                pos, q, lab, cluster,
+                check_elements=not getattr(args, "allow_substitution", False))
         except ValueError as exc:
             mpi_print(f"  [error] {exc}")
             return EXIT_INPUT

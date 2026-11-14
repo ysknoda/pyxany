@@ -29,6 +29,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ..config import ConfigError
 from ..parallel import is_root, mpi_print
 
 FORMAT_VERSION = 1
@@ -133,7 +134,7 @@ def read(path) -> Checkpoint:
     with np.load(path, allow_pickle=False) as d:
         version = int(d["format_version"])
         if version != FORMAT_VERSION:
-            raise ValueError(f"{path}: checkpoint format {version}, expected {FORMAT_VERSION}")
+            raise ConfigError(f"{path}: checkpoint format {version}, expected {FORMAT_VERSION}")
         return Checkpoint(
             P=d["P"],
             P_a=d["P_a"] if "P_a" in d else None,
@@ -156,12 +157,12 @@ def initial_density(
     Different system: error, since the density would mean something else.
     """
     if ckpt.P.shape != (n_basis, n_basis):
-        raise ValueError(
+        raise ConfigError(
             f"{path}: density is {ckpt.P.shape[0]} x {ckpt.P.shape[1]} but this "
             f"basis has {n_basis} functions; it is a different system"
         )
     if ckpt.system != system:
-        raise ValueError(
+        raise ConfigError(
             f"{path}: written for a different system (atoms, charge, "
             f"multiplicity, basis or alpha differ); refusing to restart from it"
         )

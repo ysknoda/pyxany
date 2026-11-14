@@ -29,7 +29,6 @@ def summary_figure(result, config, path, forces=None) -> None:
 
     mol, basis = result.molecule, result.basis
     eps_ev = result.eps * HARTREE_TO_EV
-    finite = np.isfinite(eps_ev)
     occ = result.occupations
     homo, lumo = result.homo_lumo()
     homo_ev, lumo_ev = homo * HARTREE_TO_EV, lumo * HARTREE_TO_EV
@@ -55,29 +54,44 @@ def summary_figure(result, config, path, forces=None) -> None:
     # Core levels sit hundreds of eV below the valence band; plotting the full
     # range compresses everything of interest into a few pixels, so the window
     # is set from the valence region and the number of hidden core levels is
-    # stated instead.
-    order = np.argsort(np.where(finite, eps_ev, np.inf))
-    n_occ = int((occ > 1e-8).sum())
-    lo_ev, hi_ev, n_core = _valence_window(eps_ev, finite, occ, homo_ev, lumo_ev)
-    shown = 0
-    for rank, i in enumerate(order[: min(n_occ + 8, int(finite.sum()))]):
-        if not (lo_ev <= eps_ev[i] <= hi_ev):
-            continue
-        shown += 1
-        col = "#4fc3f7" if occ[i] > 1e-8 else "#ef9a9a"
-        lw = 2.6 if rank in (n_occ - 1, n_occ) else 1.4
-        ax_lev.hlines(eps_ev[i], 0.15, 0.85, colors=col, linewidths=lw)
-        ax_lev.text(0.87, eps_ev[i], f"{rank + 1}", color=_DIM, fontsize=6,
-                    va="center")
+    # stated instead. An unrestricted run draws both spin channels (the alpha
+    # channel alone hid the beta frontier, ADR 0012 F5: for CH3 the beta LUMO
+    # lies below the alpha LUMO).
+    if result.unrestricted:
+        channels = [("alpha", result.eps_a * HARTREE_TO_EV, result.occ_a, 0.05, 0.45),
+                    ("beta", result.eps_b * HARTREE_TO_EV, result.occ_b, 0.60, 1.00)]
+    else:
+        channels = [("", eps_ev, occ, 0.15, 0.85)]
+    all_eps = np.concatenate([c[1] for c in channels])
+    all_occ = np.concatenate([c[2] for c in channels])
+    all_finite = np.isfinite(all_eps)
+    lo_ev, hi_ev, n_core = _valence_window(all_eps, all_finite, all_occ, homo_ev, lumo_ev)
+    if result.unrestricted:
+        n_core //= 2
+    for name, eps_c, occ_c, x0, x1 in channels:
+        fin = np.isfinite(eps_c)
+        order = np.argsort(np.where(fin, eps_c, np.inf))
+        n_occ_c = int((occ_c > 1e-8).sum())
+        for rank, i in enumerate(order[: min(n_occ_c + 8, int(fin.sum()))]):
+            if not (lo_ev <= eps_c[i] <= hi_ev):
+                continue
+            col = "#4fc3f7" if occ_c[i] > 1e-8 else "#ef9a9a"
+            lw = 2.6 if rank in (n_occ_c - 1, n_occ_c) else 1.4
+            ax_lev.hlines(eps_c[i], x0, x1, colors=col, linewidths=lw)
+            ax_lev.text(x1 + 0.02, eps_c[i], f"{rank + 1}", color=_DIM, fontsize=6,
+                        va="center")
+        if name:
+            ax_lev.text(0.5 * (x0 + x1), hi_ev, name, color=_DIM, fontsize=9,
+                        ha="center", va="bottom")
     if np.isfinite(homo_ev) and np.isfinite(lumo_ev):
         ax_lev.axhspan(homo_ev, lumo_ev, alpha=0.15, color="#ffd54f")
-        ax_lev.text(0.99, 0.5 * (homo_ev + lumo_ev),
+        ax_lev.text(1.08, 0.5 * (homo_ev + lumo_ev),
                     f"gap\n{lumo_ev - homo_ev:.2f} eV",
                     color="#ffd54f", fontsize=8, va="center")
     ax_lev.set_ylim(lo_ev, hi_ev)
     ax_lev.set_xticks([])
     ax_lev.set_ylabel("energy (eV)")
-    title = "orbital levels"
+    title = "orbital levels" + ("  (alpha | beta)" if result.unrestricted else "")
     if n_core:
         title += f"  ({n_core} core level{'s' if n_core > 1 else ''} below {lo_ev:.0f} eV)"
     ax_lev.set_title(title, fontsize=10)
@@ -88,18 +102,24 @@ def summary_figure(result, config, path, forces=None) -> None:
 
     # -- density of states -------------------------------------------------
     dos_cfg = config.properties.dos
-    in_window = finite & (eps_ev >= lo_ev) & (eps_ev <= hi_ev)
-    e, dos = density_of_states(eps_ev[in_window], sigma=dos_cfg.get("sigma", 0.3),
-                               n_points=dos_cfg.get("n_points", 600),
-                               e_min=lo_ev, e_max=hi_ev)
-    ax_dos.fill_betweenx(e, dos, alpha=0.35, color="#64b5f6")
-    ax_dos.plot(dos, e, color="#90caf9", lw=1.4)
+    for name, eps_c, _occ_c, _x0, _x1 in channels:
+        fin = np.isfinite(eps_c)
+        in_window = fin & (eps_c >= lo_ev) & (eps_c <= hi_ev)
+        e, dos = density_of_states(eps_c[in_window], sigma=dos_cfg.get("sigma", 0.3),
+                                   n_points=dos_cfg.get("n_points", 600),
+                                   e_min=lo_ev, e_max=hi_ev)
+        sign = -1.0 if name == "beta" else 1.0
+        ax_dos.fill_betweenx(e, sign * dos, alpha=0.35, color="#64b5f6")
+        ax_dos.plot(sign * dos, e, color="#90caf9", lw=1.4)
+    if result.unrestricted:
+        ax_dos.axvline(0, color=_DIM, lw=0.8)
     for value, col, lbl in ((homo_ev, "#4fc3f7", "HOMO"), (lumo_ev, "#ef9a9a", "LUMO")):
         if np.isfinite(value) and lo_ev <= value <= hi_ev:
             ax_dos.axhline(value, color=col, ls="--", lw=1, alpha=0.75)
             ax_dos.text(0, value, f" {lbl}", color=col, fontsize=8, va="bottom")
     ax_dos.set_ylim(lo_ev, hi_ev)
-    ax_dos.set_xlabel("DOS (states/eV)")
+    ax_dos.set_xlabel("DOS (states/eV)" + ("; beta drawn negative" if result.unrestricted
+                                          else ""))
     ax_dos.set_ylabel("energy (eV)")
     ax_dos.set_title("density of states (valence region)", fontsize=10)
 
@@ -117,7 +137,7 @@ def summary_figure(result, config, path, forces=None) -> None:
         if len(mol) <= 8:
             ax_mo.legend(fontsize=7, facecolor=_BG, edgecolor=_EDGE, labelcolor=_DIM,
                          ncol=2)
-    ax_mo.set_title("MO composition")
+    ax_mo.set_title("MO composition" + (" (alpha channel)" if result.unrestricted else ""))
 
     # -- Mulliken charges --------------------------------------------------
     pop = mulliken(result.P, result.S, basis, mol)

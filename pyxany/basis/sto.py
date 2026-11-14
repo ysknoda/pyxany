@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from ..config import ConfigError
 from ..data import elements as elem
 from ..data.loaders import orbital_labels, sto_table
 from .types import STO
@@ -45,7 +46,7 @@ def sto_exponents(basis_key: str) -> dict[str, list]:
     """
     key = basis_key.lower().strip()
     if key not in STO_KEYS:
-        raise ValueError(f"unknown STO basis '{basis_key}'; choose from {STO_KEYS}")
+        raise ConfigError(f"unknown STO basis '{basis_key}'; choose from {STO_KEYS}")
 
     if key.startswith("tz"):
         tz = sto_table("tz")

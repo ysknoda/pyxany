@@ -25,6 +25,7 @@ from pathlib import Path
 import numpy as np
 from scipy.special import erf
 
+from .config import ConfigError
 from .constants import ANG_TO_BOHR
 
 _TWO_OVER_SQRT_PI = 2.0 / np.sqrt(np.pi)
@@ -131,13 +132,13 @@ def read_charges(path, units: str = "angstrom") -> tuple[np.ndarray, np.ndarray]
             else:
                 raise ValueError
         except ValueError:
-            raise ValueError(
+            raise ConfigError(
                 f"{path}:{number}: expected 'x y z q' or 'label x y z q', got {line!r}"
             ) from None
         pos.append(values[:3])
         q.append(values[3])
     if not q:
-        raise ValueError(f"{path}: no point charges found")
+        raise ConfigError(f"{path}: no point charges found")
     scale = ANG_TO_BOHR if units == "angstrom" else 1.0
     return np.asarray(pos, dtype=float) * scale, np.asarray(q, dtype=float)
 

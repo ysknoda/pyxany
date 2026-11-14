@@ -18,6 +18,8 @@ from functools import lru_cache
 
 import numpy as np
 
+from ..config import ConfigError
+
 
 @lru_cache(maxsize=64)
 def spherical_product(n_theta: int, n_phi: int | None = None):
@@ -64,7 +66,7 @@ def lebedev_order_for(n_a: int) -> int:
     for order in LEBEDEV_ORDERS:
         if order >= need:
             return order
-    raise ValueError(f"n_a = {n_a} needs Lebedev order {need}; the largest available is "
+    raise ConfigError(f"n_a = {n_a} needs Lebedev order {need}; the largest available is "
                      f"{LEBEDEV_ORDERS[-1]} (n_a <= {(LEBEDEV_ORDERS[-1] + 1) // 2})")
 
 
@@ -84,7 +86,7 @@ def angular_grid(kind: str, n_a: int):
 
         x, w = lebedev_rule(lebedev_order_for(n_a))
         return np.ascontiguousarray(x.T), np.asarray(w, dtype=float)
-    raise ValueError(f"unknown angular grid {kind!r}; use one of {ANGULAR_KINDS}")
+    raise ConfigError(f"unknown angular grid {kind!r}; use one of {ANGULAR_KINDS}")
 
 
 def n_angular_points(n_theta: int, n_phi: int | None = None) -> int:

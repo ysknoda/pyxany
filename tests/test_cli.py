@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import pytest
 
 from pyxany.cli import EXIT_INPUT, EXIT_OK, build_parser, main
@@ -200,3 +201,71 @@ def test_run_without_matplotlib_skips_the_figure(project, monkeypatch, capsys):
     assert main(["run", str(project / "co.yaml")]) == EXIT_OK
     assert "matplotlib is not installed" in capsys.readouterr().out
     assert not list((project / "results").glob("*.png"))
+
+
+def test_input_errors_exit_1(tmp_path):
+    """Missing structure, unknown symbol, bad --coord and wrong types exited 3."""
+    from pyxany.cli import EXIT_INPUT
+
+    (tmp_path / "a.yaml").write_text("molecule: {structure: missing.xyz}\n")
+    assert main(["validate", str(tmp_path / "a.yaml")]) == EXIT_INPUT
+    (tmp_path / "x.xyz").write_text("1\n\nXx 0 0 0\n")
+    (tmp_path / "b.yaml").write_text("molecule: {structure: x.xyz}\n")
+    assert main(["validate", str(tmp_path / "b.yaml")]) == EXIT_INPUT
+    (tmp_path / "c.yaml").write_text("molecule: {structure: x.xyz}\nscf: {smearing: abc}\n")
+    assert main(["validate", str(tmp_path / "c.yaml")]) == EXIT_INPUT
+
+
+def test_truncated_xyz_is_an_input_error(tmp_path):
+    from pyxany.io.xyz import XYZError, read_xyz
+
+    (tmp_path / "t.xyz").write_text("3\ncomment\nO 0 0 0\nH 0 0 1\n")   # one atom short
+    with pytest.raises(XYZError, match="ends early"):
+        read_xyz(tmp_path / "t.xyz")
+
+
+def test_scan_rejects_bad_angles_and_bends_a_linear_molecule():
+    from pyxany.cli.scan import _apply, _check_range
+    from pyxany.config import ConfigError
+    from pyxany.molecule import Atom, Molecule
+
+    with pytest.raises(ConfigError):
+        _check_range("angle", [170.0, 190.0])
+    co2 = Molecule([Atom.from_element(s, np.array([0, 0, z])) for s, z in
+                    (("O", -2.2), ("C", 0.0), ("O", 2.2))])          # along z
+    _apply(co2, "angle", [0, 1, 2], 150.0)
+    p = co2.positions
+    v1, v2 = p[0] - p[1], p[2] - p[1]
+    ang = np.degrees(np.arccos(v1 @ v2 / np.linalg.norm(v1) / np.linalg.norm(v2)))
+    assert ang == pytest.approx(150.0, abs=1e-6)
+
+
+def test_basis_key_is_honored(capsys):
+    assert main(["basis", "631g", "--element", "Se"]) == EXIT_INPUT
+    assert main(["basis", "nonsense"]) == EXIT_INPUT
+    assert main(["basis", "dz", "--element", "Se"]) == EXIT_OK
+
+
+def test_log_records_the_error(tmp_path):
+    log = tmp_path / "run.log"
+    assert main(["run", str(tmp_path / "missing.yaml"), "--log", str(log)]) == EXIT_INPUT
+    assert "input file not found" in log.read_text()
+
+
+def test_embed_checks_the_element_on_each_removed_site(tmp_path):
+    """MgO with the origin shifted by a/2 put Mg on O sites and suggested -26."""
+    import shutil
+
+    from pyxany.cli import EXIT_INPUT
+
+    examples = __import__("pathlib").Path(__file__).resolve().parent.parent / "examples"
+    for n in ("mgo_crystal.yaml", "mg19o6.xyz"):
+        shutil.copy(examples / n, tmp_path / n)
+    spec = tmp_path / "mgo_crystal.yaml"
+    text = spec.read_text()
+    import yaml as _yaml
+    d = _yaml.safe_load(text)
+    a = d["lattice"][0][0]
+    d["origin"] = [a / 2, 0.0, 0.0]
+    spec.write_text(_yaml.safe_dump(d))
+    assert main(["embed", str(spec), "-o", str(tmp_path / "q.xyz")]) == EXIT_INPUT

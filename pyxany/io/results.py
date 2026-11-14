@@ -35,15 +35,13 @@ def result_dict(result, config, forces=None, dipole=None, extra: dict | None = N
             "converged": bool(result.converged),
             "n_iterations": int(result.n_iterations),
             "unrestricted": bool(result.unrestricted),
-            "history": [
-                {
-                    k: (float(v) if isinstance(v, (int, float, np.floating)) else v)
-                    for k, v in h.items()
-                }
-                for h in result.history
-            ],
+            "history": [{k: _number(v) for k, v in h.items()} for h in result.history],
         },
-        "energies_hartree": {k: float(v) for k, v in result.energies.items()},
+        # electron counts are not energies (they used to sit in this block)
+        "energies_hartree": {k: float(v) for k, v in result.energies.items()
+                             if k not in _ELECTRON_COUNTS},
+        "electron_counts": {k: float(v) for k, v in result.energies.items()
+                            if k in _ELECTRON_COUNTS},
         "orbitals": {
             # For an unrestricted run these are the ALPHA channel; homo/lumo/gap
             # below span both channels, and "by_spin" carries each separately.
@@ -149,6 +147,29 @@ def _grids(result, config) -> dict:
     return grid_summary(config, result.grid, result.molecule, result.terms)
 
 
+#: entries of SCFResult.energies that count electrons rather than Hartree
+_ELECTRON_COUNTS = ("n_electrons_integrated", "trace_PS", "embedding_spill_electrons")
+
+
+def _number(v):
+    """JSON-safe scalar: ints stay ints, non-finite floats become null."""
+    if isinstance(v, (bool, np.bool_)):
+        return bool(v)
+    if isinstance(v, (int, np.integer)):
+        return int(v)
+    if isinstance(v, (float, np.floating)):
+        return float(v) if np.isfinite(v) else None
+    return v
+
+
+def _json_safe(obj):
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return _number(obj)
+
+
 def _finite_list(arr):
     return [float(v) if np.isfinite(v) else None for v in arr]
 
@@ -160,7 +181,12 @@ def _version() -> str:
 
 
 def write_json(path, payload: dict) -> None:
-    Path(path).write_text(json.dumps(payload, indent=2) + "\n")
+    """RFC 8259 JSON: NaN and Infinity (e.g. the first iteration's dE) as null.
+
+    Every _results.json used to contain "dE": Infinity, which strict JSON
+    readers reject (ADR 0012 P0).
+    """
+    Path(path).write_text(json.dumps(_json_safe(payload), indent=2, allow_nan=False) + "\n")
 
 
 def write_text(path, text: str) -> None:
