@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.2.0a3 (2026-11-14)
+
+Findings of the P0 re-review (ADR 0012): one Critical (NAO basis), nine High,
+the Medium/Low list and the reviewers' suggestions, each with a regression
+test; default grid.n_r 45 (ADR 0015).
 
 ### Fixed
 

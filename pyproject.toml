@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyxany"
-version = "0.2.0a2"
+version = "0.2.0a3"
 description = "DV-Xalpha (Discrete Variational Xalpha) all-electron molecular orbital code"
 readme = "README.md"
 license = "MIT"
