@@ -240,3 +240,39 @@ def test_exact_two_center_gradient_matches_finite_differences(h2o):
         Sm, Tm = overlap_kinetic_2c(fa, fb, A, B - e, rA, rB)
         fd[x] = (np.sum(Pb * (Tp - Tm)) - np.sum(Wb * (Sp - Sm))) / (2 * h)
     assert np.abs(exact - fd).max() < 1e-7 * max(1.0, np.abs(fd).max())
+
+
+def test_compiled_alpha_field_matches_numpy():
+    """alpha(r) and its force term, compiled (ADR 0012 P0) vs the numpy loops."""
+    from pyxany.molecule import Atom, Molecule
+    from pyxany.parallel import numba_enabled, set_numba_mode
+    from pyxany.scf import alpha_field as af
+
+    if not numba_enabled():
+        pytest.skip("numba not available")
+    rng = np.random.default_rng(3)
+    els = ["Si", "H", "O", "Ga"]
+    mol = Molecule([Atom.from_element(els[i % 4], rng.uniform(-5, 5, 3)) for i in range(9)])
+    table = {"Si": 0.72, "H": 0.97, "O": 0.74, "Ga": 0.70}
+
+    class Cfg:
+        uniform_alpha = None
+
+        def alpha_for(self, e):
+            return table[e]
+
+    cfg = Cfg()
+    alphas = af.atom_alphas(mol, cfg)
+    pts = rng.uniform(-8, 8, (3000, 3))
+    owner = rng.integers(0, len(mol), 3000)
+    coeff = rng.normal(size=3000)
+    fast = (af.alpha_on_points(pts, mol, cfg),
+            af.alpha_mixture_gradient(pts, owner, coeff, mol, alphas))
+    try:
+        set_numba_mode("off")
+        slow = (af.alpha_on_points(pts, mol, cfg),
+                af.alpha_mixture_gradient(pts, owner, coeff, mol, alphas))
+    finally:
+        set_numba_mode("auto")
+    assert np.abs(fast[0] - slow[0]).max() < 1e-12
+    assert np.abs(fast[1] - slow[1]).max() < 1e-10 * max(1.0, np.abs(slow[1]).max())

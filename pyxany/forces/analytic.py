@@ -28,23 +28,20 @@ Grid-derivative term
 --------------------
 The expressions above are the exact gradient of the *continuum* energy
 functional.  The computed energy is a quadrature of it on a grid whose points
-and Becke weights both move with the nuclei, so the true derivative of the
-computed number carries an extra contribution
+and Becke weights both move with the nuclei, so the derivative of the computed
+number carries the extra contribution
 
     sum_k [ dw_k/dR_B * G(r_k) + w_k * grad G(r_k) . dr_k/dR_B ]
 
-with ``G = rho (v_nuc + V_H/2 + eps_xc)``.  For an exact quadrature that sum
-vanishes identically -- it *is* the derivative of the quadrature error, and it
-shrinks as the grid is refined.
+with ``G = rho (v_nuc + V_H/2 + eps_xc)``. It is included
+(``_grid_motion_gradient``), together with the S/T Pulay terms of the matrices
+the SCF actually uses, so these forces are the derivative of the computed
+energy: they agree with finite differences of it to the FD and SCF tolerances.
 
-Two things are done about it here rather than hoping it is small:
-
-* its rigid-translation component, which is the dominant part, is removed
-  exactly by :func:`project_out_translation` (enabled by default), restoring
-  ``sum_A F_A = 0``;
-* what remains is measurable -- ``pyxany forces --compare`` prints it against
-  central finite differences, and docs/forces.md tabulates how it falls with
-  grid density.
+That agreement says nothing about the grid's own error, which is set mainly by
+the radial quadrature (NH2, UKS: 6.5e-3 Ha/Bohr at n_r 30 / n_a 12 against an
+(80, 26) reference, 1.5e-4 at n_r 45; insensitive to n_a). ``pyxany forces
+--compare`` estimates it by refining grid.n_r, and docs/forces.md tabulates it.
 """
 
 from __future__ import annotations

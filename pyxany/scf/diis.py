@@ -96,7 +96,25 @@ class SpinPulayDIIS(PulayDIIS):
 
 
 class EDIIS:
-    """Energy-DIIS: minimize a quadratic model of E over density mixings."""
+    """Energy-DIIS of Kudin, Scuseria & Cances, J. Chem. Phys. 116, 8255 (2002).
+
+    Minimizes the interpolated energy
+
+        E(c) = sum_i c_i E_i - 1/4 sum_ij c_i c_j tr[(F_i - F_j)(P_i - P_j)]
+
+    over c_i >= 0, sum c_i = 1, and returns sum_i c_i F_i. The paper's 1/2 is
+    for its convention dE/dD = 2F (D the spin density of RHF); here F = dE/dP
+    for the total density P, and 1/4 is what makes E(c) equal E(sum c_i P_i)
+    exactly for a quadratic functional E(P) = tr(hP) + 1/2 tr(P G P): checked
+    against brute force on such a model in tests/test_scf.py. F and
+    P may be stacked (2, n, n) arrays for UKS, the trace then running over both
+    channels with one coefficient set (as for SpinPulayDIIS).
+
+    The previous version solved the Lagrange system of c^T B c alone and never
+    read the energies (any two vectors gave the midpoint, even for E = -10 and
+    +10 Ha), then clipped negative coefficients, which is not the constrained
+    minimum (ADR 0012 P0).
+    """
 
     def __init__(self, max_vectors: int = 8):
         self.max_vectors = max_vectors
@@ -113,32 +131,49 @@ class EDIIS:
             self._P.pop(0)
             self._E.pop(0)
 
-    def extrapolate(self) -> np.ndarray | None:
+    def coefficients(self) -> np.ndarray | None:
+        """The constrained minimizer c of the interpolated energy."""
+        from scipy.optimize import minimize
+
         n = len(self._F)
         if n < 2:
             return None
-        B = np.zeros((n, n))
-        for i in range(n):
-            for j in range(n):
-                B[i, j] = np.einsum("mn,nm->", self._F[i] - self._F[j],
-                                    self._P[i] - self._P[j])
-        A = np.zeros((n + 1, n + 1))
-        A[:n, :n] = B
-        A[n, :n] = A[:n, n] = 1.0
-        rhs = np.zeros(n + 1)
-        rhs[n] = 1.0
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", LinAlgWarning)
-            try:
-                c = np.linalg.lstsq(A, rhs, rcond=None)[0][:n]
-            except Exception:
-                return None
-        c = np.maximum(c, 0.0)
-        total = c.sum()
-        if not np.isfinite(total) or total < 1e-15:
+        E = np.array(self._E)
+        # tr[(F_i - F_j)(P_i - P_j)] = d_ii + d_jj - d_ij - d_ji, d_ij = tr(F_i P_j)
+        Fs = np.array(self._F).reshape(n, -1)
+        Ps = np.array([np.swapaxes(P, -1, -2) for P in self._P]).reshape(n, -1)
+        d = Fs @ Ps.T
+        diag = np.diag(d)
+        B = diag[:, None] + diag[None, :] - d - d.T
+        shift = E.min()                      # conditioning only; c sums to 1
+
+        def f(c):
+            return float(c @ (E - shift) - 0.25 * c @ B @ c)
+
+        def grad(c):
+            return (E - shift) - 0.5 * (B @ c)
+
+        best = None
+        # the objective need not be convex: start from every vertex and the centre
+        starts = [np.eye(n)[i] for i in range(n)] + [np.full(n, 1.0 / n)]
+        for c0 in starts:
+            res = minimize(f, c0, jac=grad, method="SLSQP", bounds=[(0.0, 1.0)] * n,
+                           constraints=[{"type": "eq", "fun": lambda c: c.sum() - 1.0,
+                                         "jac": lambda c: np.ones_like(c)}],
+                           options={"ftol": 1e-12, "maxiter": 200})
+            if np.all(np.isfinite(res.x)) and (best is None or f(res.x) < f(best)):
+                best = res.x
+        if best is None:
             return None
-        c /= total
-        return sum(c[i] * self._F[i] for i in range(n))
+        c = np.clip(best, 0.0, None)
+        total = c.sum()
+        return c / total if total > 1e-15 else None
+
+    def extrapolate(self) -> np.ndarray | None:
+        c = self.coefficients()
+        if c is None:
+            return None
+        return sum(c[i] * self._F[i] for i in range(len(c)))
 
     @property
     def n_vectors(self) -> int:

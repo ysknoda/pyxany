@@ -791,3 +791,123 @@ def own_cell_weight_gradient(points, order, starts, coeff, centers, a, stiffness
                     out[A, j, 0] += alpha * (unit[j, 0] / Rij + mu * R0 / Rij2)
                     out[A, j, 1] += alpha * (unit[j, 1] / Rij + mu * R1 / Rij2)
                     out[A, j, 2] += alpha * (unit[j, 2] / Rij + mu * R2 / Rij2)
+
+
+# --------------------------------------------------------------------------
+# Element-specific X-alpha: Becke-weighted alpha(r) and its force term
+# (ADR 0011; compiled for ADR 0012 P0, where the numpy loops were projected at
+# ~20 min per call for Si47H60 with alpha_hf)
+# --------------------------------------------------------------------------
+@nb.njit(parallel=True, cache=True)
+def alpha_mix(points, centers, a, inv_r, alphas, stiffness, out):
+    """``alpha(r_k) = sum_A P_A alpha_A / sum_A P_A`` (see scf/alpha_field.py)."""
+    n_pts = points.shape[0]
+    n_at = centers.shape[0]
+    for k in nb.prange(n_pts):
+        dist = np.empty(n_at)
+        for i in range(n_at):
+            dx = points[k, 0] - centers[i, 0]
+            dy = points[k, 1] - centers[i, 1]
+            dz = points[k, 2] - centers[i, 2]
+            dist[i] = np.sqrt(dx * dx + dy * dy + dz * dz)
+        total = 0.0
+        num = 0.0
+        for i in range(n_at):
+            p = 1.0
+            for j in range(n_at):
+                if i == j:
+                    continue
+                mu = (dist[i] - dist[j]) * inv_r[i, j]
+                p *= _smooth_step(mu + a[i, j] * (1.0 - mu * mu), stiffness)
+                if p == 0.0:
+                    break
+            total += p
+            num += p * alphas[i]
+        if total > 1e-300:
+            out[k] = num / total
+        else:  # far from everything: the nearest atom's value, as becke_weights
+            best = 0
+            for i in range(1, n_at):
+                if dist[i] < dist[best]:
+                    best = i
+            out[k] = alphas[best]
+
+
+@nb.njit(parallel=True, cache=True)
+def alpha_mixture_gradient(points, order, starts, coeff, centers, a, alphas, stiffness,
+                           out):
+    """``out[O, B] = sum_{k owned by O} coeff_k d alpha(r_k)/dR_B``, points moving
+    with their owner O (scf/alpha_field.py:alpha_mixture_gradient summed over O).
+
+    Each thread handles whole owner atoms and writes only its ``out[O]`` rows.
+    """
+    n_at = centers.shape[0]
+    for O in nb.prange(n_at):
+        dist = np.empty(n_at)
+        unit = np.empty((n_at, 3))
+        P = np.empty(n_at)
+        r_dnu = np.empty((n_at, n_at))
+        mus = np.empty((n_at, n_at))
+        g = np.empty((n_at, 3))
+        for q in range(starts[O], starts[O + 1]):
+            k = order[q]
+            for i in range(n_at):
+                d0 = points[k, 0] - centers[i, 0]
+                d1 = points[k, 1] - centers[i, 1]
+                d2 = points[k, 2] - centers[i, 2]
+                dist[i] = np.sqrt(d0 * d0 + d1 * d1 + d2 * d2)
+                inv = 1.0 / max(dist[i], 1e-300)
+                unit[i, 0] = d0 * inv
+                unit[i, 1] = d1 * inv
+                unit[i, 2] = d2 * inv
+            for c in range(n_at):
+                P[c] = 1.0
+                for e in range(n_at):
+                    if c == e:
+                        continue
+                    R0 = centers[c, 0] - centers[e, 0]
+                    R1 = centers[c, 1] - centers[e, 1]
+                    R2 = centers[c, 2] - centers[e, 2]
+                    R = np.sqrt(R0 * R0 + R1 * R1 + R2 * R2)
+                    mu = (dist[c] - dist[e]) / R
+                    sv, dsv = _smooth_step_and_derivative(mu + a[c, e] * (1.0 - mu * mu),
+                                                          stiffness)
+                    P[c] *= sv
+                    ratio = dsv / sv if sv > 1e-300 else 0.0
+                    r_dnu[c, e] = ratio * (1.0 - 2.0 * a[c, e] * mu)
+                    mus[c, e] = mu
+            Z = 0.0
+            num = 0.0
+            for c in range(n_at):
+                Z += P[c]
+                num += P[c] * alphas[c]
+            if Z <= 0.0:
+                Z = 1.0
+            abar = num / Z
+            for i in range(n_at):
+                g[i, 0] = 0.0
+                g[i, 1] = 0.0
+                g[i, 2] = 0.0
+            for c in range(n_at):
+                if P[c] == 0.0:
+                    continue
+                for e in range(n_at):
+                    if c == e:
+                        continue
+                    R0 = centers[c, 0] - centers[e, 0]
+                    R1 = centers[c, 1] - centers[e, 1]
+                    R2 = centers[c, 2] - centers[e, 2]
+                    R = np.sqrt(R0 * R0 + R1 * R1 + R2 * R2)
+                    coef = (alphas[c] - abar) / Z * P[c] * r_dnu[c, e] / R
+                    mu = mus[c, e]
+                    for x in range(3):
+                        e_ce = (centers[c, x] - centers[e, x]) / R
+                        g[c, x] += coef * (-unit[c, x] - mu * e_ce)
+                        g[e, x] += coef * (unit[e, x] + mu * e_ce)
+            ck = coeff[k]
+            for x in range(3):
+                total = 0.0
+                for b in range(n_at):
+                    out[O, b, x] += ck * g[b, x]
+                    total += g[b, x]
+                out[O, O, x] -= ck * total     # the owner moves the point

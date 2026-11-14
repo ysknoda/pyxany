@@ -29,6 +29,7 @@ def execute(args) -> int:
             cmp = compare_with_fd(result, cfg, step=cfg.forces.fd_step)
             _print_comparison(molecule, cmp)
             forces = cmp["analytic"]
+            _print_radial_estimate(molecule, cfg, result, forces)
         else:
             from ..forces import compute_forces, compute_forces_fd
 
@@ -58,6 +59,42 @@ def _print_comparison(molecule, cmp) -> None:
     mpi_print(f"  |sum F| analytic / fd          {cmp['translation_residual_analytic']:.2e}"
               f" / {cmp['translation_residual_fd']:.2e}")
     mpi_print("")
-    mpi_print("  The residual is dominated by the neglected derivative of the Becke cell")
-    mpi_print("  weights and by grid quadrature error; both shrink as grid.n_r / grid.n_a")
-    mpi_print("  are increased.")
+    mpi_print("  The analytic forces include the grid-motion terms, so this difference only")
+    mpi_print("  checks the implementation (finite-difference step and SCF tolerance). It")
+    mpi_print("  does not measure the grid's own error; the radial estimate below does.")
+
+
+#: radial points added for the grid-error estimate of `forces --compare`
+RADIAL_STEP = 15
+
+
+def _print_radial_estimate(molecule, cfg, result, forces) -> None:
+    """Change of the analytic forces when grid.n_r grows by RADIAL_STEP.
+
+    The force error of a grid is dominated by its radial quadrature: NH2 (UKS)
+    at n_r 30 / n_a 12 is 6.5e-3 Ha/Bohr off an (80, 26) reference, 1.5e-4 at
+    n_r 45, and hardly changes with n_a (P0 re-review, ADR 0012), while the
+    analytic-FD difference on one grid is 2.7e-4. This compares two radial
+    grids, which is what an optimization's f_max has to be judged against.
+    """
+    import copy
+
+    import numpy as np
+
+    from ..forces import compute_forces
+
+    finer = copy.deepcopy(cfg)
+    finer.grid.n_r = cfg.grid.n_r + RADIAL_STEP
+    mol2 = molecule.copy()
+    basis2 = build_molecule_basis(finer, mol2)
+    res2 = run_scf(mol2, basis2, finer, verbose=0,
+                   initial={"P": result.P, "P_a": result.P_a, "P_b": result.P_b})
+    f2 = compute_forces(res2, finer)
+    change = float(np.abs(f2 - forces).max())
+    mpi_print(f"  grid error estimate: max |F(n_r {finer.grid.n_r}) - F(n_r {cfg.grid.n_r})| "
+              f"= {change:.3e} Ha/Bohr")
+    if cfg.optimize.f_max < change:
+        mpi_print(f"  [warning] optimize.f_max ({cfg.optimize.f_max:g}) is below this "
+                  f"estimate: an optimization would chase grid noise. Raise grid.n_r or "
+                  f"f_max.")
+    mpi_print("")

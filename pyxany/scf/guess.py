@@ -66,16 +66,18 @@ def rescale_to_electron_count(P: np.ndarray, S: np.ndarray, n_electrons: float) 
 def spin_split(P: np.ndarray, molecule, basis, n_alpha: float, n_beta: float):
     """Split a closed-shell guess into (P_alpha, P_beta).
 
-    The excess alpha electrons are placed on the valence functions of the
-    heaviest atom, which is enough to break the spin symmetry and let the SCF
-    find the open-shell solution.
+    P_a = P/2 + s V and P_b = P/2 - s V with s = (n_alpha - n_beta)/2 and V a
+    spin density of trace one on the valence functions of the heaviest atom,
+    which breaks the spin symmetry. Tr(P_a S) = n_alpha and Tr(P_b S) = n_beta.
+
+    The previous split scaled P by n_alpha/N and then *added* the excess on
+    top: 2S electrons too many (O2 triplet: 18 for 16; ADR 0012 P0).
     """
-    total = n_alpha + n_beta
-    P_a = P * (n_alpha / total)
-    P_b = P * (n_beta / total)
+    P_a = 0.5 * P
+    P_b = 0.5 * P
     extra = n_alpha - n_beta
     if extra <= 0:
-        return P_a, P_b
+        return P_a.copy(), P_b.copy()
 
     heavy = max(range(len(molecule)), key=lambda i: molecule[i].Z)
     valence = [mu for mu, f in enumerate(basis)
@@ -83,9 +85,12 @@ def spin_split(P: np.ndarray, molecule, basis, n_alpha: float, n_beta: float):
     if not valence:
         valence = [mu for mu, f in enumerate(basis) if f.atom_idx == heavy]
     if valence:
-        per = extra / len(valence)
+        P_a = P_a.copy()
+        P_b = P_b.copy()
+        per = 0.5 * extra / len(valence)
         for mu in valence:
             P_a[mu, mu] += per
+            P_b[mu, mu] -= per
     return P_a, P_b
 
 

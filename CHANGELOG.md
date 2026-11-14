@@ -37,7 +37,52 @@
   to 0.07); pairs are now screened on the sampled reach of each atom (F12).
 - `parallel.mpi_version()` always printed an empty mpi4py version.
 
+- **EDIIS ignored the energies**: it solved for the stationary point of the
+  error matrix alone (two vectors always gave the midpoint) and clipped
+  negative weights. It now minimizes the Kudin-Scuseria-Cances interpolated
+  energy over the simplex, with the coefficient 1/4 that F = dE/dP requires;
+  UKS uses one coefficient set for both spins. Converged energies unchanged
+  (H2O, CO, O2, CH3, NH2, H2O O1s TS to 1e-8 Ha).
+- The UKS initial guess put 2S surplus electrons into P_alpha (O2 triplet: 18
+  for 16); it now splits P/2 +- a trace-one spin density.
+- A transition-state restart rescaled the hole channel to the integer count
+  (H2O HOMO TS: 2.26 Ha off, 122 more iterations; now 6 to the same energy);
+  `--restart` from a run that stopped at max_iter is an input error.
+- With smearing, HOMO/LUMO are the levels straddling half filling (a barely
+  populated near-degenerate partner was taken as the HOMO).
+- UKS diagonalization honours `scf.s_threshold` (F9); MPI broadcasts P_alpha
+  and P_beta; the checkpoint fingerprint hashes alpha values and NAO/GTO
+  parameters; an excitation into a full orbital is refused in every branch.
+- Input errors exit 1 (XYZError and the input checks of occupations, TS,
+  checkpoint, passivation, scan, freeze and basis keys are now ConfigError;
+  config fields are type-checked). `--set` values are read as YAML; derived
+  defaults follow overrides; `overlap_population.pairs` and numeric settings
+  are validated; `embedding.units` takes the `molecule.units` aliases.
+- `scan`/`opt` exit 2 when an SCF did not converge (and say how many);
+  `scan` bends linear molecules, rejects angles outside (0, 180), writes the
+  checkpoint and reports the minimum of converged points only.
+- `gridcheck` sums the electron count over MPI ranks; `passivate --role
+  EL=anion|cation`; `--emit-yaml` writes a structure path relative to the
+  YAML; `embed` checks the element of each removed site
+  (`--allow-substitution`); `pyxany basis KEY` reports that key.
+- `--log` records the error messages and is opened on rank 0 only (F4); `-q`
+  suppresses the timing table, so `-q --json` is valid JSON; result JSON is
+  strict (null for non-finite, integer `iter`, electron counts in
+  `electron_counts`).
+- The UKS summary figure draws both spin channels and a +/- DOS (F5).
+
+### Performance
+
+- The element-specific alpha field and its force term are compiled (numba):
+  27 atoms / 50k points 1.6 s -> 0.08 s and 12.7 s -> 0.27 s, numpy path
+  unchanged and equal to 5e-14.
+
 ### Changed
+
+- `pyxany forces --compare` also prints a grid-error estimate (forces at
+  n_r + 15) and warns when `optimize.f_max` is below it; docs/forces.md
+  separates the implementation check (analytic vs FD, 1.3e-4 Ha/Bohr for H2O)
+  from the grid error (2.2e-3 at n_r 30, 1.7e-4 at 45, 2.3e-5 at 60).
 
 - **Configuration keys that did nothing** (ADR 0013): `runtime.numba`
   (auto/on/off) and `--numba`/`--no-numba` now choose the backend (both had

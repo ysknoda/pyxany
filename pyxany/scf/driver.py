@@ -72,10 +72,19 @@ class SCFResult:
     def total_energy(self) -> float:
         return self.energies["E_total"]
 
-    @staticmethod
-    def _frontier(eps, occ) -> tuple[float, float]:
-        filled = np.where(occ > 1e-8)[0]
-        empty = np.where((occ <= 1e-8) & np.isfinite(eps))[0]
+    def _frontier(self, eps, occ) -> tuple[float, float]:
+        """Highest level at least half filled, lowest level less than half filled.
+
+        For integer occupations that is the plain HOMO/LUMO. With smearing, a
+        threshold of 1e-8 made a barely populated partner of a near-degenerate
+        pair the "HOMO" (gap 2.71 eV instead of 0.008 eV for a 0.3 mHa pair at
+        kT = 0.002; ADR 0012 P0); the half-filling rule takes the two levels
+        that straddle the Fermi level.
+        """
+        half = 0.5 if self.unrestricted else 1.0
+        finite = np.isfinite(eps)
+        filled = np.where(finite & (occ >= half - 1e-12))[0]
+        empty = np.where(finite & (occ < half - 1e-12))[0]
         return (float(eps[filled].max()) if len(filled) else float("nan"),
                 float(eps[empty].min()) if len(empty) else float("nan"))
 
@@ -270,7 +279,7 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
         P = P_a + P_b
         accel = {
             "diis_ab": SpinPulayDIIS(),
-            "ediis_a": EDIIS(), "ediis_b": EDIIS(),
+            "ediis_ab": EDIIS(),
         }
     else:
         P_a = P_b = None
@@ -339,7 +348,8 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                                  _commutator_rms(F_b, P_b, S, X_keep))
                 Fa_use, Fb_use, method, err, mix = _accelerate_uks(
                     accel, F_a, F_b, P_a, P_b, S, energies["E_total"], it, scf_cfg, dE)
-                eps_a, C_a, eps_b, C_b = _diagonalize_uks(Fa_use, Fb_use, S, n_basis)
+                eps_a, C_a, eps_b, C_b = _diagonalize_uks(Fa_use, Fb_use, S, n_basis,
+                                                          scf_cfg.s_threshold)
                 occ_a = fermi_occupations(eps_a, n_alpha, scf_cfg.smearing, 1.0)
                 occ_b = fermi_occupations(eps_b, n_beta, scf_cfg.smearing, 1.0)
                 if holes is not None:
@@ -380,6 +390,11 @@ def run_scf(molecule, basis, config, verbose: int = 1, *, initial: dict | None =
                 extra = (homo * HARTREE_TO_EV,)
 
             bcast_array(P)
+            if unrestricted:
+                # rho_a and rho_b come from these; rank-local copies drifted
+                # apart under MPI (72 vs 84 iterations; ADR 0012 P0)
+                bcast_array(P_a)
+                bcast_array(P_b)
             history.append({"iter": it, "E": energies["E_total"], "E_free": e_current,
                             "dE": dE, "error": err, "d_rms": d_rms,
                             "commutator": commutator, "method": method, "mix": mix})
@@ -519,12 +534,12 @@ def _accelerate_rks(accel, F, P, S, energy, it, cfg, dE):
 
 def _accelerate_uks(accel, F_a, F_b, P_a, P_b, S, energy, it, cfg, dE):
     if it <= cfg.ediis_iters:
-        accel["ediis_a"].push(F_a, P_a, energy)
-        accel["ediis_b"].push(F_b, P_b, energy)
-        a = accel["ediis_a"].extrapolate()
-        b = accel["ediis_b"].extrapolate()
-        return (a if a is not None else F_a), (b if b is not None else F_b), \
-            "EDIIS", dE, cfg.mix_ediis
+        # one coefficient set for both channels, as for the Pulay DIIS (F11)
+        accel["ediis_ab"].push(np.stack([F_a, F_b]), np.stack([P_a, P_b]), energy)
+        ab = accel["ediis_ab"].extrapolate()
+        if ab is None:
+            return F_a, F_b, "EDIIS", dE, cfg.mix_ediis
+        return ab[0], ab[1], "EDIIS", dE, cfg.mix_ediis
     # one coefficient set for both channels (ADR 0012, F11)
     accel["diis_ab"].push(F_a, F_b, P_a, P_b, S)
     ab = accel["diis_ab"].extrapolate()
@@ -535,9 +550,10 @@ def _accelerate_uks(accel, F_a, F_b, P_a, P_b, S, energy, it, cfg, dE):
     return ab[0], ab[1], "DIIS", err, mix
 
 
-def _diagonalize_uks(F_a, F_b, S, n_basis):
-    eps_a, C_a, _ = solve_generalized(F_a, S)
-    eps_b, C_b, _ = solve_generalized(F_b, S)
+def _diagonalize_uks(F_a, F_b, S, n_basis, s_threshold):
+    # s_threshold as for RKS: it was left at the default (ADR 0012, F9)
+    eps_a, C_a, _ = solve_generalized(F_a, S, s_threshold)
+    eps_b, C_b, _ = solve_generalized(F_b, S, s_threshold)
     return eps_a, C_a, eps_b, C_b
 
 

@@ -36,6 +36,12 @@ def alpha_on_points(points, molecule, scf_cfg, block: int = 100_000):
         return float(alphas[0])
     radii = np.array([a.grid_radius() for a in molecule])
     pts = np.asarray(points, dtype=float)
+    from ..kernels import alpha_mix
+
+    compiled = alpha_mix(pts, np.asarray(molecule.positions, dtype=float),
+                         size_adjustment(radii), alphas, DEFAULT_STIFFNESS)
+    if compiled is not None:
+        return compiled
     out = np.empty(len(pts))
     for lo in range(0, len(pts), block):
         w = becke_weights(pts[lo : lo + block], molecule.positions, radii)
@@ -107,9 +113,17 @@ def alpha_mixture_gradient(points, owner, coeff, molecule, alphas, block: int = 
     ``grad_r alpha = -sum_X g[k, X]``. Returns (n_atoms, 3).
     """
     n_at = len(molecule)
-    out = np.zeros((n_at, 3))
     pts = np.asarray(points, dtype=float)
     owner = np.asarray(owner)
+    from ..kernels import alpha_mixture_gradient as compiled
+
+    radii = np.array([a.grid_radius() for a in molecule])
+    fast = compiled(pts, owner, np.asarray(coeff, dtype=float),
+                    np.asarray(molecule.positions, dtype=float), size_adjustment(radii),
+                    np.asarray(alphas, dtype=float), DEFAULT_STIFFNESS)
+    if fast is not None:
+        return fast
+    out = np.zeros((n_at, 3))
     for lo in range(0, len(pts), block):
         sl = slice(lo, lo + block)
         g = alpha_point_gradient(pts[sl], molecule, alphas)  # (m, n_at, 3)

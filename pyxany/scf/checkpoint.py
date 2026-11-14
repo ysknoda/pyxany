@@ -46,14 +46,35 @@ def _digest(*arrays_or_text) -> str:
 
 
 def system_fingerprint(molecule, basis, config, unrestricted: bool) -> str:
+    """Identity of the system a checkpoint belongs to.
+
+    Hashes the alpha *values* per atom (not the repr of the setting, whose
+    mapping order and table name hid equal or different physics) and the
+    parameters of every function (NAO/GTO hashed zeta = 0, so another NAO
+    basis with the same labels passed; ADR 0012 P0).
+    """
     labels = "|".join(f"{f.atom_idx}:{f.label}:{type(f).__name__}" for f in basis)
-    exps = [getattr(f, "zeta", 0.0) for f in basis]
+    alphas = [round(float(config.scf.alpha_for(a.element if not a.is_pseudo else "H")), 12)
+              for a in molecule]
     return _digest(
         np.asarray(molecule.charges),
         f"q={molecule.charge};m={molecule.multiplicity};u={unrestricted};"
-        f"a={config.scf.alpha!r};ts={_ts_key(config)};emb={_embedding_key(config)};{labels}",
-        exps,
+        f"ts={_ts_key(config)};emb={_embedding_key(config)};{labels}",
+        np.asarray(alphas),
+        np.concatenate([_function_parameters(f) for f in basis]) if len(basis) else [],
     )
+
+
+def _function_parameters(f) -> np.ndarray:
+    """Numbers that define a basis function's radial shape."""
+    if hasattr(f, "zeta"):
+        return np.atleast_1d(np.asarray(f.zeta, dtype=float))
+    if hasattr(f, "prims"):
+        return np.round(np.asarray(f.prims, dtype=float).ravel(), 12)
+    if hasattr(f, "radial_grid"):
+        # a few samples of R(r) pin the solved orbital
+        return np.round(np.asarray(f.radial_grid, dtype=float)[::97], 10)
+    return np.zeros(1)
 
 
 def _embedding_key(config) -> str:

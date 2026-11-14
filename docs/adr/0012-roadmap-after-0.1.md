@@ -53,12 +53,12 @@ Size: S <= 1 day, M a few days, L a week or more.
 | F1 | CI: `ruff check src tests` points at the `src/` removed by ADR 0001 (E902), and the package job expects 12 data tables while 14 ship. Lint the real paths; compare the wheel against the tables in the source tree instead of a fixed count | S | -- | Done in 0.2.0a1 |
 | F2 | 68 ruff findings (ruff 0.16.6); dead code `max_occ` (`scf/driver.py`) and an unused `S @ C` product (`properties/population.py`, an n^3 matrix product per call). Pin the ruff version in the `dev` extra so a new release cannot turn CI red | S | -- | Done in 0.2.0a1 |
 | F3 | Seven configuration keys are validated but read nowhere (same class as the `checkpoint_every` HIGH of 2026-08-27): `runtime.numba`, `runtime.mpi`, `runtime.verbosity`, `passivation.scheme`, `passivation.basis`, `properties.bde`, `properties.esp`; `--numba` has no effect. Design in ADR 0013 | S | -- | Done (ADR 0013; YAML on/off booleans accepted) |
-| F4 | `--log`: input and runtime errors go to stderr only, so the log of a failed run is empty (measured: 0 bytes); every MPI rank opens the log with mode `w`. Route error messages into the log and open it on rank 0 only | S | -- | Proposed |
-| F5 | The summary figure (`<prefix>_results.png`) of a UKS run draws the alpha levels only while its HOMO/LUMO span both channels (`plotting.summary_figure`); the bonding figures were already fixed | S | -- | Proposed |
+| F4 | `--log`: input and runtime errors go to stderr only, so the log of a failed run is empty (measured: 0 bytes); every MPI rank opens the log with mode `w`. Route error messages into the log and open it on rank 0 only | S | -- | Done 2026-11-14 |
+| F5 | The summary figure (`<prefix>_results.png`) of a UKS run draws the alpha levels only while its HOMO/LUMO span both channels (`plotting.summary_figure`); the bonding figures were already fixed | S | -- | Done 2026-11-14 |
 | F6 | Documentation drift: README (SciPy floor, `embed`, transition state, embedding, `alpha_hf`, restart) -- done in 0.2.0a1; ADR 0005 still says `--set` cannot reach nested keys (fixed by ADR 0009) | S | -- | README done in 0.2.0a1; ADR 0005 note Proposed |
 | F7 | Without matplotlib, `pyxany run` failed with exit code 3 after a converged SCF: the guard imported `pyxany.plotting`, which imports matplotlib only inside its functions. Found by the wheel smoke test while preparing 0.2.0a1; the CI package job (bare wheel, `pyxany run h2o.yaml`) would have failed on it. Guard on matplotlib itself; regression test | S | -- | Done in 0.2.0a1 |
 | F8 | The SCF could report convergence without self-consistency (energy and density tests only); the N2 1s transition state stopped 65 meV off at the defaults and the slow test failed on Linux CI. Found by the first CI run. Design in ADR 0014 | S | -- | Done in 0.2.0a2 |
-| F9 | The UKS diagonalization ignores `scf.s_threshold` (`_diagonalize_uks` calls `solve_generalized` with the default 5e-4); found with F8 | S | -- | Proposed |
+| F9 | The UKS diagonalization ignores `scf.s_threshold` (`_diagonalize_uks` calls `solve_generalized` with the default 5e-4); found with F8 | S | -- | Done 2026-11-14 |
 | R0 | The code is non-relativistic, which nothing said. README statement (done in 0.2.0a1); a run-time warning, once per run, when an element with Z > 36 is present; for a core-ionization transition state an unconditional note plus, for a 1s hole, the hydrogen-like estimate of the missing correction (Zalpha)^2/4 x abs(E) (Q79) | S | -- | README done in 0.2.0a1; warnings Proposed |
 
 R0 numbers: the Dirac 1s level of a one-electron atom is
@@ -90,7 +90,18 @@ before being recorded. Gate: F10-F18 come before any A item.
 | F17 | High | (v) `passivate --reference` decides "bond present" by exact equality of displacement vectors rounded to 1e-4 (`passivation/detect.py`): with 0.001 A noise 9 of 36 terminators land on existing Si (0.85 A away) while the report says closed shell. Match by angle/length tolerance; check terminator-atom distances | Done (30 deg angular match; clash warning; neighbor lists built once) |
 | F18 | Medium->gate | (v) `--no-numba` has no effect either: the environment variable is set after `HAVE_NUMBA` is bound at import. ADR 0013's premise for `runtime.numba` needs a lazy backend choice; folded into F3 | Done with F3 (backend chosen at call time) |
 
-Medium (fix list): EDIIS ignores the energies (`scf/diis.py`; not KSC 2002);
+Medium and Low: fixed 2026-11-14 together with F4, F5 and F9 (commits after
+0253f66), each with a regression test, except the Bragg-Slater attribution
+(Low, UNCERTAIN): the values are kept (the radial-grid table was measured with
+them) and their source needs the Slater (1964) table to be checked; the
+suggestions (Mulliken spin populations, `embed` on every rank, the cube-path
+hint) are left for later. EDIIS now follows Kudin-Scuseria-Cances with the
+coefficient 1/4 that F = dE/dP requires (the paper's 1/2 is for dE/dD = 2F),
+checked against brute force on an exact quadratic model. Found on the way:
+at the default grid (n_r 30) the H2O force error is 2.2e-3 Ha/Bohr, above the
+default optimize.f_max of 1e-3 (docs/forces.md); `forces --compare` now warns.
+
+Medium (original list): EDIIS ignores the energies (`scf/diis.py`; not KSC 2002);
 UKS guess puts 2S surplus electrons and an over-occupied alpha core into P_a;
 a transition-state restart rescales the hole channel to an integer count (122
 extra iterations); the force docstring and `forces --compare` miss the

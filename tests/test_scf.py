@@ -389,3 +389,89 @@ def test_reported_bond_orders_use_the_open_shell_form_for_uks():
     assert abs(open_shell[0, 1] - closed[0, 1]) > 0.3
     reported = result_dict(r, cfg)["population"]["mayer_bond_orders"][0][1]
     assert reported == pytest.approx(open_shell[0, 1], abs=1e-12)
+
+
+def test_ediis_minimizes_the_interpolated_energy_of_a_quadratic_model():
+    """For E(P) = tr(hP) + 1/2 tr(P G P) and F = dE/dP the EDIIS model is exact,
+    so its coefficients must minimize E(sum c_i P_i) over the simplex. The old
+    version ignored the energies entirely (ADR 0012 P0)."""
+    from pyxany.scf.diis import EDIIS
+
+    rng = np.random.default_rng(1)
+    n = 4
+    h = rng.normal(size=(n, n))
+    h = h + h.T
+    M = rng.normal(size=(n * n, n * n))
+    G = M @ M.T * 0.05
+
+    def F(P):
+        return h + (G @ P.ravel()).reshape(n, n)
+
+    def E(P):
+        return float(np.sum(h * P) + 0.5 * P.ravel() @ G @ P.ravel())
+
+    Ps = [(lambda A: A + A.T)(rng.normal(size=(n, n))) for _ in range(3)]
+    ed = EDIIS()
+    for P in Ps:
+        ed.push(F(P), P, E(P))
+    c = ed.coefficients()
+    e_ediis = E(sum(w * P for w, P in zip(c, Ps, strict=True)))
+    grid = [np.array([a, b, 1 - a - b]) for a in np.linspace(0, 1, 201)
+            for b in np.linspace(0, 1, 201) if a + b <= 1 + 1e-12]
+    e_best = min(E(sum(w * P for w, P in zip(g, Ps, strict=True))) for g in grid)
+    assert e_ediis <= e_best + 1e-6
+    two = EDIIS()
+    two.push(F(Ps[0]), Ps[0], -10.0)
+    two.push(F(Ps[1]), Ps[1], 10.0)
+    c2 = two.coefficients()
+    assert c2[0] > c2[1]            # the energies matter
+
+
+def test_uks_guess_holds_the_right_electron_counts():
+    """The old split gave O2 triplet 18 electrons for 16 (2S too many)."""
+    from conftest import make_config, make_molecule
+    from pyxany.basis import build_basis
+    from pyxany.integrals.overlap import build_overlap_kinetic
+    from pyxany.scf.guess import spin_split
+
+    mol = make_molecule("o2", [("O", 0, 0, 0), ("O", 0, 0, 1.208)], multiplicity=3)
+    basis = build_basis(mol, make_config(basis={"set": "dz"}))
+    S, _ = build_overlap_kinetic(mol, basis)
+    rng = np.random.default_rng(0)
+    A = rng.normal(size=S.shape)
+    P = A @ A.T
+    P *= 16.0 / np.trace(P @ S)
+    P_a, P_b = spin_split(P, mol, basis, 9.0, 7.0)
+    assert np.trace(P_a @ S) == pytest.approx(9.0, abs=1e-9)
+    assert np.trace(P_b @ S) == pytest.approx(7.0, abs=1e-9)
+
+
+def test_smeared_frontier_straddles_the_fermi_level():
+    """A barely populated near-degenerate partner was taken as the HOMO."""
+    from types import SimpleNamespace
+
+    from pyxany.scf.driver import SCFResult
+    from pyxany.scf.occupations import fermi_occupations
+
+    eps = np.array([-1.0, -0.5, -0.2000, -0.1997, 0.3])
+    occ = fermi_occupations(eps, 6.0, 0.002, 2.0)
+    fake = SimpleNamespace(unrestricted=False)
+    homo, lumo = SCFResult._frontier(fake, eps, occ)
+    assert (homo, lumo) == (-0.2000, -0.1997)
+
+
+def test_checkpoint_fingerprint_sees_alpha_values_and_nao_shapes():
+    from conftest import make_config, make_molecule
+    from pyxany.basis import build_basis
+    from pyxany.scf.checkpoint import system_fingerprint
+
+    mol = make_molecule("w", [("O", 0, 0, 0), ("H", 0, 0.76, 0.59), ("H", 0, -0.76, 0.59)])
+    c1 = make_config(scf={"alpha": {"default": 0.7, "O": 0.74, "H": 0.97}})
+    c2 = make_config(scf={"alpha": {"H": 0.97, "O": 0.74, "default": 0.7}})
+    b = build_basis(mol, c1)
+    assert system_fingerprint(mol, b, c1, False) == system_fingerprint(mol, b, c2, False)
+    n1 = make_config(basis={"set": "nao"}, grid={"atom": {"n_points": 2000}})
+    n2 = make_config(basis={"set": "nao"}, grid={"atom": {"n_points": 1200}})
+    f1 = system_fingerprint(mol, build_basis(mol, n1), n1, False)
+    f2 = system_fingerprint(mol, build_basis(mol, n2), n2, False)
+    assert f1 != f2

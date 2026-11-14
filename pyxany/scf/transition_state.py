@@ -190,6 +190,11 @@ class HoleManager:
                 self.last = {"source": i, "eps_source": e_h, "localized": False}
                 if self.dest is not None:
                     j = self._pick(self.dest, eps, occ, C, occupied=False)
+                    if occ[j] + self.electrons > 1.0 + 1e-9:   # as in the branch below
+                        raise ConfigError(
+                            f"transition_state: orbital {j + 1} cannot take "
+                            f"{self.electrons} more electrons in one spin channel"
+                        )
                     occ[j] += self.electrons
                     self.last.update({"dest": j, "eps_dest": float(eps[j])})
                 return occ

@@ -192,3 +192,39 @@ def own_cell_weight_gradient(points, owner, coeff, centers, a, stiffness):
                                  np.ascontiguousarray(centers, dtype=float),
                                  np.ascontiguousarray(a), int(stiffness), out)
     return out
+
+
+def alpha_mix(points, centers, a, alphas, stiffness):
+    """Compiled Becke-weighted alpha(r), or None for the numpy path."""
+    import numpy as np
+
+    mod = _numba()
+    if mod is None:
+        return None
+    R = np.linalg.norm(centers[:, None, :] - centers[None, :, :], axis=2)
+    np.fill_diagonal(R, 1.0)
+    out = np.empty(len(points))
+    mod.alpha_mix(np.ascontiguousarray(points, dtype=float),
+                  np.ascontiguousarray(centers, dtype=float), np.ascontiguousarray(a),
+                  1.0 / R, np.ascontiguousarray(alphas, dtype=float), int(stiffness), out)
+    return out
+
+
+def alpha_mixture_gradient(points, owner, coeff, centers, a, alphas, stiffness):
+    """Compiled alpha-mixture force term (n_atoms, 3), or None for the numpy path."""
+    import numpy as np
+
+    mod = _numba()
+    if mod is None:
+        return None
+    owner = np.asarray(owner, np.int64)
+    n_at = len(centers)
+    order = np.argsort(owner, kind="stable").astype(np.int64)
+    starts = np.searchsorted(owner[order], np.arange(n_at + 1)).astype(np.int64)
+    out = np.zeros((n_at, n_at, 3))
+    mod.alpha_mixture_gradient(np.ascontiguousarray(points, dtype=float), order, starts,
+                               np.ascontiguousarray(coeff, dtype=float),
+                               np.ascontiguousarray(centers, dtype=float),
+                               np.ascontiguousarray(a), np.ascontiguousarray(alphas, dtype=float),
+                               int(stiffness), out)
+    return out.sum(axis=0)

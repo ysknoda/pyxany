@@ -32,46 +32,44 @@ pyxany forces molecule.yaml --compare      # both, side by side
 
 ## Accuracy, measured
 
-The analytic expressions are the exact gradient of the *continuum* energy
-functional. The computed energy is a quadrature of it on a grid whose points and
-Becke weights both move with the nuclei, contributing
+The computed energy is a quadrature on a grid whose points and Becke weights
+move with the nuclei. The analytic forces include that motion (the
+grid-derivative term `Σ_k [dw_k/dR_B · G(r_k) + w_k ∇G(r_k)·dr_k/dR_B]`,
+`G = ρ(v_nuc + V_H/2 + ε_xc)`) and the S/T Pulay terms of the matrices the SCF
+uses, so they are the derivative of the computed energy. Two different errors
+therefore have to be kept apart:
 
-```
-Σ_k [ dw_k/dR_B · G(r_k) + w_k · ∇G(r_k)·dr_k/dR_B ],   G = ρ(v_nuc + V_H/2 + ε_xc)
-```
+1. **Implementation**: analytic against central finite differences of the same
+   energy on the same grid. H₂O (DZ, n_r 30 / n_a 12): max 1.3e-4 Ha/Bohr; NH₂
+   (UKS, element-specific α, three point charges, Lebedev, pruning) 2.7e-4 at
+   (30, 12) and 4.7e-5 at (45, 18). This is set by the FD step and the SCF
+   tolerance, not by the grid.
+2. **Grid**: the forces of one grid against a much finer one. This is what an
+   optimization's `f_max` must be compared with, and it is dominated by the
+   **radial** quadrature.
 
-For an exact quadrature this vanishes; what is left is the derivative of the
-quadrature error, and it falls as the grid is refined. Its rigid-translation
-component is removed exactly (`forces.project_translation`, on by default), which
-restores `Σ_A F_A = 0` to machine precision.
+H₂O (DZ) against n_r 80 / n_a 26 (max |F| there 2.3e-2 Ha/Bohr; measured 2026-11-14):
 
-Measured against finite differences:
-
-**H₂ at 0.90 Å** (max |F| ≈ 5.3e-2 Ha/Bohr)
-
-| grid | l_max | max \|analytic − FD\| |
+| grid (n_r, n_a) | \|ΔE\| (Ha) | max \|ΔF\| (Ha/Bohr) |
 |---|---|---|
-| 30 × 12 | 4 | 3.9e-4 |
-| 40 × 14 | 4 | 2.3e-4 |
-| 50 × 16 | 6 | 5.6e-5 |
-| 60 × 18 | 6 | 2.0e-5 |
+| 30, 12 (default) | 2.0e-3 | 2.2e-3 |
+| 45, 12 | 3.4e-4 | 1.7e-4 |
+| 60, 12 | 8.7e-5 | 2.3e-5 |
+| 30, 18 | 2.0e-3 | 2.1e-3 |
 
-**H₂O near equilibrium** (max |F| ≈ 3.5e-2 Ha/Bohr)
+More angular points change nothing; more radial points do. At the default grid
+the force error (2e-3) exceeds the default `optimize.f_max` (1e-3).
+`pyxany forces --compare` prints both numbers: the FD difference and a grid
+error estimate from n_r + 15, with a warning when `f_max` is below the latter.
 
-| grid | l_max | \|Σ F\| unprojected | \|Σ F\| projected | max \|analytic − FD\| |
-|---|---|---|---|---|
-| 25 × 10 | 4 | 1.9e-2 | 4.9e-18 | 6.6e-3 |
-| 30 × 12 | 6 | 7.8e-3 | 2.5e-29 | 3.5e-3 |
-
-A symmetric diatomic is a special case: the grid-derivative contributions cancel
-by symmetry, which is why H₂ is one to two orders of magnitude more accurate
-than a polyatomic at the same grid. **Do not calibrate expectations on H₂.**
+The translational sum rule `Σ_A F_A = 0` holds after
+`forces.project_translation` (on by default); it is necessary, not sufficient.
 
 ### Choosing
 
-- **Geometry optimization**: analytic forces, with `grid.n_r ≥ 40` and
-  `grid.n_a ≥ 14`. Do not set `optimize.f_max` tighter than the force error at
-  your grid — check it once with `pyxany forces --compare`.
+- **Geometry optimization**: analytic forces with `grid.n_r ≥ 45`. Do not set
+  `optimize.f_max` tighter than the grid error estimate that
+  `pyxany forces --compare` prints for your system.
 - **Publication-quality gradients on a small system**: `forces.method:
   finite_difference`.
 - **Screening or a first relaxation**: analytic at the default grid is fine.
