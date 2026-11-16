@@ -89,7 +89,11 @@ def test_unit_charge_pseudo_hydrogen_is_exactly_hydrogen_in_every_basis(basis_se
             atoms.append(a)
         mol = Molecule(atoms, name="sih4")
         energies.append(run_scf(mol, build_basis(mol, cfg), cfg, verbose=0).total_energy)
-    assert energies[1] == pytest.approx(energies[0], abs=1e-12)
+    # 1e-9 Ha is 3e-12 relative on -289 Ha: the arithmetic is the same, but
+    # threaded reductions round differently from run to run, and 1e-12 failed
+    # once on CI at exactly 1.0e-12 (run 43871392697). The defect this guards
+    # against moved the inner Si charge by 0.4 e.
+    assert energies[1] == pytest.approx(energies[0], abs=1e-9)
 
 
 def test_fractional_terminator_scales_every_hydrogen_function_by_one_ratio():
