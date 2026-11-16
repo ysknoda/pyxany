@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.2.0a3 (2026-11-14)
+## 0.2.0a4 (2026-11-16)
+
+Same package code as the v0.2.0a3 tag, which was not released: its CI failed
+in the four numpy-only jobs because `test_runtime_numba_and_cli_flags_choose_the_backend`
+asked for numba where it is not installed (the code correctly refused). The
+test now exercises both installations. The entries below were tagged as
+0.2.0a3.
+
+## 0.2.0a3 (2026-11-14, tagged, not released)
 
 Findings of the P0 re-review (ADR 0012): one Critical (NAO basis), nine High,
 the Medium/Low list and the reviewers' suggestions, each with a regression
